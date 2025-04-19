@@ -1,0 +1,569 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { ArrowUpRight, Bell, CreditCard, DollarSign, Home, LogOut, Menu, Send, User, FileText } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+// Transaction interface
+interface Transaction {
+  id: string
+  description: string
+  amount: number
+  date: string
+  type:
+    | "deposit"
+    | "withdrawal"
+    | "transfer"
+    | "payment"
+    | "fee"
+    | "interest"
+    | "crypto_buy"
+    | "crypto_sell"
+  status: "completed" | "pending" | "failed"
+  accountType?: "checking" | "savings" | "crypto"
+  category?: string
+  cryptoAmount?: number
+  cryptoPrice?: number
+}
+
+// UserData interface
+interface UserData {
+  fullName: string
+  checkingBalance: number
+  savingsBalance: number
+  cryptoBalance: number
+  email: string
+}
+
+// Contact interface
+interface Contact {
+  id: string
+  name: string
+  email: string
+  phone: string
+  initials: string
+}
+
+export default function DashboardPage() {
+  const router = useRouter()
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [userData, setUserData] = useState<UserData | null>(null)
+  const [cryptoValue, setCryptoValue] = useState<number>(0)
+  const [btcPrice, setBtcPrice] = useState<number>(44256.32)
+  const [error, setError] = useState<string | null>(null)
+  const [recentContacts, setRecentContacts] = useState<Contact[]>([])
+
+  // Fetch user data and transactions on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        router.push("/login")
+        return
+      }
+
+      try {
+        // Fetch user data
+        const userResponse = await fetch("/api/user", {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!userResponse.ok) {
+          throw new Error("Failed to fetch user data")
+        }
+        const userData = await userResponse.json()
+        setUserData({
+          fullName: userData.fullName || "",
+          checkingBalance: userData.balance || 0,
+          savingsBalance: userData.savingsBalance || 0,
+          cryptoBalance: userData.cryptoBalance || 0,
+          email: userData.email || "",
+        })
+
+        // Fetch transactions
+        const transactionsResponse = await fetch("/api/transactions", {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!transactionsResponse.ok) {
+          const errorData = await transactionsResponse.json()
+          setError(errorData.error || "Failed to fetch transactions")
+          setTransactions([])
+        } else {
+          const transactionsData = await transactionsResponse.json()
+          const mappedTransactions = (transactionsData.transactions || []).map((tx: any) => ({
+            ...tx,
+            id: tx._id.toString(),
+          }))
+          setTransactions(mappedTransactions)
+        }
+
+        // Load recent Zelle contacts from localStorage
+        const storedContacts = localStorage.getItem("recentZelleContacts")
+        const contacts = storedContacts ? JSON.parse(storedContacts) : []
+        setRecentContacts(contacts)
+      } catch (error) {
+        console.error("Error fetching data:", error)
+        setError("An error occurred while loading your dashboard")
+      }
+    }
+
+    fetchData()
+  }, [router]) // Only runs when router changes (effectively once on mount)
+
+  // Update crypto value when userData or btcPrice changes
+  useEffect(() => {
+    if (userData) {
+      setCryptoValue(userData.cryptoBalance * btcPrice)
+    }
+  }, [userData, btcPrice])
+
+  // Simulate BTC price updates every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const priceDelta = Math.random() * 400 - 200
+      const newPrice = btcPrice + priceDelta
+      setBtcPrice(newPrice)
+    }, 30000) // Update every 30 seconds
+
+    return () => clearInterval(interval) // Cleanup on unmount
+  }, []) // Empty dependency array = runs once on mount
+
+  const handleLogout = () => {
+    localStorage.removeItem("token")
+    router.push("/login")
+  }
+
+  return (
+    <div className="flex min-h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Mobile Navigation */}
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="md:hidden fixed top-4 left-4 z-40 bg-white shadow-md border-slate-200"
+          >
+            <Menu className="h-5 w-5 text-indigo-600" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="p-0">
+          <div className="flex h-full flex-col bg-gradient-to-br from-indigo-800 to-purple-900 text-white">
+            <div className="p-4 border-b border-indigo-700 bg-gradient-to-r from-indigo-900 to-purple-950">
+              <div className="flex items-center gap-2">
+                <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+              </div>
+            </div>
+            <nav className="flex-1 overflow-auto py-2">
+              <div className="px-3 py-2">
+                <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-indigo-200">Main</h2>
+                <div className="space-y-1">
+                  <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                    <Link href="/dashboard">
+                      <Home className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                    <Link href="/dashboard/accounts">
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Accounts
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                    <Link href="/dashboard/transactions">
+                      <FileText className="mr-2 h-4 w-4" />
+                      Transactions
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                    <Link href="/dashboard/transfers">
+                      <Send className="mr-2 h-4 w-4" />
+                      Transfers
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                    <Link href="/dashboard/crypto">
+                      <ArrowUpRight className="mr-2 h-4 w-4" />
+                      Crypto
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+              <div className="px-3 py-2">
+                <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-indigo-200">Settings</h2>
+                <div className="space-y-1">
+                  <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                    <Link href="/dashboard/profile">
+                      <User className="mr-2 h-4 w-4" />
+                      Profile
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </Button>
+                </div>
+              </div>
+            </nav>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Desktop Sidebar */}
+      <div className="hidden md:flex border-r bg-gradient-to-br from-indigo-800 to-purple-900 text-white w-64 flex-col fixed inset-y-0">
+        <div className="p-4 border-b border-indigo-700 bg-gradient-to-r from-indigo-900 to-purple-950">
+          <div className="flex items-center gap-2">
+            <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+          </div>
+        </div>
+        <nav className="flex-1 overflow-auto py-4">
+          <div className="px-3 py-2">
+            <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-indigo-200">Main</h2>
+            <div className="space-y-1">
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                <Link href="/dashboard">
+                  <Home className="mr-2 h-4 w-4" />
+                  Dashboard
+                </Link>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                <Link href="/dashboard/accounts">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Accounts
+                </Link>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                <Link href="/dashboard/transactions">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Transactions
+                </Link>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                <Link href="/dashboard/transfers">
+                  <Send className="mr-2 h-4 w-4" />
+                  Transfers
+                </Link>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                <Link href="/dashboard/crypto">
+                  <ArrowUpRight className="mr-2 h-4 w-4" />
+                  Crypto
+                </Link>
+              </Button>
+            </div>
+          </div>
+          <div className="px-3 py-2">
+            <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-indigo-200">Settings</h2>
+            <div className="space-y-1">
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                <Link href="/dashboard/profile">
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Link>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            </div>
+          </div>
+        </nav>
+
+      </div>
+
+      {/* Main Content */}
+      <div className="md:pl-64 flex-1">
+        <header className="bg-white border-b border-indigo-100 h-16 sticky top-0 z-30 flex items-center shadow-sm">
+          <div className="flex-1 px-6">
+            <h1 className="text-xl font-bold md:hidden bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-purple-700">
+              Dashboard
+            </h1>
+          </div>
+          <div className="flex items-center gap-4 px-6">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="h-5 w-5 text-slate-600" />
+                  <Badge className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-gradient-to-r from-indigo-600 to-purple-600">
+                    3
+                  </Badge>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <div className="max-h-80 overflow-auto">
+                  <DropdownMenuItem className="p-3 cursor-pointer hover:bg-slate-50">
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium">Security Alert</span>
+                      <span className="text-sm text-muted-foreground">Your password was changed successfully.</span>
+                      <span className="text-xs text-muted-foreground">10 minutes ago</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="p-3 cursor-pointer hover:bg-slate-50">
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium">Money Received</span>
+                      <span className="text-sm text-muted-foreground">You received $125.00 from John Doe.</span>
+                      <span className="text-xs text-muted-foreground">2 hours ago</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="p-3 cursor-pointer hover:bg-slate-50">
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium">New Feature</span>
+                      <span className="text-sm text-muted-foreground">Check out our new crypto wallet feature!</span>
+                      <span className="text-xs text-muted-foreground">1 day ago</span>
+                    </div>
+                  </DropdownMenuItem>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="justify-center" asChild>
+                  <Link href="/dashboard/notifications">View All Notifications</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8 border-2 border-indigo-100">
+                    <AvatarImage src="/placeholder.svg?height=32&width=32" alt="@user" />
+                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+                      {userData?.fullName?.charAt(0) || "JD"}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  <span>Accounts</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </header>
+        <main className="p-6">
+          <h1 className="text-2xl font-bold mb-6 hidden md:block bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+            Dashboard
+          </h1>
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-md">
+              {error}
+            </div>
+          )}
+
+          {/* Account Cards */}
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+            <div className="relative group h-full">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-300"></div>
+              <Card className="relative bg-white border-0 shadow-lg h-full flex flex-col">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-indigo-600">Checking Account</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  <div className="text-2xl font-bold">${(userData?.checkingBalance || 0).toFixed(2)}</div>
+                  <p className="text-xs text-slate-500">Account #: xxxx-xxxx-4582</p>
+                </CardContent>
+                <div className="p-4 pt-0 mt-auto">
+                  <div className="flex space-x-2">
+                    <Button
+                      size="sm"
+                      className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all"
+                      asChild
+                    >
+                      <Link href="/dashboard/transfers">Send Money</Link>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                      asChild
+                    >
+                      <Link href="/dashboard/accounts">Details</Link>
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            <div className="relative group h-full">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-300"></div>
+              <Card className="relative bg-white border-0 shadow-lg h-full flex flex-col">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-amber-600">Bitcoin Wallet</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  <div className="text-2xl font-bold">{(userData?.cryptoBalance || 0).toFixed(6)} BTC</div>
+                  <p className="text-xs text-slate-500">
+                    ≈ ${(cryptoValue || 0).toFixed(2)} (${btcPrice.toFixed(2)}/BTC)
+                  </p>
+                </CardContent>
+                <div className="p-4 pt-0 mt-auto">
+                  <div className="flex space-x-2">
+                    <Button
+                      size="sm"
+                      className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md hover:shadow-lg transition-all"
+                      asChild
+                    >
+                      <Link href="/dashboard/crypto">Buy/Sell</Link>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-amber-200 text-amber-600 hover:bg-amber-50"
+                      asChild
+                    >
+                      <Link href="/dashboard/crypto">Details</Link>
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            <div className="relative group h-full">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-300"></div>
+              <Card className="relative bg-white border-0 shadow-lg h-full flex flex-col">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-emerald-600">Quick Transfer</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  {recentContacts.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {recentContacts.slice(0, 3).map((contact) => (
+                        <Button
+                          key={contact.id}
+                          variant="outline"
+                          className="flex flex-col items-center p-3 h-auto border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+                          asChild
+                        >
+                          <Link href={`/dashboard/transfers?type=zelle&contactId=${contact.id}`}>
+                            <Avatar className="h-8 w-8 mb-1 border-2 border-emerald-100">
+                              <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white">
+                                {contact.initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-xs">{contact.name}</span>
+                          </Link>
+                        </Button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center text-slate-500 flex-1 flex items-center justify-center">
+                      No recent recipients
+                    </div>
+                  )}
+                </CardContent>
+                <div className="p-4 pt-0 mt-auto">
+                  <Button
+                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-md hover:shadow-lg transition-all"
+                    asChild
+                  >
+                    <Link href="/dashboard/transfers?type=zelle">Zelle Transfer</Link>
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          {/* Recent Transactions */}
+          <h2 className="text-xl font-bold mb-4 text-slate-800">Recent Transactions</h2>
+          <div className="relative">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20"></div>
+            <Card className="relative border-0 shadow-lg">
+              <CardContent className="p-0">
+                <div className="divide-y divide-slate-100">
+                  {transactions.slice(0, 5).map((transaction) => (
+                    <div
+                      key={transaction.id}
+                      className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                            transaction.type === "deposit" || transaction.type === "interest"
+                              ? "bg-gradient-to-br from-emerald-500 to-teal-500"
+                              : transaction.type === "withdrawal" ||
+                                transaction.type === "payment" ||
+                                transaction.type === "fee"
+                                ? "bg-gradient-to-br from-red-500 to-pink-500"
+                                : transaction.type === "transfer"
+                                  ? "bg-gradient-to-br from-blue-500 to-indigo-500"
+                                  : "bg-gradient-to-br from-amber-500 to-orange-500" // For crypto_buy, crypto_sell
+                          }`}
+                        >
+                          {transaction.type === "deposit" || transaction.type === "interest" ? (
+                            <DollarSign className="h-5 w-5 text-white" />
+                          ) : transaction.type === "withdrawal" ||
+                            transaction.type === "payment" ||
+                            transaction.type === "fee" ? (
+                            <CreditCard className="h-5 w-5 text-white" />
+                          ) : transaction.type === "transfer" ? (
+                            <Send className="h-5 w-5 text-white" />
+                          ) : (
+                            <ArrowUpRight className="h-5 w-5 text-white" /> // For crypto transactions
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium">{transaction.description}</div>
+                          <div className="text-sm text-slate-500">
+                            {new Date(transaction.date).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        className={`font-bold ${
+                          transaction.amount > 0 ? "text-emerald-600" : "text-red-600"
+                        }`}
+                      >
+                        {transaction.amount > 0 ? "+" : ""}
+                        {transaction.amount.toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
+                  {transactions.length === 0 && (
+                    <div className="p-4 text-center text-slate-500">
+                      {error ? "Unable to load transactions" : "No recent transactions found."}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="flex justify-center mt-4">
+            <Button
+              variant="outline"
+              className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300"
+              asChild
+            >
+              <Link href="/dashboard/transactions">View All Transactions</Link>
+            </Button>
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,771 @@
+// app/admin/dashboard/page.tsx
+"use client"
+
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { BarChart3, CreditCard, Home, LogOut, Menu, Plus, Search, Settings, Users, Loader } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+
+// Interface for User (unchanged from Code-01)
+interface User {
+  id: string
+  name: string
+  username: string
+  email: string
+  accountNumber: string
+  balance: number
+  status: "pending" | "active" | "suspended"
+  twoFactorEnabled: boolean
+  lastLogin: string
+}
+
+// Interface for Transaction (unchanged from Code-01)
+interface Transaction {
+  id: string
+  userId: string
+  type: "deposit" | "withdrawal" | "transfer" | "adjustment"
+  amount: number
+  description: string
+  date: string
+  status: "completed" | "pending" | "failed"
+}
+
+// Interface for PendingUser (imported from Code-02)
+interface PendingUser {
+  _id: string
+  fullName: string
+  username: string
+  email: string
+  phone: string
+  ssn: string
+  streetAddress: string
+  city: string
+  state: string
+  zipCode: string
+}
+
+export default function AdminDashboardPage() {
+  const router = useRouter()
+
+  // States from Code-01, with additions from Code-02 for backend integration
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true)
+  const [users, setUsers] = useState<User[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([])
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    pendingApprovals: 0,
+    totalBalance: 0,
+    transactionsToday: 0,
+  })
+  const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
+  const [newTransaction, setNewTransaction] = useState({
+    userId: "",
+    type: "deposit",
+    amount: "",
+    description: "", // Note: Code-01 uses 'description', Code-02 uses 'memo'. Assuming API expects 'description'.
+  })
+  const [isPendingApprovalsOpen, setIsPendingApprovalsOpen] = useState(false)
+  const [transactionError, setTransactionError] = useState<string | null>(null)
+
+  // Authentication check and data fetching (from Code-02)
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/admin/check-auth", {
+          method: "GET",
+          credentials: "include",
+        })
+
+        if (!response.ok) {
+          router.push("/admin/login")
+          return
+        }
+
+        setIsAuthenticated(true)
+
+        const fetchData = async () => {
+          try {
+            const usersRes = await fetch("/api/admin/users")
+            const usersData = await usersRes.json()
+            setUsers(usersData.users || [])
+
+            const transactionsRes = await fetch("/api/admin/transactions")
+            const transactionsData = await transactionsRes.json()
+            setTransactions(transactionsData.transactions || [])
+
+            const pendingRes = await fetch("/api/admin/pending-users")
+            const pendingData = await pendingRes.json()
+            if (!pendingRes.ok) throw new Error(pendingData.error || "Failed to fetch pending users")
+            setPendingUsers(pendingData.pendingUsers || [])
+
+            setStats({
+              totalUsers: usersData.users?.length || 0,
+              pendingApprovals: pendingData.pendingUsers?.length || 0,
+              totalBalance: usersData.users?.reduce((sum: number, user: User) => sum + user.balance, 0) || 0,
+              transactionsToday: transactionsData.transactions?.filter((txn: Transaction) =>
+                new Date(txn.date).toDateString() === new Date().toDateString()
+              ).length || 0,
+            })
+          } catch (error) {
+            console.error("Error fetching dashboard data:", error)
+          }
+        }
+
+        await fetchData()
+      } catch (error) {
+        console.error("Auth check error:", error)
+        router.push("/admin/login")
+      } finally {
+        setIsLoadingAuth(false)
+      }
+    }
+
+    checkAuth()
+  }, [router])
+
+  // Handle adding a new transaction with API call (from Code-02)
+  const handleAddTransaction = async () => {
+    if (!newTransaction.userId || !newTransaction.amount || !newTransaction.description) {
+      setTransactionError("Please fill in all required fields")
+      return
+    }
+
+    const amount = parseFloat(newTransaction.amount)
+    if (isNaN(amount) || amount === 0) {
+      setTransactionError("Please enter a valid non-zero amount")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/admin/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          userId: newTransaction.userId,
+          type: newTransaction.type,
+          amount: newTransaction.amount,
+          description: newTransaction.description, // Using 'description' to match Code-01's field name
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to process transaction")
+      }
+
+      const { transaction, newBalance } = result
+
+      // Update local state
+      const updatedUsers = users.map((user) =>
+        user.id === newTransaction.userId ? { ...user, balance: newBalance } : user
+      )
+      setUsers(updatedUsers)
+      setTransactions((prev) => [transaction, ...prev])
+      setStats((prev) => ({
+        ...prev,
+        totalBalance: updatedUsers.reduce((sum, user) => sum + user.balance, 0),
+        transactionsToday: prev.transactionsToday + 1,
+      }))
+
+      setNewTransaction({ userId: "", type: "deposit", amount: "", description: "" })
+      setTransactionError(null)
+      setIsAddTransactionOpen(false)
+    } catch (error: any) {
+      console.error("Error adding transaction:", error)
+      setTransactionError(error.message || "Failed to process transaction")
+    }
+  }
+
+  // Handle approving a pending user with API call (from Code-02)
+  const handleApproveUser = async (pendingUserId: string) => {
+    try {
+      const response = await fetch("/api/admin/approve-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pendingUserId }),
+      })
+
+      const data = await response.json()
+      if (response.ok) {
+        setPendingUsers((prev) => prev.filter((user) => user._id !== pendingUserId))
+        const approvedUser = pendingUsers.find((u) => u._id === pendingUserId)
+        if (approvedUser) {
+          const newUser: User = {
+            id: pendingUserId,
+            name: approvedUser.fullName,
+            username: approvedUser.username || "N/A",
+            email: approvedUser.email,
+            accountNumber: "N/A",
+            balance: 0,
+            status: "active",
+            twoFactorEnabled: false,
+            lastLogin: "N/A",
+          }
+          setUsers((prev) => [...prev, newUser])
+          setStats((prev) => ({
+            ...prev,
+            pendingApprovals: prev.pendingApprovals - 1,
+            totalUsers: prev.totalUsers + 1,
+            totalBalance: prev.totalBalance + newUser.balance,
+          }))
+        }
+      } else {
+        console.error("Approval failed:", data.error)
+      }
+    } catch (error) {
+      console.error("Error approving user:", error)
+    }
+  }
+
+  // Handle logout with API call (from Code-02)
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/admin/logout", {
+        method: "POST",
+        credentials: "include",
+      })
+      router.push("/admin/login")
+    } catch (error) {
+      console.error("Logout error:", error)
+      router.push("/admin/login")
+    }
+  }
+
+  // Render loading state or redirect if not authenticated (from Code-02)
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null // The router will redirect to login
+  }
+
+  // Original UI from Code-01, unchanged except for data source and event handlers
+  return (
+    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
+      <div className="hidden md:flex border-r bg-gradient-to-br from-indigo-800 to-purple-900 text-white w-64 flex-col fixed inset-y-0">
+        <div className="p-4 border-b border-indigo-700 bg-gradient-to-r from-indigo-900 to-purple-950">
+          <div className="flex items-center gap-2">
+            <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+            <Badge variant="secondary">Admin</Badge>
+          </div>
+        </div>
+        <nav className="flex-1 overflow-auto py-4">
+          <div className="px-3 py-2">
+            <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-indigo-200">Dashboard</h2>
+            <div className="space-y-1">
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                <Link href="/admin/dashboard"><Home className="mr-2 h-4 w-4" />Overview</Link>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                <Link href="/admin/users"><Users className="mr-2 h-4 w-4" />Users</Link>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                <Link href="/admin/transactions"><CreditCard className="mr-2 h-4 w-4" />Transactions</Link>
+              </Button>
+            </div>
+          </div>
+          <div className="px-3 py-2">
+            <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-indigo-200">Settings</h2>
+            <div className="space-y-1">
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                <Link href="/admin/settings"><Settings className="mr-2 h-4 w-4" />Site Settings</Link>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />Logout
+              </Button>
+            </div>
+          </div>
+        </nav>
+      </div>
+
+      <div className="flex-1 md:pl-64">
+        <header className="bg-white border-b border-indigo-100 h-16 sticky top-0 z-30 flex items-center px-4">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" className="md:hidden">
+                <Menu className="h-5 w-5 text-indigo-600" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0">
+              <div className="flex h-full flex-col bg-gradient-to-br from-indigo-800 to-purple-900 text-white">
+                <div className="p-4 border-b border-indigo-700 bg-gradient-to-r from-indigo-900 to-purple-950">
+                  <div className="flex items-center gap-2">
+                    <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+                    <Badge variant="secondary">Admin</Badge>
+                  </div>
+                </div>
+                <nav className="flex-1 overflow-auto py-2">
+                  <div className="px-3 py-2">
+                    <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-indigo-200">Dashboard</h2>
+                    <div className="space-y-1">
+                      <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                        <Link href="/admin/dashboard"><Home className="mr-2 h-4 w-4" />Overview</Link>
+                      </Button>
+                      <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                        <Link href="/admin/users"><Users className="mr-2 h-4 w-4" />Users</Link>
+                      </Button>
+                      <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                        <Link href="/admin/transactions"><CreditCard className="mr-2 h-4 w-4" />Transactions</Link>
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="px-3 py-2">
+                    <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-indigo-200">Settings</h2>
+                    <div className="space-y-1">
+                      <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                        <Link href="/admin/settings"><Settings className="mr-2 h-4 w-4" />Site Settings</Link>
+                      </Button>
+                      <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" onClick={handleLogout}>
+                        <LogOut className="mr-2 h-4 w-4" />Logout
+                      </Button>
+                    </div>
+                  </div>
+                </nav>
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          <div className="flex-1 flex items-center justify-between md:justify-start gap-4">
+            <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+              Admin Dashboard
+            </h1>
+            <form className="hidden md:flex items-center relative w-full max-w-xs">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input type="search" placeholder="Search..." className="w-full pl-8" />
+            </form>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8 border-2 border-indigo-100">
+                    <AvatarImage src="/placeholder.svg?height=32&width=32" alt="@admin" />
+                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+                      AD
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Admin Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Link href="/admin/profile" className="flex w-full">Profile</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Link href="/admin/settings" className="flex w-full">Settings</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </header>
+
+        <main className="p-4 sm:p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+            <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-indigo-800">Total Users</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl sm:text-2xl font-bold text-indigo-900">{stats.totalUsers}</div>
+                <p className="text-xs text-indigo-700">{stats.pendingApprovals} pending approval</p>
+              </CardContent>
+            </Card>
+            <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-indigo-800">Total Balance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl sm:text-2xl font-bold text-indigo-900">${stats.totalBalance.toFixed(2)}</div>
+                <p className="text-xs text-indigo-700">Across all accounts</p>
+              </CardContent>
+            </Card>
+            <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-indigo-800">Transactions Today</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl sm:text-2xl font-bold text-indigo-900">{stats.transactionsToday}</div>
+                <p className="text-xs text-indigo-700">{new Date().toLocaleDateString()}</p>
+              </CardContent>
+            </Card>
+            <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-indigo-800">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2">
+                <Button
+                  variant="outline"
+                  className="w-full bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  onClick={() => setIsAddTransactionOpen(true)}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />Add Transaction
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  onClick={() => setIsPendingApprovalsOpen(true)}
+                >
+                  Approvals
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          <h2 className="text-lg sm:text-xl font-bold mb-4 bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+            Account Overview
+          </h2>
+          <Card className="mb-6 sm:mb-8 backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-indigo-50/50">
+                      <th className="text-left p-2 sm:p-4 text-indigo-800">User</th>
+                      <th className="text-left p-2 sm:p-4 text-indigo-800 hidden md:table-cell">Account #</th>
+                      <th className="text-right p-2 sm:p-4 text-indigo-800">Balance</th>
+                      <th className="text-center p-2 sm:p-4 text-indigo-800 hidden sm:table-cell">Status</th>
+                      <th className="text-left p-2 sm:p-4 text-indigo-800 hidden lg:table-cell">Last Login</th>
+                      <th className="text-center p-2 sm:p-4 text-indigo-800 hidden md:table-cell">2FA</th>
+                      <th className="text-center p-2 sm:p-4 text-indigo-800">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-indigo-100">
+                    {users.map((user) => (
+                      <tr key={user.id} className="hover:bg-indigo-50/50 transition-colors">
+                        <td className="p-2 sm:p-4">
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <Avatar className="h-6 w-6 sm:h-8 sm:w-8 border-2 border-indigo-100">
+                              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+                                {user.name.split(" ").map((n) => n[0]).join("")}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium text-sm text-indigo-900">{user.name}</div>
+                              <div className="text-xs text-indigo-600 hidden sm:block">{user.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-2 sm:p-4 font-mono text-xs hidden md:table-cell text-indigo-700">
+                          {user.accountNumber}
+                        </td>
+                        <td className="p-2 sm:p-4 text-right font-medium text-sm text-indigo-900">${user.balance.toFixed(2)}</td>
+                        <td className="p-2 sm:p-4 text-center hidden sm:table-cell">
+                          <Badge
+                            variant={user.status === "active" ? "default" : user.status === "pending" ? "secondary" : "destructive"}
+                            className={
+                              user.status === "active"
+                                ? "bg-green-100 text-green-800 border-green-200 hover:bg-green-200"
+                                : user.status === "pending"
+                                ? "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
+                                : "bg-red-100 text-red-800 border-red-200 hover:bg-red-200"
+                            }
+                          >
+                            {user.status}
+                          </Badge>
+                        </td>
+                        <td className="p-2 sm:p-4 text-xs hidden lg:table-cell text-indigo-700">{user.lastLogin}</td>
+                        <td className="p-2 sm:p-4 text-center hidden md:table-cell">
+                          {user.twoFactorEnabled ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
+                              Enabled
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                              Disabled
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="p-2 sm:p-4 text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50"
+                            asChild
+                          >
+                            <Link href={`/admin/users/${user.id}`}>Manage</Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <h2 className="text-lg sm:text-xl font-bold mb-4 bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+            Recent Transactions
+          </h2>
+          <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-indigo-50/50">
+                      <th className="text-left p-2 sm:p-4 text-indigo-800">ID</th>
+                      <th className="text-left p-2 sm:p-4 text-indigo-800">User</th>
+                      <th className="text-left p-2 sm:p-4 text-indigo-800 hidden md:table-cell">Type</th>
+                      <th className="text-right p-2 sm:p-4 text-indigo-800">Amount</th>
+                      <th className="text-left p-2 sm:p-4 text-indigo-800 hidden lg:table-cell">Description</th>
+                      <th className="text-left p-2 sm:p-4 text-indigo-800 hidden md:table-cell">Date</th>
+                      <th className="text-center p-2 sm:p-4 text-indigo-800 hidden sm:table-cell">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-indigo-100">
+                    {transactions.slice(0, 5).map((transaction) => {
+                      const user = users.find((user) => user.id === transaction.userId)
+                      return (
+                        <tr key={transaction.id} className="hover:bg-indigo-50/50 transition-colors">
+                          <td className="p-2 sm:p-4 font-mono text-xs text-indigo-700">{transaction.id}</td>
+                          <td className="p-2 sm:p-4 text-sm text-indigo-900">{user?.name || "Unknown User"}</td>
+                          <td className="p-2 sm:p-4 capitalize hidden md:table-cell text-indigo-900">{transaction.type}</td>
+                          <td
+                            className={`p-2 sm:p-4 text-right font-medium text-sm ${
+                              transaction.amount > 0 ? "text-green-600" : "text-red-600"
+                            }`}
+                          >
+                            {transaction.amount > 0 ? "+" : ""}${transaction.amount.toFixed(2)}
+                          </td>
+                          <td className="p-2 sm:p-4 text-sm hidden lg:table-cell text-indigo-900">{transaction.description}</td>
+                          <td className="p-2 sm:p-4 text-xs hidden md:table-cell text-indigo-700">{transaction.date}</td>
+                          <td className="p-2 sm:p-4 text-center hidden sm:table-cell">
+                            <Badge
+                              variant={
+                                transaction.status === "completed"
+                                  ? "default"
+                                  : transaction.status === "pending"
+                                  ? "secondary"
+                                  : "destructive"
+                              }
+                              className={
+                                transaction.status === "completed"
+                                  ? "bg-green-100 text-green-800 border-green-200 hover:bg-green-200"
+                                  : transaction.status === "pending"
+                                  ? "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
+                                  : "bg-red-100 text-red-800 border-red-200 hover:bg-red-200"
+                              }
+                            >
+                              {transaction.status}
+                            </Badge>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="p-4 border-t">
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  asChild
+                >
+                  <Link href="/admin/transactions">View All Transactions</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+
+      <Dialog open={isAddTransactionOpen} onOpenChange={setIsAddTransactionOpen}>
+        <DialogContent className="max-w-[90vw] sm:max-w-md bg-white/95 backdrop-blur-sm border border-indigo-100">
+          <DialogHeader>
+            <DialogTitle className="text-indigo-900">Add New Transaction</DialogTitle>
+            <DialogDescription className="text-indigo-600">
+              Create a new transaction for a user's account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4 px-2 sm:px-0">
+            {transactionError && (
+              <div className="text-red-600 text-sm">{transactionError}</div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="user" className="text-indigo-800">Select User</Label>
+              <select
+                id="user"
+                className="w-full rounded-md border border-indigo-200 bg-white/80 px-3 py-2 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                value={newTransaction.userId}
+                onChange={(e) => setNewTransaction({ ...newTransaction, userId: e.target.value })}
+              >
+                <option value="">Select a user</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name} ({user.accountNumber})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="type" className="text-indigo-800">Transaction Type</Label>
+              <select
+                id="type"
+                className="w-full rounded-md border border-indigo-200 bg-white/80 px-3 py-2 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                value={newTransaction.type}
+                onChange={(e) => setNewTransaction({ ...newTransaction, type: e.target.value })}
+              >
+                <option value="deposit">Deposit</option>
+                <option value="withdrawal">Withdrawal</option>
+                <option value="transfer">Transfer</option>
+                <option value="adjustment">Adjustment</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="amount" className="text-indigo-800">Amount</Label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-600">$</div>
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  className="pl-7 border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                  placeholder="0.00"
+                  value={newTransaction.amount}
+                  onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description" className="text-indigo-800">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Enter transaction description"
+                className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                value={newTransaction.description}
+                onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              onClick={() => {
+                setIsAddTransactionOpen(false)
+                setTransactionError(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+              onClick={handleAddTransaction}
+            >
+              Create Transaction
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPendingApprovalsOpen} onOpenChange={setIsPendingApprovalsOpen}>
+        <DialogContent className="max-w-[90vw] sm:max-w-lg bg-white/95 backdrop-blur-sm border border-indigo-100">
+          <DialogHeader>
+            <DialogTitle className="text-indigo-900">Pending Approvals</DialogTitle>
+            <DialogDescription className="text-indigo-600">
+              Review and approve new user registrations.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {pendingUsers.length > 0 ? (
+              <div className="space-y-4">
+                {pendingUsers.map((user) => (
+                  <div key={user._id} className="border rounded-lg p-4 space-y-4 bg-white/80">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10 border-2 border-indigo-100">
+                          <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+                            {user.fullName.split(" ").map((n) => n[0]).join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium text-indigo-900">{user.fullName}</div>
+                          <div className="text-sm text-indigo-600">{user.email}</div>
+                        </div>
+                      </div>
+                      <Badge variant="secondary">Pending</Badge>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                      <div className="text-indigo-700">
+                        <span className="text-indigo-500">Username:</span> {user.username || "Not set"}
+                      </div>
+                      <div className="text-indigo-700">
+                        <span className="text-indigo-500">Phone:</span> {user.phone}
+                      </div>
+                      <div className="text-indigo-700">
+                        <span className="text-indigo-500">SSN:</span> {user.ssn}
+                      </div>
+                      <div className="text-indigo-700">
+                        <span className="text-indigo-500">Address:</span> {`${user.streetAddress}, ${user.city}, ${user.state} ${user.zipCode}`}
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        className="border-red-200 text-red-700 hover:bg-red-50"
+                        size="sm"
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                        onClick={() => handleApproveUser(user._id)}
+                      >
+                        Approve
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-indigo-600">No pending approvals</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+              onClick={() => setIsPendingApprovalsOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
