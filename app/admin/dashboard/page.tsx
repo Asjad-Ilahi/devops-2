@@ -1,23 +1,14 @@
-// app/admin/dashboard/page.tsx
 "use client"
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { BarChart3, CreditCard, Home, LogOut, Menu, Plus, Search, Settings, Users, Loader } from "lucide-react"
+import { CreditCard, Home, LogOut, Menu, Plus, Settings, Users, Loader, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
@@ -30,7 +21,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
-// Interface for User (unchanged from Code-01)
+// Interface for User
 interface User {
   id: string
   name: string
@@ -43,7 +34,7 @@ interface User {
   lastLogin: string
 }
 
-// Interface for Transaction (unchanged from Code-01)
+// Interface for Transaction
 interface Transaction {
   id: string
   userId: string
@@ -54,7 +45,7 @@ interface Transaction {
   status: "completed" | "pending" | "failed"
 }
 
-// Interface for PendingUser (imported from Code-02)
+// Interface for PendingUser
 interface PendingUser {
   _id: string
   fullName: string
@@ -71,7 +62,7 @@ interface PendingUser {
 export default function AdminDashboardPage() {
   const router = useRouter()
 
-  // States from Code-01, with additions from Code-02 for backend integration
+  // State management
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoadingAuth, setIsLoadingAuth] = useState(true)
   const [users, setUsers] = useState<User[]>([])
@@ -88,12 +79,12 @@ export default function AdminDashboardPage() {
     userId: "",
     type: "deposit",
     amount: "",
-    description: "", // Note: Code-01 uses 'description', Code-02 uses 'memo'. Assuming API expects 'description'.
+    description: "",
   })
   const [isPendingApprovalsOpen, setIsPendingApprovalsOpen] = useState(false)
   const [transactionError, setTransactionError] = useState<string | null>(null)
 
-  // Authentication check and data fetching (from Code-02)
+  // Authentication check and data fetching
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -149,7 +140,7 @@ export default function AdminDashboardPage() {
     checkAuth()
   }, [router])
 
-  // Handle adding a new transaction with API call (from Code-02)
+  // Handle adding a new transaction
   const handleAddTransaction = async () => {
     if (!newTransaction.userId || !newTransaction.amount || !newTransaction.description) {
       setTransactionError("Please fill in all required fields")
@@ -171,7 +162,7 @@ export default function AdminDashboardPage() {
           userId: newTransaction.userId,
           type: newTransaction.type,
           amount: newTransaction.amount,
-          description: newTransaction.description, // Using 'description' to match Code-01's field name
+          description: newTransaction.description,
         }),
       })
 
@@ -183,7 +174,6 @@ export default function AdminDashboardPage() {
 
       const { transaction, newBalance } = result
 
-      // Update local state
       const updatedUsers = users.map((user) =>
         user.id === newTransaction.userId ? { ...user, balance: newBalance } : user
       )
@@ -204,7 +194,7 @@ export default function AdminDashboardPage() {
     }
   }
 
-  // Handle approving a pending user with API call (from Code-02)
+  // Handle approving a pending user
   const handleApproveUser = async (pendingUserId: string) => {
     try {
       const response = await fetch("/api/admin/approve-user", {
@@ -245,7 +235,7 @@ export default function AdminDashboardPage() {
     }
   }
 
-  // Handle logout with API call (from Code-02)
+  // Handle logout
   const handleLogout = async () => {
     try {
       await fetch("/api/admin/logout", {
@@ -259,7 +249,7 @@ export default function AdminDashboardPage() {
     }
   }
 
-  // Render loading state or redirect if not authenticated (from Code-02)
+  // Render loading state or redirect if not authenticated
   if (isLoadingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -272,9 +262,9 @@ export default function AdminDashboardPage() {
     return null // The router will redirect to login
   }
 
-  // Original UI from Code-01, unchanged except for data source and event handlers
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
+      {/* Main Sidebar (Desktop) */}
       <div className="hidden md:flex border-r bg-gradient-to-br from-indigo-800 to-purple-900 text-white w-64 flex-col fixed inset-y-0">
         <div className="p-4 border-b border-indigo-700 bg-gradient-to-r from-indigo-900 to-purple-950">
           <div className="flex items-center gap-2">
@@ -301,6 +291,12 @@ export default function AdminDashboardPage() {
             <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-indigo-200">Settings</h2>
             <div className="space-y-1">
               <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                <Link href="/admin/profile">
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Link>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
                 <Link href="/admin/settings"><Settings className="mr-2 h-4 w-4" />Site Settings</Link>
               </Button>
               <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" onClick={handleLogout}>
@@ -312,6 +308,7 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="flex-1 md:pl-64">
+        {/* Header */}
         <header className="bg-white border-b border-indigo-100 h-16 sticky top-0 z-30 flex items-center px-4">
           <Sheet>
             <SheetTrigger asChild>
@@ -346,6 +343,12 @@ export default function AdminDashboardPage() {
                     <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-indigo-200">Settings</h2>
                     <div className="space-y-1">
                       <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+                        <Link href="/admin/profile">
+                          <User className="mr-2 h-4 w-4" />
+                          Profile
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
                         <Link href="/admin/settings"><Settings className="mr-2 h-4 w-4" />Site Settings</Link>
                       </Button>
                       <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" onClick={handleLogout}>
@@ -357,41 +360,14 @@ export default function AdminDashboardPage() {
               </div>
             </SheetContent>
           </Sheet>
-
           <div className="flex-1 flex items-center justify-between md:justify-start gap-4">
             <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
               Admin Dashboard
             </h1>
-            <form className="hidden md:flex items-center relative w-full max-w-xs">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input type="search" placeholder="Search..." className="w-full pl-8" />
-            </form>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8 border-2 border-indigo-100">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" alt="@admin" />
-                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
-                      AD
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Admin Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Link href="/admin/profile" className="flex w-full">Profile</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Link href="/admin/settings" className="flex w-full">Settings</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </header>
 
+        {/* Main Content */}
         <main className="p-4 sm:p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
@@ -601,6 +577,7 @@ export default function AdminDashboardPage() {
         </main>
       </div>
 
+      {/* Add Transaction Dialog */}
       <Dialog open={isAddTransactionOpen} onOpenChange={setIsAddTransactionOpen}>
         <DialogContent className="max-w-[90vw] sm:max-w-md bg-white/95 backdrop-blur-sm border border-indigo-100">
           <DialogHeader>
@@ -690,6 +667,7 @@ export default function AdminDashboardPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Pending Approvals Dialog */}
       <Dialog open={isPendingApprovalsOpen} onOpenChange={setIsPendingApprovalsOpen}>
         <DialogContent className="max-w-[90vw] sm:max-w-lg bg-white/95 backdrop-blur-sm border border-indigo-100">
           <DialogHeader>
