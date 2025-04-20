@@ -59,6 +59,15 @@ interface PendingUser {
   zipCode: string
 }
 
+// Helper function to format date to DD-MM-YYYY
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  return `${day}-${month}-${year}`
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter()
 
@@ -394,7 +403,7 @@ export default function AdminDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-xl sm:text-2xl font-bold text-indigo-900">{stats.transactionsToday}</div>
-                <p className="text-xs text-indigo-700">{new Date().toLocaleDateString()}</p>
+                <p className="text-xs text-indigo-700">{formatDate(new Date().toISOString())}</p>
               </CardContent>
             </Card>
             <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
@@ -472,7 +481,7 @@ export default function AdminDashboardPage() {
                             {user.status}
                           </Badge>
                         </td>
-                        <td className="p-2 sm:p-4 text-xs hidden lg:table-cell text-indigo-700">{user.lastLogin}</td>
+                        <td className="p-2 sm:p-4 text-xs hidden lg:table-cell text-indigo-700">{formatDate(user.lastLogin)}</td>
                         <td className="p-2 sm:p-4 text-center hidden md:table-cell">
                           {user.twoFactorEnabled ? (
                             <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
@@ -536,7 +545,7 @@ export default function AdminDashboardPage() {
                             {transaction.amount > 0 ? "+" : ""}${transaction.amount.toFixed(2)}
                           </td>
                           <td className="p-2 sm:p-4 text-sm hidden lg:table-cell text-indigo-900">{transaction.description}</td>
-                          <td className="p-2 sm:p-4 text-xs hidden md:table-cell text-indigo-700">{transaction.date}</td>
+                          <td className="p-2 sm:p-4 text-xs hidden md:table-cell text-indigo-700">{formatDate(transaction.date)}</td>
                           <td className="p-2 sm:p-4 text-center hidden sm:table-cell">
                             <Badge
                               variant={
