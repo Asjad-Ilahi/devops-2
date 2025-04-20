@@ -1,20 +1,27 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState } from "react"
-import Link from "next/link"
-import { ArrowLeft, Check, Globe, Loader2, Palette, Save, Upload } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import type React from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Check, Globe, Loader2, Palette, Save, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AdminSettingsPage() {
-  // General settings state
+  const router = useRouter();
+
+  // Authentication and loading states
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
+  // Settings states
   const [generalSettings, setGeneralSettings] = useState({
     siteName: "Zelle Banking",
     supportEmail: "support@zellebank.example.com",
@@ -25,79 +32,171 @@ export default function AdminSettingsPage() {
     linkedinUrl: "",
     privacyPolicy: "",
     termsOfService: "",
-  })
+  });
 
-  // Appearance settings state
   const [appearanceSettings, setAppearanceSettings] = useState({
     primaryColor: "#6D1ED4",
     logoUrl: "/zelle-logo.svg",
     zelleLogoUrl: "/zelle-logo.svg",
     checkingIcon: "square",
     savingsIcon: "circle",
-  })
+  });
 
-  // Loading and alert states
-  const [isLoading, setIsLoading] = useState(false)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Handle general settings change
+  // Fetch settings after authentication check
+  useEffect(() => {
+    const checkAuthAndFetchSettings = async () => {
+      try {
+        // Step 1: Check authentication
+        const authResponse = await fetch("/api/admin/check-auth", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (!authResponse.ok) {
+          router.push("/admin/login");
+          return;
+        }
+
+        setIsAuthenticated(true);
+
+        // Step 2: Fetch settings if authenticated
+        const settingsResponse = await fetch("/api/admin/settings", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (!settingsResponse.ok) {
+          if (settingsResponse.status === 401) {
+            setError("Unauthorized access. Please log in again.");
+            router.push("/admin/login");
+            return;
+          } else if (settingsResponse.status === 404) {
+            setError("Settings not found. Using default values. Save to create settings.");
+            // Default values are already set in state
+            return;
+          }
+          throw new Error(`HTTP error! Status: ${settingsResponse.status}`);
+        }
+
+        const data = await settingsResponse.json();
+        setGeneralSettings({
+          siteName: data.siteName || "Zelle Banking",
+          supportEmail: data.supportEmail || "support@zellebank.example.com",
+          supportPhone: data.supportPhone || "1-800-555-1234",
+          instagramUrl: data.instagramUrl || "",
+          twitterUrl: data.twitterUrl || "",
+          facebookUrl: data.facebookUrl || "",
+          linkedinUrl: data.linkedinUrl || "",
+          privacyPolicy: data.privacyPolicy || "",
+          termsOfService: data.termsOfService || "",
+        });
+      } catch (error) {
+        console.error("Error fetching settings:", error);
+        if (!error.message.includes("Unauthorized")) { // Avoid overwriting 401 redirect
+          setError("Failed to load settings from the server. Using default values.");
+        }
+      } finally {
+        setIsLoadingAuth(false);
+      }
+    };
+
+    checkAuthAndFetchSettings();
+  }, [router]);
+
+  // Handlers for form changes and submissions (unchanged from original)
   const handleGeneralChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setGeneralSettings({ ...generalSettings, [name]: value })
-  }
+    const { name, value } = e.target;
+    setGeneralSettings({ ...generalSettings, [name]: value });
+  };
 
-  // Handle appearance settings change
   const handleAppearanceChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setAppearanceSettings({ ...appearanceSettings, [name]: value })
-  }
+    const { name, value } = e.target;
+    setAppearanceSettings({ ...appearanceSettings, [name]: value });
+  };
 
-  // Handle site logo file upload
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader()
+      const reader = new FileReader();
       reader.onloadend = () => {
-        setAppearanceSettings({ ...appearanceSettings, logoUrl: reader.result as string })
-      }
-      reader.readAsDataURL(file)
+        setAppearanceSettings({ ...appearanceSettings, logoUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
     }
-  }
+  };
 
-  // Handle Zelle logo file upload
   const handleZelleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader()
+      const reader = new FileReader();
       reader.onloadend = () => {
-        setAppearanceSettings({ ...appearanceSettings, zelleLogoUrl: reader.result as string })
-      }
-      reader.readAsDataURL(file)
+        setAppearanceSettings({ ...appearanceSettings, zelleLogoUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
     }
-  }
+  };
 
-  // Handle appearance select change
   const handleAppearanceSelect = (name: string, value: string) => {
-    setAppearanceSettings({ ...appearanceSettings, [name]: value })
-  }
+    setAppearanceSettings({ ...appearanceSettings, [name]: value });
+  };
 
-  // Handle settings save
   const handleSaveSettings = async (settingsType: string) => {
-    setIsLoading(true)
-    setSuccess(null)
-    setError(null)
+    setIsLoading(true);
+    setSuccess(null);
+    setError(null);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      setSuccess(`${settingsType} settings saved successfully`)
-      setTimeout(() => setSuccess(null), 3000)
+      if (settingsType === "General") {
+        const response = await fetch("/api/admin/settings", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(generalSettings),
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            setError("Unauthorized. Redirecting to login...");
+            router.push("/admin/login");
+            return;
+          }
+          throw new Error(`Failed to save settings. Status: ${response.status}`);
+        }
+
+        setSuccess("General settings saved successfully");
+      } else {
+        // Simulate save for appearance settings (not required by task)
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        setSuccess("Appearance settings saved successfully");
+      }
+      setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
-      setError(`Failed to save ${settingsType.toLowerCase()} settings. Please try again.`)
+      console.error(`Error saving ${settingsType.toLowerCase()} settings:`, error);
+      setError(`Failed to save ${settingsType.toLowerCase()} settings. Please try again.`);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
+  };
+
+  // Render loading state or redirect if not authenticated
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
+  if (!isAuthenticated) {
+    return null; // Router will handle redirect to /admin/login
+  }
+
+  // Original UI rendering
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-indigo-50">
       <div className="p-6 max-w-5xl mx-auto">
@@ -115,7 +214,6 @@ export default function AdminSettingsPage() {
           Admin Settings
         </h1>
 
-        {/* Success/Error Alerts */}
         {success && (
           <Alert className="mb-6 bg-green-50 border border-green-200 text-green-800">
             <Check className="h-4 w-4 text-green-600" />
@@ -146,7 +244,6 @@ export default function AdminSettingsPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* General Settings Tab */}
           <TabsContent value="general">
             <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
               <CardHeader>
@@ -314,7 +411,6 @@ export default function AdminSettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* Appearance Settings Tab */}
           <TabsContent value="appearance">
             <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
               <CardHeader>
@@ -456,7 +552,9 @@ export default function AdminSettingsPage() {
                           <span className="font-bold">{generalSettings.siteName}</span>
                         </div>
                         <div className="flex gap-2">
-                          <Button style={{ backgroundColor: appearanceSettings.primaryColor }}>Primary Button</Button>
+                          <Button style={{ backgroundColor: appearanceSettings.primaryColor }}>
+                            Primary Button
+                          </Button>
                           <Button variant="outline">Secondary Button</Button>
                         </div>
                       </div>
@@ -488,5 +586,5 @@ export default function AdminSettingsPage() {
         </Tabs>
       </div>
     </div>
-  )
+  );
 }

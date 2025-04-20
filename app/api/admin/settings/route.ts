@@ -7,7 +7,6 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 export async function GET(request: NextRequest) {
   try {
-    // Extract token from Cookie header
     const token = request.headers.get("cookie")
       ?.split("; ")
       .find((row) => row.startsWith("adminToken="))
@@ -17,12 +16,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Verify the token
-    const decoded = jwt.verify(token, JWT_SECRET) as { adminId: string };
+    jwt.verify(token, JWT_SECRET);
 
     await mongoose.connect(process.env.MONGODB_URI!);
     
-    // Since settings are global, we don't need adminId; fetch the first settings document
     const settings = await Settings.findOne().lean();
     if (!settings) {
       return NextResponse.json({ error: 'Settings not found' }, { status: 404 });
@@ -37,7 +34,6 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    // Extract token from Cookie header
     const token = request.headers.get("cookie")
       ?.split("; ")
       .find((row) => row.startsWith("adminToken="))
@@ -47,19 +43,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Verify the token
-    const decoded = jwt.verify(token, JWT_SECRET) as { adminId: string };
+    jwt.verify(token, JWT_SECRET);
 
     const data = await request.json();
     
-    // Validate required fields
-    if (!data.siteName || !data.supportEmail || !data.supportPhone) {
+    if (!data.siteName || !data.supportEmail || !data.supportPhone || !data.privacyPolicy || !data.termsOfService) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     await mongoose.connect(process.env.MONGODB_URI!);
     
-    // Update or create settings (upsert)
     const settings = await Settings.findOneAndUpdate(
       {},
       {
@@ -69,7 +62,9 @@ export async function PUT(request: NextRequest) {
         instagramUrl: data.instagramUrl || '',
         twitterUrl: data.twitterUrl || '',
         facebookUrl: data.facebookUrl || '',
-        linkedinUrl: data.linkedinUrl || ''
+        linkedinUrl: data.linkedinUrl || '',
+        privacyPolicy: data.privacyPolicy,
+        termsOfService: data.termsOfService
       },
       { upsert: true, new: true }
     );
