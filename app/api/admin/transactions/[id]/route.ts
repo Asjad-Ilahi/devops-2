@@ -156,9 +156,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const { id } = await params;
-    const body = await req.json();
-    const { relatedTransferId } = body;
-
     const originalTransaction = await Transaction.findById(id);
     if (!originalTransaction) {
       return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
@@ -173,126 +170,118 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Transaction already refunded" }, { status: 400 });
     }
 
-    const user = await User.findById(originalTransaction.userId).select(
-      "fullName email balance savingsBalance cryptoBalance accountNumber savingsNumber"
-    );
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    let refundTransactions = [];
+    let usersToUpdate = new Set<string>();
 
-    // Determine refund amount and crypto amount
-    let refundAmount = -originalTransaction.amount;
-    let refundCryptoAmount = 0;
-
-    if (originalTransaction.type === "crypto_buy") {
-      refundCryptoAmount = -(originalTransaction.cryptoAmount || 0); // Deduct BTC
-    } else if (originalTransaction.type === "crypto_sell") {
-      refundCryptoAmount = originalTransaction.cryptoAmount || 0; // Add BTC
-    }
-
-    const refundTransaction = new Transaction({
-      userId: originalTransaction.userId,
-      description: `Refund for ${originalTransaction.description}`,
-      amount: refundAmount,
-      date: new Date(),
-      type: "refund",
-      category: originalTransaction.category,
-      accountType: originalTransaction.accountType,
-      status: "completed",
-      memo: `Refund for transaction ${originalTransaction._id}`,
-      relatedTransactionId: originalTransaction._id,
-      cryptoAmount: refundCryptoAmount || undefined,
-      cryptoPrice: originalTransaction.cryptoPrice || undefined,
-    });
-
-    await refundTransaction.save();
-
-    // Update user balance based on account type
-    if (originalTransaction.accountType === "checking") {
-      user.balance += refundAmount;
-    } else if (originalTransaction.accountType === "savings") {
-      user.savingsBalance += refundAmount;
-    }
-    if (refundCryptoAmount) {
-      user.cryptoBalance += refundCryptoAmount;
-    }
-
-    // Handle paired transfer (checking-to-savings or savings-to-checking)
-    let relatedRefund = null;
-    if (relatedTransferId) {
-      const pairedTransaction = await Transaction.findById(relatedTransferId);
+    if (originalTransaction.type === "transfer" && originalTransaction.relatedTransactionId) {
+      const relatedTransaction = await Transaction.findById(originalTransaction.relatedTransactionId);
       if (
-        pairedTransaction &&
-        pairedTransaction.userId.toString() === originalTransaction.userId.toString() &&
-        pairedTransaction.type === "transfer" &&
-        Math.abs(pairedTransaction.amount) === Math.abs(originalTransaction.amount) &&
-        pairedTransaction.amount === -originalTransaction.amount &&
-        new Date(pairedTransaction.date).getTime() === new Date(originalTransaction.date).getTime()
+        relatedTransaction &&
+        relatedTransaction.type === "transfer" &&
+        relatedTransaction.relatedTransactionId.toString() === originalTransaction._id.toString()
       ) {
-        const pairedRefund = new Transaction({
-          userId: pairedTransaction.userId,
-          description: `Refund for ${pairedTransaction.description}`,
-          amount: -pairedTransaction.amount,
+        // Refund both transactions
+        const refund1 = new Transaction({
+          userId: originalTransaction.userId,
+          description: `Refund for ${originalTransaction.description}`,
+          amount: -originalTransaction.amount,
           date: new Date(),
           type: "refund",
-          category: pairedTransaction.category,
-          accountType: pairedTransaction.accountType,
+          category: originalTransaction.category,
+          accountType: originalTransaction.accountType,
           status: "completed",
-          memo: `Refund for transaction ${pairedTransaction._id} (paired with ${originalTransaction._id})`,
-          relatedTransactionId: pairedTransaction._id,
+          memo: `Refund for transaction ${originalTransaction._id}`,
+          relatedTransactionId: originalTransaction._id,
         });
+        const refund2 = new Transaction({
+          userId: relatedTransaction.userId,
+          description: `Refund for ${relatedTransaction.description}`,
+          amount: -relatedTransaction.amount,
+          date: new Date(),
+          type: "refund",
+          category: relatedTransaction.category,
+          accountType: relatedTransaction.accountType,
+          status: "completed",
+          memo: `Refund for transaction ${relatedTransaction._id}`,
+          relatedTransactionId: relatedTransaction._id,
+        });
+        refundTransactions.push(refund1, refund2);
+        usersToUpdate.add(originalTransaction.userId.toString());
+        usersToUpdate.add(relatedTransaction.userId.toString());
+      } else {
+        // Refund only the original transaction
+        const refund = new Transaction({
+          userId: originalTransaction.userId,
+          description: `Refund for ${originalTransaction.description}`,
+          amount: -originalTransaction.amount,
+          date: new Date(),
+          type: "refund",
+          category: originalTransaction.category,
+          accountType: originalTransaction.accountType,
+          status: "completed",
+          memo: `Refund for transaction ${originalTransaction._id}`,
+          relatedTransactionId: originalTransaction._id,
+        });
+        refundTransactions.push(refund);
+        usersToUpdate.add(originalTransaction.userId.toString());
+      }
+    } else {
+      // Regular refund
+      const refund = new Transaction({
+        userId: originalTransaction.userId,
+        description: `Refund for ${originalTransaction.description}`,
+        amount: -originalTransaction.amount,
+        date: new Date(),
+        type: "refund",
+        category: originalTransaction.category,
+        accountType: originalTransaction.accountType,
+        status: "completed",
+        memo: `Refund for transaction ${originalTransaction._id}`,
+        relatedTransactionId: originalTransaction._id,
+      });
+      refundTransactions.push(refund);
+      usersToUpdate.add(originalTransaction.userId.toString());
+    }
 
-        await pairedRefund.save();
+    // Save refund transactions
+    await Promise.all(refundTransactions.map((tx) => tx.save()));
 
-        // Update the opposite account balance
-        if (pairedTransaction.accountType === "checking") {
-          user.balance += pairedRefund.amount;
-        } else if (pairedTransaction.accountType === "savings") {
-          user.savingsBalance += pairedRefund.amount;
+    // Update users' balances
+    for (const userId of usersToUpdate) {
+      const user = await User.findById(userId);
+      if (user) {
+        const userRefunds = refundTransactions.filter((tx) => tx.userId.toString() === userId);
+        for (const refund of userRefunds) {
+          if (refund.accountType === "checking") {
+            user.balance += refund.amount;
+          } else if (refund.accountType === "savings") {
+            user.savingsBalance += refund.amount;
+          } else if (refund.accountType === "crypto") {
+            user.cryptoBalance += refund.cryptoAmount || 0;
+          }
         }
-
-        relatedRefund = {
-          id: pairedRefund._id.toString(),
-          userId: pairedTransaction.userId.toString(),
-          userName: user.fullName,
-          userEmail: user.email,
-          type: pairedRefund.type,
-          amount: pairedRefund.amount,
-          description: pairedRefund.description,
-          date: pairedRefund.date.toISOString(),
-          status: pairedRefund.status,
-          account: pairedRefund.accountType,
-          memo: pairedRefund.memo,
-          relatedTransactionId: pairedRefund.relatedTransactionId?.toString(),
-        };
+        await user.save();
       }
     }
 
-    await user.save();
-
-    const refundData = {
-      id: refundTransaction._id.toString(),
-      userId: refundTransaction.userId.toString(),
-      userName: user.fullName,
-      userEmail: user.email,
-      type: refundTransaction.type,
-      amount: refundTransaction.amount,
-      description: refundTransaction.description,
-      date: refundTransaction.date.toISOString(),
-      status: refundTransaction.status,
-      account: refundTransaction.accountType,
-      memo: refundTransaction.memo,
-      relatedTransactionId: refundTransaction.relatedTransactionId?.toString(),
-      cryptoAmount: refundTransaction.cryptoAmount,
-      cryptoPrice: refundTransaction.cryptoPrice,
+    // Prepare response
+    const response = {
+      message: "Refund processed successfully",
+      refundTransactions: refundTransactions.map((tx) => ({
+        id: tx._id.toString(),
+        userId: tx.userId.toString(),
+        type: tx.type,
+        amount: tx.amount,
+        description: tx.description,
+        date: tx.date.toISOString(),
+        status: tx.status,
+        account: tx.accountType,
+        memo: tx.memo,
+        relatedTransactionId: tx.relatedTransactionId?.toString(),
+      })),
     };
 
-    return NextResponse.json({
-      transaction: refundData,
-      userBalance: refundTransaction.accountType === "savings" ? user.savingsBalance : user.balance,
-      userCryptoBalance: user.cryptoBalance,
-      relatedRefund,
-    });
+    return NextResponse.json(response);
   } catch (error) {
     console.error("Error processing refund:", error);
     return NextResponse.json({ error: "Failed to process refund" }, { status: 500 });

@@ -36,24 +36,36 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { DateRange } from "react-day-picker"
 
-// Define User interface (consistent with dashboard)
+// Define User interface
 interface User {
   id: string
   name: string
   email: string
-  // Add other fields as needed from the User interface in dashboard
 }
 
-// Define Transaction interface (remove userName and userEmail if not provided by API)
+// Define Transaction interface
 interface Transaction {
   id: string
   userId: string
-  type: "deposit" | "withdrawal" | "transfer" | "payment" | "fee" | "interest" | "adjustment"
+  type: "deposit" | "withdrawal" | "transfer" | "payment" | "fee" | "interest" | "adjustment" | "refund" | "crypto_buy" | "crypto_sell"
   amount: number
   description: string
   date: string
   status: "completed" | "pending" | "failed"
   account: string
+  relatedTransactionId?: string
+}
+
+interface TransactionGroup {
+  id: string
+  userIds: string[]
+  description: string
+  date: string
+  amount: number
+  status: string
+  accounts: string[]
+  transactionIds: string[]
+  type: string
 }
 
 export default function AdminTransactionsPage() {
@@ -75,7 +87,7 @@ export default function AdminTransactionsPage() {
   // Transactions and Users state
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [users, setUsers] = useState<User[]>([])
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([])
+  const [groupedTransactions, setGroupedTransactions] = useState<TransactionGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -112,7 +124,6 @@ export default function AdminTransactionsPage() {
 
         setTransactions(transactionsData.transactions)
         setUsers(usersData.users)
-        setFilteredTransactions(transactionsData.transactions)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data")
         console.error("Error fetching data:", err)
@@ -124,54 +135,118 @@ export default function AdminTransactionsPage() {
     fetchData()
   }, [router])
 
-  // Apply filters
+  // Group transactions
   useEffect(() => {
     const userMap = new Map(users.map((user) => [user.id, user]))
-    let filtered = [...transactions]
+    const grouped: TransactionGroup[] = []
+    const processedIds = new Set<string>()
+
+    transactions.forEach((tx) => {
+      if (processedIds.has(tx.id)) return
+
+      if (tx.type === "transfer" && tx.relatedTransactionId) {
+        const relatedTx = transactions.find(
+          (t) => t.id === tx.relatedTransactionId && t.type === "transfer"
+        )
+        if (relatedTx && !processedIds.has(relatedTx.id)) {
+          const isInternal = tx.userId === relatedTx.userId
+          const senderTx = tx.amount < 0 ? tx : relatedTx
+          const receiverTx = tx.amount > 0 ? tx : relatedTx
+          const senderUser = userMap.get(senderTx.userId)?.name || "Unknown"
+          const receiverUser = userMap.get(receiverTx.userId)?.name || "Unknown"
+          const amount = Math.abs(senderTx.amount)
+
+          let description = ""
+          if (isInternal) {
+            description = `${senderUser} transferred $${amount.toFixed(2)} from ${senderTx.account} to ${receiverTx.account}`
+          } else {
+            description = `${senderUser} sent $${amount.toFixed(2)} to ${receiverUser}`
+          }
+
+          grouped.push({
+            id: `${senderTx.id}-${receiverTx.id}`,
+            userIds: [senderTx.userId, receiverTx.userId],
+            description,
+            date: senderTx.date,
+            amount,
+            status: senderTx.status === "completed" && receiverTx.status === "completed" ? "completed" : "pending",
+            accounts: [senderTx.account, receiverTx.account],
+            transactionIds: [senderTx.id, receiverTx.id],
+            type: "transfer",
+          })
+          processedIds.add(senderTx.id)
+          processedIds.add(receiverTx.id)
+        } else {
+          // Fallback for unpaired transfer
+          grouped.push({
+            id: tx.id,
+            userIds: [tx.userId],
+            description: tx.description,
+            date: tx.date,
+            amount: Math.abs(tx.amount),
+            status: tx.status,
+            accounts: [tx.account],
+            transactionIds: [tx.id],
+            type: tx.type,
+          })
+          processedIds.add(tx.id)
+        }
+      } else {
+        grouped.push({
+          id: tx.id,
+          userIds: [tx.userId],
+          description: tx.description,
+          date: tx.date,
+          amount: tx.amount,
+          status: tx.status,
+          accounts: [tx.account],
+          transactionIds: [tx.id],
+          type: tx.type,
+        })
+        processedIds.add(tx.id)
+      }
+    })
+
+    // Apply filters
+    let filtered = [...grouped]
 
     if (searchTerm) {
-      filtered = filtered.filter((transaction) => {
-        const user = userMap.get(transaction.userId)
-        const userName = user?.name || ""
-        const userEmail = user?.email || ""
-        return (
-          transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          transaction.id.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      })
+      filtered = filtered.filter((group) =>
+        group.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        group.userIds.some((userId) => {
+          const user = userMap.get(userId)
+          return (
+            user?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user?.email.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        }) ||
+        group.id.toLowerCase().includes(searchTerm.toLowerCase())
+      )
     }
 
     if (dateRange.from) {
-      filtered = filtered.filter((transaction) => {
-        const transactionDate = new Date(transaction.date)
-        return transactionDate >= dateRange.from!
-      })
+      filtered = filtered.filter((group) => new Date(group.date) >= dateRange.from!)
     }
 
     if (dateRange.to) {
-      filtered = filtered.filter((transaction) => {
-        const transactionDate = new Date(transaction.date)
-        return transactionDate <= dateRange.to!
-      })
+      filtered = filtered.filter((group) => new Date(group.date) <= dateRange.to!)
     }
 
     if (typeFilter !== "all") {
-      filtered = filtered.filter((transaction) => transaction.type === typeFilter)
+      filtered = filtered.filter((group) => group.type === typeFilter)
     }
 
     if (statusFilter !== "all") {
-      filtered = filtered.filter((transaction) => transaction.status === statusFilter)
+      filtered = filtered.filter((group) => group.status === statusFilter)
     }
 
     if (amountFilter === "positive") {
-      filtered = filtered.filter((transaction) => transaction.amount > 0)
+      filtered = filtered.filter((group) => group.amount > 0)
     } else if (amountFilter === "negative") {
-      filtered = filtered.filter((transaction) => transaction.amount < 0)
+      filtered = filtered.filter((group) => group.amount < 0)
     }
 
-    setFilteredTransactions(filtered)
+    setGroupedTransactions(filtered)
   }, [searchTerm, dateRange, typeFilter, statusFilter, amountFilter, transactions, users])
 
   // Reset filters
@@ -187,6 +262,7 @@ export default function AdminTransactionsPage() {
   const getTransactionIcon = (type: string) => {
     switch (type) {
       case "deposit":
+      case "interest":
         return <ArrowDown className="h-5 w-5 text-green-600" />
       case "withdrawal":
         return <ArrowUp className="h-5 w-5 text-red-600" />
@@ -196,26 +272,44 @@ export default function AdminTransactionsPage() {
         return <CreditCard className="h-5 w-5 text-orange-600" />
       case "fee":
         return <FileText className="h-5 w-5 text-gray-600" />
-      case "interest":
-        return <ArrowDown className="h-5 w-5 text-green-600" />
-      case "adjustment":
-        return <FileText className="h-5 w-5 text-purple-600" />
-      case "zelle":
-        return <Send className="h-5 w-5 text-purple-600" />
       case "refund":
         return <RefreshCcw className="h-5 w-5 text-yellow-600" />
+      case "crypto_buy":
+        return <CreditCard className="h-5 w-5 text-purple-600" />
+      case "crypto_sell":
+        return <CreditCard className="h-5 w-5 text-indigo-600" />
       default:
         return <CreditCard className="h-5 w-5" />
     }
   }
 
-  // Handle transaction status change (client-side)
-  const handleStatusChange = (transactionId: string, newStatus: "completed" | "pending" | "failed") => {
-    setTransactions((prev) =>
-      prev.map((transaction) =>
-        transaction.id === transactionId ? { ...transaction, status: newStatus } : transaction
+  // Handle transaction status change (client-side placeholder)
+  const handleStatusChange = async (transactionIds: string[], newStatus: "completed" | "pending" | "failed") => {
+    try {
+      // Update status for all transaction IDs in the group
+      const promises = transactionIds.map((txId) =>
+        fetch(`/api/admin/transactions/${txId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ status: newStatus }),
+        })
       )
-    )
+      const responses = await Promise.all(promises)
+      for (const response of responses) {
+        if (!response.ok) {
+          throw new Error("Failed to update transaction status")
+        }
+      }
+      setGroupedTransactions((prev) =>
+        prev.map((group) =>
+          group.transactionIds.some((id) => transactionIds.includes(id)) ? { ...group, status: newStatus } : group
+        )
+      )
+    } catch (error) {
+      console.error("Error updating status:", error)
+      setError("Failed to update transaction status")
+    }
   }
 
   // Handle date range selection
@@ -337,6 +431,9 @@ export default function AdminTransactionsPage() {
                     <SelectItem value="fee">Fees</SelectItem>
                     <SelectItem value="interest">Interest</SelectItem>
                     <SelectItem value="adjustment">Adjustments</SelectItem>
+                    <SelectItem value="crypto_buy">Crypto Buy</SelectItem>
+                    <SelectItem value="crypto_sell">Crypto Sell</SelectItem>
+                    <SelectItem value="refund">Refund</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -400,7 +497,7 @@ export default function AdminTransactionsPage() {
           <CardHeader>
             <CardTitle className="text-indigo-900">Transaction History</CardTitle>
             <CardDescription className="text-indigo-600">
-              {filteredTransactions.length} transactions found
+              {groupedTransactions.length} transactions found
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -409,66 +506,68 @@ export default function AdminTransactionsPage() {
                 <thead>
                   <tr className="border-b bg-indigo-50/50">
                     <th className="text-left p-4 text-indigo-800">ID</th>
-                    <th className="text-left p-4 text-indigo-800">User</th>
+                    <th className="text-left p-4 text-indigo-800">Users</th>
                     <th className="text-left p-4 text-indigo-800">Description</th>
                     <th className="text-left p-4 text-indigo-800">Date</th>
-                    <th className="text-left p-4 text-indigo-800">Account</th>
+                    <th className="text-left p-4 text-indigo-800">Accounts</th>
                     <th className="text-right p-4 text-indigo-800">Amount</th>
                     <th className="text-center p-4 text-indigo-800">Status</th>
                     <th className="text-center p-4 text-indigo-800">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-indigo-100">
-                  {filteredTransactions.map((transaction) => {
-                    const user = users.find((u) => u.id === transaction.userId)
+                  {groupedTransactions.map((group) => {
+                    const userNames = group.userIds.map((id) => users.find((u) => u.id === id)?.name || "Unknown User")
                     return (
-                      <tr key={transaction.id} className="hover:bg-indigo-50/50 transition-colors">
-                        <td className="p-4 font-mono text-xs">{transaction.id}</td>
+                      <tr key={group.id} className="hover:bg-indigo-50/50 transition-colors">
+                        <td className="p-4 font-mono text-xs">{group.id}</td>
                         <td className="p-4">
                           <div>
-                            <div className="font-medium text-indigo-900">{user?.name || "Unknown User"}</div>
-                            <div className="text-sm text-indigo-600">{user?.email || ""}</div>
+                            <div className="font-medium text-indigo-900">{userNames.join(" to ")}</div>
+                            <div className="text-sm text-indigo-600">
+                              {userNames.map((name, index) => (
+                                <span key={group.userIds[index]}>
+                                  {users.find((u) => u.id === group.userIds[index])?.email || ""}
+                                  {index < userNames.length - 1 ? " to " : ""}
+                                </span>
+                              ))}
+                            </div>
                           </div>
                         </td>
                         <td className="p-4">
                           <div className="flex items-center gap-3">
                             <div className="h-8 w-8 rounded-full flex items-center justify-center bg-muted">
-                              {getTransactionIcon(transaction.type)}
+                              {getTransactionIcon(group.type)}
                             </div>
                             <div>
-                              <div className="font-medium">{transaction.description}</div>
-                              <div className="text-sm text-muted-foreground capitalize">{transaction.type}</div>
+                              <div className="font-medium">{group.description}</div>
+                              <div className="text-sm text-muted-foreground capitalize">{group.type.replace("_", " ")}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="p-4">{transaction.date}</td>
-                        <td className="p-4">{transaction.account}</td>
-                        <td
-                          className={`p-4 text-right font-medium ${
-                            transaction.amount > 0 ? "text-green-600" : "text-red-600"
-                          }`}
-                        >
-                          {transaction.amount > 0 ? "+" : ""}
-                          {transaction.amount.toFixed(2)}
+                        <td className="p-4">{new Date(group.date).toLocaleString()}</td>
+                        <td className="p-4">{group.accounts.join(" to ")}</td>
+                        <td className="p-4 text-right font-medium text-green-600">
+                          ${group.amount.toFixed(2)}
                         </td>
                         <td className="p-4 text-center">
                           <Badge
                             variant={
-                              transaction.status === "completed"
+                              group.status === "completed"
                                 ? "default"
-                                : transaction.status === "pending"
-                                  ? "secondary"
-                                  : "destructive"
+                                : group.status === "pending"
+                                ? "secondary"
+                                : "destructive"
                             }
                             className={
-                              transaction.status === "completed"
+                              group.status === "completed"
                                 ? "bg-green-100 text-green-800 border-green-200 hover:bg-green-200"
-                                : transaction.status === "pending"
+                                : group.status === "pending"
                                 ? "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
                                 : "bg-red-100 text-red-800 border-red-200 hover:bg-red-200"
                             }
                           >
-                            {transaction.status}
+                            {group.status}
                           </Badge>
                         </td>
                         <td className="p-4 text-center">
@@ -485,25 +584,32 @@ export default function AdminTransactionsPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Transaction Actions</DropdownMenuLabel>
                               <DropdownMenuSeparator />
+                              {group.transactionIds.map((txId) => (
+                                <DropdownMenuItem key={txId} asChild>
+                                  <Link href={`/admin/transactions/${txId}`}>View Details (ID: {txId})</Link>
+                                </DropdownMenuItem>
+                              ))}
                               <DropdownMenuItem asChild>
-                                <Link href={`/admin/transactions/${transaction.id}`}>View Details</Link>
+                                <Link href={`/admin/users/${group.userIds[0]}`}>View User</Link>
                               </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link href={`/admin/users/${transaction.userId}`}>View User</Link>
-                              </DropdownMenuItem>
+                              {group.userIds.length > 1 && (
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/admin/users/${group.userIds[1]}`}>View Recipient</Link>
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator />
-                              {transaction.status === "pending" && (
+                              {group.status === "pending" && (
                                 <>
-                                  <DropdownMenuItem onClick={() => handleStatusChange(transaction.id, "completed")}>
+                                  <DropdownMenuItem onClick={() => handleStatusChange(group.transactionIds, "completed")}>
                                     Mark as Completed
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleStatusChange(transaction.id, "failed")}>
+                                  <DropdownMenuItem onClick={() => handleStatusChange(group.transactionIds, "failed")}>
                                     Mark as Failed
                                   </DropdownMenuItem>
                                 </>
                               )}
-                              {transaction.status === "failed" && (
-                                <DropdownMenuItem onClick={() => handleStatusChange(transaction.id, "completed")}>
+                              {group.status === "failed" && (
+                                <DropdownMenuItem onClick={() => handleStatusChange(group.transactionIds, "completed")}>
                                   Mark as Completed
                                 </DropdownMenuItem>
                               )}
@@ -513,7 +619,7 @@ export default function AdminTransactionsPage() {
                       </tr>
                     )
                   })}
-                  {filteredTransactions.length === 0 && (
+                  {groupedTransactions.length === 0 && (
                     <tr>
                       <td colSpan={8} className="p-4 text-center text-muted-foreground">
                         No transactions found matching your filters

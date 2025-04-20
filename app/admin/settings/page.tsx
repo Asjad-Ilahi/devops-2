@@ -21,20 +21,16 @@ export default function AdminSettingsPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
-  // Settings states
-  const [generalSettings, setGeneralSettings] = useState({
+  // Consolidated settings state
+  const [settings, setSettings] = useState({
     siteName: "Zelle Banking",
     supportEmail: "support@zellebank.example.com",
     supportPhone: "1-800-555-1234",
     instagramUrl: "",
     twitterUrl: "",
     facebookUrl: "",
-    linkedinUrl: "",
     privacyPolicy: "",
     termsOfService: "",
-  });
-
-  const [appearanceSettings, setAppearanceSettings] = useState({
     primaryColor: "#6D1ED4",
     logoUrl: "/zelle-logo.svg",
     zelleLogoUrl: "/zelle-logo.svg",
@@ -50,7 +46,6 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     const checkAuthAndFetchSettings = async () => {
       try {
-        // Step 1: Check authentication
         const authResponse = await fetch("/api/admin/check-auth", {
           method: "GET",
           credentials: "include",
@@ -63,7 +58,6 @@ export default function AdminSettingsPage() {
 
         setIsAuthenticated(true);
 
-        // Step 2: Fetch settings if authenticated
         const settingsResponse = await fetch("/api/admin/settings", {
           method: "GET",
           credentials: "include",
@@ -76,27 +70,30 @@ export default function AdminSettingsPage() {
             return;
           } else if (settingsResponse.status === 404) {
             setError("Settings not found. Using default values. Save to create settings.");
-            // Default values are already set in state
             return;
           }
           throw new Error(`HTTP error! Status: ${settingsResponse.status}`);
         }
 
         const data = await settingsResponse.json();
-        setGeneralSettings({
+        setSettings({
           siteName: data.siteName || "Zelle Banking",
           supportEmail: data.supportEmail || "support@zellebank.example.com",
           supportPhone: data.supportPhone || "1-800-555-1234",
           instagramUrl: data.instagramUrl || "",
           twitterUrl: data.twitterUrl || "",
           facebookUrl: data.facebookUrl || "",
-          linkedinUrl: data.linkedinUrl || "",
           privacyPolicy: data.privacyPolicy || "",
           termsOfService: data.termsOfService || "",
+          primaryColor: data.primaryColor || "#6D1ED4",
+          logoUrl: data.logoUrl || "/zelle-logo.svg",
+          zelleLogoUrl: data.zelleLogoUrl || "/zelle-logo.svg",
+          checkingIcon: data.checkingIcon || "square",
+          savingsIcon: data.savingsIcon || "circle",
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching settings:", error);
-        if (!error.message.includes("Unauthorized")) { // Avoid overwriting 401 redirect
+        if (!error.message.includes("Unauthorized")) {
           setError("Failed to load settings from the server. Using default values.");
         }
       } finally {
@@ -107,83 +104,60 @@ export default function AdminSettingsPage() {
     checkAuthAndFetchSettings();
   }, [router]);
 
-  // Handlers for form changes and submissions (unchanged from original)
-  const handleGeneralChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  // Handlers for form changes
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setGeneralSettings({ ...generalSettings, [name]: value });
+    setSettings({ ...settings, [name]: value });
   };
 
-  const handleAppearanceChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setAppearanceSettings({ ...appearanceSettings, [name]: value });
-  };
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: "logoUrl" | "zelleLogoUrl") => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setAppearanceSettings({ ...appearanceSettings, logoUrl: reader.result as string });
+        setSettings({ ...settings, [field]: reader.result as string });
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleZelleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAppearanceSettings({ ...appearanceSettings, zelleLogoUrl: reader.result as string });
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleSelect = (name: string, value: string) => {
+    setSettings({ ...settings, [name]: value });
   };
 
-  const handleAppearanceSelect = (name: string, value: string) => {
-    setAppearanceSettings({ ...appearanceSettings, [name]: value });
-  };
-
-  const handleSaveSettings = async (settingsType: string) => {
+  const handleSaveSettings = async () => {
     setIsLoading(true);
     setSuccess(null);
     setError(null);
     try {
-      if (settingsType === "General") {
-        const response = await fetch("/api/admin/settings", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(generalSettings),
-          credentials: "include",
-        });
+      const response = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(settings),
+        credentials: "include",
+      });
 
-        if (!response.ok) {
-          if (response.status === 401) {
-            setError("Unauthorized. Redirecting to login...");
-            router.push("/admin/login");
-            return;
-          }
-          throw new Error(`Failed to save settings. Status: ${response.status}`);
+      if (!response.ok) {
+        if (response.status === 401) {
+          setError("Unauthorized. Redirecting to login...");
+          router.push("/admin/login");
+          return;
         }
-
-        setSuccess("General settings saved successfully");
-      } else {
-        // Simulate save for appearance settings (not required by task)
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        setSuccess("Appearance settings saved successfully");
+        throw new Error(`Failed to save settings. Status: ${response.status}`);
       }
+
+      setSuccess("Settings saved successfully");
       setTimeout(() => setSuccess(null), 3000);
-    } catch (error) {
-      console.error(`Error saving ${settingsType.toLowerCase()} settings:`, error);
-      setError(`Failed to save ${settingsType.toLowerCase()} settings. Please try again.`);
+    } catch (error: any) {
+      console.error("Error saving settings:", error);
+      setError("Failed to save settings. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Render loading state or redirect if not authenticated
   if (isLoadingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -196,7 +170,6 @@ export default function AdminSettingsPage() {
     return null; // Router will handle redirect to /admin/login
   }
 
-  // Original UI rendering
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-indigo-50">
       <div className="p-6 max-w-5xl mx-auto">
@@ -261,8 +234,8 @@ export default function AdminSettingsPage() {
                     <Input
                       id="siteName"
                       name="siteName"
-                      value={generalSettings.siteName}
-                      onChange={handleGeneralChange}
+                      value={settings.siteName}
+                      onChange={handleChange}
                       className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                     />
                   </div>
@@ -276,8 +249,8 @@ export default function AdminSettingsPage() {
                       id="supportEmail"
                       name="supportEmail"
                       type="email"
-                      value={generalSettings.supportEmail}
-                      onChange={handleGeneralChange}
+                      value={settings.supportEmail}
+                      onChange={handleChange}
                       className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                     />
                   </div>
@@ -288,8 +261,8 @@ export default function AdminSettingsPage() {
                     <Input
                       id="supportPhone"
                       name="supportPhone"
-                      value={generalSettings.supportPhone}
-                      onChange={handleGeneralChange}
+                      value={settings.supportPhone}
+                      onChange={handleChange}
                       className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                     />
                   </div>
@@ -305,8 +278,8 @@ export default function AdminSettingsPage() {
                         id="instagramUrl"
                         name="instagramUrl"
                         type="url"
-                        value={generalSettings.instagramUrl}
-                        onChange={handleGeneralChange}
+                        value={settings.instagramUrl}
+                        onChange={handleChange}
                         placeholder="https://instagram.com/yourprofile"
                         className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                       />
@@ -319,8 +292,8 @@ export default function AdminSettingsPage() {
                         id="twitterUrl"
                         name="twitterUrl"
                         type="url"
-                        value={generalSettings.twitterUrl}
-                        onChange={handleGeneralChange}
+                        value={settings.twitterUrl}
+                        onChange={handleChange}
                         placeholder="https://twitter.com/yourprofile"
                         className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                       />
@@ -333,23 +306,9 @@ export default function AdminSettingsPage() {
                         id="facebookUrl"
                         name="facebookUrl"
                         type="url"
-                        value={generalSettings.facebookUrl}
-                        onChange={handleGeneralChange}
+                        value={settings.facebookUrl}
+                        onChange={handleChange}
                         placeholder="https://facebook.com/yourprofile"
-                        className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="linkedinUrl" className="text-indigo-800">
-                        LinkedIn URL
-                      </Label>
-                      <Input
-                        id="linkedinUrl"
-                        name="linkedinUrl"
-                        type="url"
-                        value={generalSettings.linkedinUrl}
-                        onChange={handleGeneralChange}
-                        placeholder="https://linkedin.com/company/yourcompany"
                         className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                       />
                     </div>
@@ -365,8 +324,8 @@ export default function AdminSettingsPage() {
                       <Textarea
                         id="privacyPolicy"
                         name="privacyPolicy"
-                        value={generalSettings.privacyPolicy}
-                        onChange={handleGeneralChange}
+                        value={settings.privacyPolicy}
+                        onChange={handleChange}
                         placeholder="Enter your privacy policy here..."
                         rows={6}
                         className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
@@ -379,8 +338,8 @@ export default function AdminSettingsPage() {
                       <Textarea
                         id="termsOfService"
                         name="termsOfService"
-                        value={generalSettings.termsOfService}
-                        onChange={handleGeneralChange}
+                        value={settings.termsOfService}
+                        onChange={handleChange}
                         placeholder="Enter your terms of service here..."
                         rows={6}
                         className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
@@ -391,7 +350,7 @@ export default function AdminSettingsPage() {
               </CardContent>
               <CardFooter>
                 <Button
-                  onClick={() => handleSaveSettings("General")}
+                  onClick={handleSaveSettings}
                   disabled={isLoading}
                   className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
                 >
@@ -429,13 +388,13 @@ export default function AdminSettingsPage() {
                       id="primaryColor"
                       name="primaryColor"
                       type="color"
-                      value={appearanceSettings.primaryColor}
-                      onChange={handleAppearanceChange}
+                      value={settings.primaryColor}
+                      onChange={handleChange}
                       className="w-12 h-10 p-1 border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                     />
                     <Input
-                      value={appearanceSettings.primaryColor}
-                      onChange={handleAppearanceChange}
+                      value={settings.primaryColor}
+                      onChange={handleChange}
                       name="primaryColor"
                       className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                     />
@@ -449,7 +408,7 @@ export default function AdminSettingsPage() {
                         id="logoUpload"
                         type="file"
                         accept="image/*"
-                        onChange={handleLogoUpload}
+                        onChange={(e) => handleLogoUpload(e, "logoUrl")}
                         className="hidden"
                       />
                       <Button
@@ -461,8 +420,8 @@ export default function AdminSettingsPage() {
                         Upload Logo
                       </Button>
                     </div>
-                    {appearanceSettings.logoUrl && (
-                      <img src={appearanceSettings.logoUrl} alt="Logo preview" className="h-10 w-auto rounded" />
+                    {settings.logoUrl && (
+                      <img src={settings.logoUrl} alt="Logo preview" className="h-10 w-auto rounded" />
                     )}
                   </div>
                 </div>
@@ -474,7 +433,7 @@ export default function AdminSettingsPage() {
                         id="zelleLogoUpload"
                         type="file"
                         accept="image/*"
-                        onChange={handleZelleLogoUpload}
+                        onChange={(e) => handleLogoUpload(e, "zelleLogoUrl")}
                         className="hidden"
                       />
                       <Button
@@ -486,8 +445,8 @@ export default function AdminSettingsPage() {
                         Upload Zelle Logo
                       </Button>
                     </div>
-                    {appearanceSettings.zelleLogoUrl && (
-                      <img src={appearanceSettings.zelleLogoUrl} alt="Zelle Logo preview" className="h-10 w-auto rounded" />
+                    {settings.zelleLogoUrl && (
+                      <img src={settings.zelleLogoUrl} alt="Zelle Logo preview" className="h-10 w-auto rounded" />
                     )}
                   </div>
                 </div>
@@ -499,8 +458,8 @@ export default function AdminSettingsPage() {
                         Checking Account Icon
                       </Label>
                       <Select
-                        value={appearanceSettings.checkingIcon}
-                        onValueChange={(value) => handleAppearanceSelect("checkingIcon", value)}
+                        value={settings.checkingIcon}
+                        onValueChange={(value) => handleSelect("checkingIcon", value)}
                       >
                         <SelectTrigger
                           id="checkingIcon"
@@ -520,8 +479,8 @@ export default function AdminSettingsPage() {
                         Savings Account Icon
                       </Label>
                       <Select
-                        value={appearanceSettings.savingsIcon}
-                        onValueChange={(value) => handleAppearanceSelect("savingsIcon", value)}
+                        value={settings.savingsIcon}
+                        onValueChange={(value) => handleSelect("savingsIcon", value)}
                       >
                         <SelectTrigger
                           id="savingsIcon"
@@ -545,14 +504,14 @@ export default function AdminSettingsPage() {
                       <div className="border rounded-md p-4 bg-background">
                         <div className="flex items-center gap-2 mb-4">
                           <img
-                            src={appearanceSettings.logoUrl || "/placeholder.svg"}
+                            src={settings.logoUrl || "/placeholder.svg"}
                             alt="Logo"
                             className="h-8 w-auto"
                           />
-                          <span className="font-bold">{generalSettings.siteName}</span>
+                          <span className="font-bold">{settings.siteName}</span>
                         </div>
                         <div className="flex gap-2">
-                          <Button style={{ backgroundColor: appearanceSettings.primaryColor }}>
+                          <Button style={{ backgroundColor: settings.primaryColor }}>
                             Primary Button
                           </Button>
                           <Button variant="outline">Secondary Button</Button>
@@ -564,7 +523,7 @@ export default function AdminSettingsPage() {
               </CardContent>
               <CardFooter>
                 <Button
-                  onClick={() => handleSaveSettings("Appearance")}
+                  onClick={handleSaveSettings}
                   disabled={isLoading}
                   className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
                 >

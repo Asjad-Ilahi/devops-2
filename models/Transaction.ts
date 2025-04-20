@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 
-// Define the Transaction schema
 const transactionSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -54,19 +53,23 @@ const transactionSchema = new mongoose.Schema({
   },
   cryptoAmount: {
     type: Number,
-    required: function (this: any) {
+    required: function () {
       return this.type === "crypto_buy" || this.type === "crypto_sell";
     },
   },
   cryptoPrice: {
     type: Number,
-    required: function (this: any) {
+    required: function () {
       return this.type === "crypto_buy" || this.type === "crypto_sell";
     },
   },
   relatedTransactionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Transaction",
+  },
+  transferId: {
+    type: mongoose.Schema.Types.ObjectId,
+    index: true,
   },
 });
 

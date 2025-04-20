@@ -62,9 +62,13 @@ export async function PUT(request: NextRequest) {
         instagramUrl: data.instagramUrl || '',
         twitterUrl: data.twitterUrl || '',
         facebookUrl: data.facebookUrl || '',
-        linkedinUrl: data.linkedinUrl || '',
         privacyPolicy: data.privacyPolicy,
-        termsOfService: data.termsOfService
+        termsOfService: data.termsOfService,
+        primaryColor: data.primaryColor || '',
+        logoUrl: data.logoUrl || '',
+        zelleLogoUrl: data.zelleLogoUrl || '',
+        checkingIcon: data.checkingIcon || '',
+        savingsIcon: data.savingsIcon || ''
       },
       { upsert: true, new: true }
     );
