@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import Color from "color"
 import {
   ArrowDown,
   ArrowLeft,
@@ -35,6 +36,12 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { DateRange } from "react-day-picker"
+
+// Interface for Colors
+interface Colors {
+  primaryColor: string
+  secondaryColor: string
+}
 
 // Define User interface
 interface User {
@@ -90,6 +97,49 @@ export default function AdminTransactionsPage() {
   const [groupedTransactions, setGroupedTransactions] = useState<TransactionGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [colors, setColors] = useState<Colors | null>(null)
+
+  // Fetch colors and set CSS custom properties
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch("/api/colors")
+        if (!response.ok) throw new Error("Failed to fetch colors")
+        const data: Colors = await response.json()
+        setColors(data)
+
+        const primary = Color(data.primaryColor)
+        const secondary = Color(data.secondaryColor)
+
+        const generateShades = (color: typeof Color.prototype) => ({
+          50: color.lighten(0.5).hex(),
+          100: color.lighten(0.4).hex(),
+          200: color.lighten(0.3).hex(),
+          300: color.lighten(0.2).hex(),
+          400: color.lighten(0.1).hex(),
+          500: color.hex(),
+          600: color.darken(0.1).hex(),
+          700: color.darken(0.2).hex(),
+          800: color.darken(0.3).hex(),
+          900: color.darken(0.4).hex(),
+        })
+
+        const primaryShades = generateShades(primary)
+        const secondaryShades = generateShades(secondary)
+
+        Object.entries(primaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--primary-${shade}`, color)
+        })
+
+        Object.entries(secondaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--secondary-${shade}`, color)
+        })
+      } catch (error) {
+        console.error("Error fetching colors:", error)
+      }
+    }
+    fetchColors()
+  }, [])
 
   // Fetch transactions and users from API
   useEffect(() => {
@@ -175,7 +225,7 @@ export default function AdminTransactionsPage() {
             type: "transfer",
           })
           processedIds.add(senderTx.id)
-          processedIds.add(receiverTx.id)
+          processedIds.add(relatedTx.id)
         } else {
           // Fallback for unpaired transfer
           grouped.push({
@@ -267,7 +317,7 @@ export default function AdminTransactionsPage() {
       case "withdrawal":
         return <ArrowUp className="h-5 w-5 text-red-600" />
       case "transfer":
-        return <Send className="h-5 w-5 text-blue-600" />
+        return <Send className="h-5 w-5 text-primary-600" />
       case "payment":
         return <CreditCard className="h-5 w-5 text-orange-600" />
       case "fee":
@@ -275,9 +325,9 @@ export default function AdminTransactionsPage() {
       case "refund":
         return <RefreshCcw className="h-5 w-5 text-yellow-600" />
       case "crypto_buy":
-        return <CreditCard className="h-5 w-5 text-purple-600" />
+        return <CreditCard className="h-5 w-5 text-secondary-600" />
       case "crypto_sell":
-        return <CreditCard className="h-5 w-5 text-indigo-600" />
+        return <CreditCard className="h-5 w-5 text-primary-600" />
       default:
         return <CreditCard className="h-5 w-5" />
     }
@@ -324,48 +374,48 @@ export default function AdminTransactionsPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-indigo-50">
+    <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
       <div className="p-6 max-w-7xl mx-auto">
         <Button
           variant="ghost"
           asChild
-          className="p-0 mb-2 text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100 transition-colors"
+          className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
         >
           <Link href="/admin/dashboard">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
           Transaction Management
         </h1>
 
         {/* Error Display */}
         {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertDescription>{error}</AlertDescription>
+          <Alert variant="destructive" className="mb-6 bg-red-50 border-red-200">
+            <AlertDescription className="text-red-700">{error}</AlertDescription>
           </Alert>
         )}
 
         {/* Filters */}
-        <Card className="mb-6 backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+        <Card className="mb-6 backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle className="text-indigo-900">Filters</CardTitle>
-                <CardDescription className="text-indigo-600">Filter transaction history</CardDescription>
+                <CardTitle className="text-primary-900">Filters</CardTitle>
+                <CardDescription className="text-primary-600">Filter transaction history</CardDescription>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={resetFilters}
-                className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50"
+                className="text-primary-600 hover:text-primary-800 hover:bg-primary-50"
               >
                 Reset Filters
               </Button>
@@ -456,22 +506,22 @@ export default function AdminTransactionsPage() {
             <div className="mt-4 flex items-center">
               <span className="text-sm font-medium mr-2">Amount:</span>
               <Tabs value={amountFilter} onValueChange={setAmountFilter} className="w-auto">
-                <TabsList className="bg-indigo-100/70 p-1 rounded-lg">
+                <TabsList className="bg-primary-100/70 p-1 rounded-lg">
                   <TabsTrigger
                     value="all"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
                   >
                     All
                   </TabsTrigger>
                   <TabsTrigger
                     value="positive"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
                   >
                     Income
                   </TabsTrigger>
                   <TabsTrigger
                     value="negative"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
                   >
                     Expenses
                   </TabsTrigger>
@@ -482,7 +532,7 @@ export default function AdminTransactionsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300"
+                  className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
                 >
                   <Download className="mr-2 h-4 w-4" />
                   Export
@@ -493,10 +543,10 @@ export default function AdminTransactionsPage() {
         </Card>
 
         {/* Transactions Table */}
-        <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+        <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
           <CardHeader>
-            <CardTitle className="text-indigo-900">Transaction History</CardTitle>
-            <CardDescription className="text-indigo-600">
+            <CardTitle className="text-primary-900">Transaction History</CardTitle>
+            <CardDescription className="text-primary-600">
               {groupedTransactions.length} transactions found
             </CardDescription>
           </CardHeader>
@@ -504,27 +554,27 @@ export default function AdminTransactionsPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b bg-indigo-50/50">
-                    <th className="text-left p-4 text-indigo-800">ID</th>
-                    <th className="text-left p-4 text-indigo-800">Users</th>
-                    <th className="text-left p-4 text-indigo-800">Description</th>
-                    <th className="text-left p-4 text-indigo-800">Date</th>
-                    <th className="text-left p-4 text-indigo-800">Accounts</th>
-                    <th className="text-right p-4 text-indigo-800">Amount</th>
-                    <th className="text-center p-4 text-indigo-800">Status</th>
-                    <th className="text-center p-4 text-indigo-800">Actions</th>
+                  <tr className="border-b bg-primary-50/50">
+                    <th className="text-left p-4 text-primary-800">ID</th>
+                    <th className="text-left p-4 text-primary-800">Users</th>
+                    <th className="text-left p-4 text-primary-800">Description</th>
+                    <th className="text-left p-4 text-primary-800">Date</th>
+                    <th className="text-left p-4 text-primary-800">Accounts</th>
+                    <th className="text-right p-4 text-primary-800">Amount</th>
+                    <th className="text-center p-4 text-primary-800">Status</th>
+                    <th className="text-center p-4 text-primary-800">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-indigo-100">
+                <tbody className="divide-y divide-primary-100">
                   {groupedTransactions.map((group) => {
                     const userNames = group.userIds.map((id) => users.find((u) => u.id === id)?.name || "Unknown User")
                     return (
-                      <tr key={group.id} className="hover:bg-indigo-50/50 transition-colors">
+                      <tr key={group.id} className="hover:bg-primary-50/50 transition-colors">
                         <td className="p-4 font-mono text-xs">{group.id}</td>
                         <td className="p-4">
                           <div>
-                            <div className="font-medium text-indigo-900">{userNames.join(" to ")}</div>
-                            <div className="text-sm text-indigo-600">
+                            <div className="font-medium text-primary-900">{userNames.join(" to ")}</div>
+                            <div className="text-sm text-primary-600">
                               {userNames.map((name, index) => (
                                 <span key={group.userIds[index]}>
                                   {users.find((u) => u.id === group.userIds[index])?.email || ""}
@@ -576,7 +626,7 @@ export default function AdminTransactionsPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50"
+                                className="text-primary-600 hover:text-primary-800 hover:bg-primary-50"
                               >
                                 Actions
                               </Button>

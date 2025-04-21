@@ -1,8 +1,8 @@
 "use client"
 
-import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Color from "color"
 import { Lock, Save, ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,11 +13,19 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
+// Interface for Colors
+interface Colors {
+  primaryColor: string
+  secondaryColor: string
+}
+
+// Interface for Admin Profile
 interface AdminProfile {
   username: string
   email: string
 }
 
+// Interface for Password Data
 interface PasswordData {
   currentPassword: string
   newPassword: string
@@ -40,6 +48,49 @@ export default function AdminProfilePage() {
   const [successMessage, setSuccessMessage] = useState<string>("")
   const [errorMessage, setErrorMessage] = useState<string>("")
   const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [colors, setColors] = useState<Colors | null>(null)
+
+  // Fetch colors and set CSS custom properties
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch("/api/colors")
+        if (!response.ok) throw new Error("Failed to fetch colors")
+        const data: Colors = await response.json()
+        setColors(data)
+
+        const primary = Color(data.primaryColor)
+        const secondary = Color(data.secondaryColor)
+
+        const generateShades = (color: typeof Color.prototype) => ({
+          50: color.lighten(0.5).hex(),
+          100: color.lighten(0.4).hex(),
+          200: color.lighten(0.3).hex(),
+          300: color.lighten(0.2).hex(),
+          400: color.lighten(0.1).hex(),
+          500: color.hex(),
+          600: color.darken(0.1).hex(),
+          700: color.darken(0.2).hex(),
+          800: color.darken(0.3).hex(),
+          900: color.darken(0.4).hex(),
+        })
+
+        const primaryShades = generateShades(primary)
+        const secondaryShades = generateShades(secondary)
+
+        Object.entries(primaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--primary-${shade}`, color)
+        })
+
+        Object.entries(secondaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--secondary-${shade}`, color)
+        })
+      } catch (error) {
+        console.error("Error fetching colors:", error)
+      }
+    }
+    fetchColors()
+  }, [])
 
   useEffect(() => {
     fetchProfile()
@@ -161,14 +212,14 @@ export default function AdminProfilePage() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-indigo-50">
+    <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
       <div className="container px-4 py-6 md:py-8 max-w-6xl mx-auto">
         <div className="mb-6">
           <Button
             variant="outline"
             size="sm"
             asChild
-            className="mb-4 bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300"
+            className="mb-4 bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
           >
             <Link href="/admin/dashboard">
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -184,10 +235,10 @@ export default function AdminProfilePage() {
 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
               My Profile
             </h1>
-            <p className="text-indigo-600">Manage your account settings and preferences</p>
+            <p className="text-primary-600">Manage your account settings and preferences</p>
           </div>
         </div>
 
@@ -204,19 +255,19 @@ export default function AdminProfilePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="md:col-span-1">
-            <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
+            <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg hover:shadow-xl transition-all duration-300">
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center text-center">
-                  <Avatar className="h-24 w-24 mb-4 border-4 border-indigo-100">
-                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+                  <Avatar className="h-24 w-24 mb-4 border-4 border-primary-100">
+                    <AvatarFallback className="bg-gradient-to-br from-primary-500 to-secondary-500 text-white">
                       {profile.username[0]?.toUpperCase() || 'A'}
                     </AvatarFallback>
                   </Avatar>
-                  <h3 className="font-bold text-lg text-indigo-900">
+                  <h3 className="font-bold text-lg text-primary-900">
                     {profile.username}
                   </h3>
-                  <p className="text-indigo-600 text-sm">{profile.email}</p>
-                  <Badge className="mt-2 bg-indigo-100 text-indigo-800 border-indigo-200">Administrator</Badge>
+                  <p className="text-primary-600 text-sm">{profile.email}</p>
+                  <Badge className="mt-2 bg-primary-100 text-primary-800 border-primary-200">Administrator</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -224,26 +275,26 @@ export default function AdminProfilePage() {
 
           <div className="md:col-span-3">
             <Tabs defaultValue="profile">
-              <TabsList className="grid w-full grid-cols-2 bg-indigo-100/70 p-1 rounded-lg">
+              <TabsList className="grid w-full grid-cols-2 bg-primary-100/70 p-1 rounded-lg">
                 <TabsTrigger
                   value="profile"
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
                 >
                   Profile
                 </TabsTrigger>
                 <TabsTrigger
                   value="security"
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
                 >
                   Security
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="profile" className="mt-4">
-                <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
+                <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg hover:shadow-xl transition-all duration-300">
                   <CardHeader>
-                    <CardTitle className="text-indigo-900">Profile Information</CardTitle>
-                    <CardDescription className="text-indigo-600">
+                    <CardTitle className="text-primary-900">Profile Information</CardTitle>
+                    <CardDescription className="text-primary-600">
                       Update your account information and contact details
                     </CardDescription>
                   </CardHeader>
@@ -251,19 +302,19 @@ export default function AdminProfilePage() {
                     <form onSubmit={handleSaveProfile} id="profile-form">
                       <div className="grid grid-cols-1 gap-4 mb-4">
                         <div className="space-y-2">
-                          <Label htmlFor="username" className="text-indigo-800">
+                          <Label htmlFor="username" className="text-primary-800">
                             Username
                           </Label>
                           <Input
                             id="username"
                             value={profile.username}
                             onChange={handleProfileChange}
-                            className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                            className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                             disabled={isLoading}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="email" className="text-indigo-800">
+                          <Label htmlFor="email" className="text-primary-800">
                             Email Address
                           </Label>
                           <Input
@@ -271,7 +322,7 @@ export default function AdminProfilePage() {
                             type="email"
                             value={profile.email}
                             onChange={handleProfileChange}
-                            className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                            className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                             disabled={isLoading}
                           />
                         </div>
@@ -282,7 +333,7 @@ export default function AdminProfilePage() {
                     <Button
                       type="submit"
                       form="profile-form"
-                      className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                      className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
                       disabled={isLoading}
                     >
                       <Save className="mr-2 h-4 w-4" />
@@ -293,10 +344,10 @@ export default function AdminProfilePage() {
               </TabsContent>
 
               <TabsContent value="security" className="mt-4">
-                <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
+                <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg hover:shadow-xl transition-all duration-300">
                   <CardHeader>
-                    <CardTitle className="text-indigo-900">Change Password</CardTitle>
-                    <CardDescription className="text-indigo-600">
+                    <CardTitle className="text-primary-900">Change Password</CardTitle>
+                    <CardDescription className="text-primary-600">
                       Update your password to maintain account security
                     </CardDescription>
                   </CardHeader>
@@ -304,7 +355,7 @@ export default function AdminProfilePage() {
                     <form onSubmit={handleChangePassword} id="password-form">
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <Label htmlFor="currentPassword" className="text-indigo-800">
+                          <Label htmlFor="currentPassword" className="text-primary-800">
                             Current Password
                           </Label>
                           <div className="relative">
@@ -313,7 +364,7 @@ export default function AdminProfilePage() {
                               type={showPassword ? "text" : "password"}
                               value={passwordData.currentPassword}
                               onChange={handlePasswordChange}
-                              className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                              className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                               disabled={isLoading}
                             />
                             <Button
@@ -329,7 +380,7 @@ export default function AdminProfilePage() {
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="newPassword" className="text-indigo-800">
+                          <Label htmlFor="newPassword" className="text-primary-800">
                             New Password
                           </Label>
                           <div className="relative">
@@ -338,7 +389,7 @@ export default function AdminProfilePage() {
                               type={showNewPassword ? "text" : "password"}
                               value={passwordData.newPassword}
                               onChange={handlePasswordChange}
-                              className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                              className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                               disabled={isLoading}
                             />
                             <Button
@@ -354,7 +405,7 @@ export default function AdminProfilePage() {
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="confirmPassword" className="text-indigo-800">
+                          <Label htmlFor="confirmPassword" className="text-primary-800">
                             Confirm New Password
                           </Label>
                           <div className="relative">
@@ -363,7 +414,7 @@ export default function AdminProfilePage() {
                               type={showConfirmPassword ? "text" : "password"}
                               value={passwordData.confirmPassword}
                               onChange={handlePasswordChange}
-                              className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                              className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                               disabled={isLoading}
                             />
                             <Button
@@ -382,11 +433,11 @@ export default function AdminProfilePage() {
                     </form>
                   </CardContent>
                   <CardFooter className="flex justify-between">
-                    <div className="text-sm text-muted-foreground">Password must be at least 8 characters long</div>
+                    <div className="text-sm text-primary-600">Password must be at least 8 characters long</div>
                     <Button
                       type="submit"
                       form="password-form"
-                      className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                      className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
                       disabled={isLoading}
                     >
                       <Lock className="mr-2 h-4 w-4" />

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import Color from "color";
 import {
   ArrowLeft,
   ArrowUpDown,
@@ -36,10 +37,16 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 
+// Interface for Colors
+interface Colors {
+  primaryColor: string;
+  secondaryColor: string;
+}
+
 interface Transaction {
   id: string;
   userId: string;
-  userName: string; // Populated from tx.userId.fullName
+  userName: string;
   userEmail: string;
   type: string;
   amount: number;
@@ -70,6 +77,7 @@ export default function UserTransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [colors, setColors] = useState<Colors | null>(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -93,11 +101,54 @@ export default function UserTransactionsPage() {
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [editFormData, setEditFormData] = useState({
     description: "",
-    amount: 0,
+    amount: "",
     type: "",
     status: "",
     date: "",
   });
+  const [editFormError, setEditFormError] = useState<string | null>(null);
+
+  // Fetch colors and set CSS custom properties
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch("/api/colors");
+        if (!response.ok) throw new Error("Failed to fetch colors");
+        const data: Colors = await response.json();
+        setColors(data);
+
+        const primary = Color(data.primaryColor);
+        const secondary = Color(data.secondaryColor);
+
+        const generateShades = (color: typeof Color.prototype) => ({
+          50: color.lighten(0.5).hex(),
+          100: color.lighten(0.4).hex(),
+          200: color.lighten(0.3).hex(),
+          300: color.lighten(0.2).hex(),
+          400: color.lighten(0.1).hex(),
+          500: color.hex(),
+          600: color.darken(0.1).hex(),
+          700: color.darken(0.2).hex(),
+          800: color.darken(0.3).hex(),
+          900: color.darken(0.4).hex(),
+        });
+
+        const primaryShades = generateShades(primary);
+        const secondaryShades = generateShades(secondary);
+
+        Object.entries(primaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--primary-${shade}`, color);
+        });
+
+        Object.entries(secondaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--secondary-${shade}`, color);
+        });
+      } catch (error) {
+        console.error("Error fetching colors:", error);
+      }
+    };
+    fetchColors();
+  }, []);
 
   // Debounce search term
   useEffect(() => {
@@ -135,23 +186,24 @@ export default function UserTransactionsPage() {
           userData = {
             id: firstTx.userId,
             fullName: firstTx.userName,
-            username: "", // Unknown if user fetch fails
+            username: "",
             email: firstTx.userEmail,
-            accountNumber: "", // Unknown if user fetch fails
-            balance: 0, // Unknown if user fetch fails
+            accountNumber: "",
+            balance: 0,
           };
         }
 
         setUser(userData);
-      } catch (error) {
-        setError("Failed to load user data and transactions");
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to load user data and transactions";
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [userId]);
+  }, [userId, router]);
 
   // Compute filtered and sorted transactions
   const filteredTransactions = useMemo(() => {
@@ -245,8 +297,9 @@ export default function UserTransactionsPage() {
       setSuccess("Transaction removed successfully");
       setIsDeleteDialogOpen(false);
       setTransactionToDelete(null);
-    } catch (error) {
-      setError("Failed to delete transaction");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete transaction";
+      setError(errorMessage);
     }
   };
 
@@ -254,12 +307,30 @@ export default function UserTransactionsPage() {
   const handleEditTransaction = async () => {
     if (!transactionToEdit) return;
 
+    setEditFormError(null);
+    const amount = Number.parseFloat(editFormData.amount);
+    if (isNaN(amount)) {
+      setEditFormError("Please enter a valid amount");
+      return;
+    }
+    if (!editFormData.description) {
+      setEditFormError("Description is required");
+      return;
+    }
+    if (!editFormData.date || isNaN(new Date(editFormData.date).getTime())) {
+      setEditFormError("Please enter a valid date");
+      return;
+    }
+
     try {
       const response = await fetch(`/api/admin/transactions/${transactionToEdit.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(editFormData),
+        body: JSON.stringify({
+          ...editFormData,
+          amount,
+        }),
       });
 
       if (!response.ok) {
@@ -273,8 +344,9 @@ export default function UserTransactionsPage() {
       setSuccess("Transaction updated successfully");
       setIsEditDialogOpen(false);
       setTransactionToEdit(null);
-    } catch (error) {
-      setError("Failed to update transaction");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update transaction";
+      setError(errorMessage);
     }
   };
 
@@ -283,11 +355,12 @@ export default function UserTransactionsPage() {
     setTransactionToEdit(transaction);
     setEditFormData({
       description: transaction.description,
-      amount: transaction.amount,
+      amount: transaction.amount.toString(),
       type: transaction.type,
       status: transaction.status,
-      date: transaction.date,
+      date: new Date(transaction.date).toISOString().slice(0, 16),
     });
+    setEditFormError(null);
     setIsEditDialogOpen(true);
   };
 
@@ -308,20 +381,20 @@ export default function UserTransactionsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-indigo-50">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-700" />
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-700" />
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-indigo-50">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50">
         <div className="text-center">
           <X className="mx-auto h-12 w-12 text-red-500" />
-          <h2 className="mt-4 text-2xl font-bold text-indigo-900">User Not Found</h2>
-          <p className="mt-2 text-indigo-600">The requested user could not be found.</p>
-          <Button asChild className="mt-6 bg-indigo-600 hover:bg-indigo-700">
+          <h2 className="mt-4 text-2xl font-bold text-primary-900">User Not Found</h2>
+          <p className="mt-2 text-primary-600">The requested user could not be found.</p>
+          <Button asChild className="mt-6 bg-primary-600 hover:bg-primary-700 text-white">
             <Link href="/admin/users">Back to Users</Link>
           </Button>
         </div>
@@ -330,12 +403,12 @@ export default function UserTransactionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 p-6">
       <div className="max-w-7xl mx-auto">
         <Button
           variant="ghost"
           asChild
-          className="p-0 mb-2 text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100 transition-colors"
+          className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
         >
           <Link href={`/admin/users/${userId}`}>
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -344,10 +417,10 @@ export default function UserTransactionsPage() {
         </Button>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
               Transaction History for {user.fullName}
             </h1>
-            <p className="text-indigo-600">
+            <p className="text-primary-600">
               Account: {user.accountNumber} | Balance: ${user.balance.toFixed(2)}
             </p>
           </div>
@@ -355,7 +428,7 @@ export default function UserTransactionsPage() {
             variant="outline"
             size="sm"
             onClick={exportTransactions}
-            className="bg-white/60 border-indigo border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800"
+            className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800"
           >
             <Download className="mr-2 h-4 w-4" />
             Export
@@ -370,39 +443,39 @@ export default function UserTransactionsPage() {
         )}
 
         {error && (
-          <Alert variant="destructive" className="mb-6">
-            <X className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+          <Alert variant="destructive" className="mb-6 bg-red-50 border-red-200">
+            <X className="h-4 w-4 text-red-700" />
+            <AlertDescription className="text-red-700">{error}</AlertDescription>
           </Alert>
         )}
 
-        <Card className="mb-6 backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+        <Card className="mb-6 backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
           <CardHeader>
-            <CardTitle className="text-indigo-900">Filters</CardTitle>
+            <CardTitle className="text-primary-900">Filters</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <Label htmlFor="search" className="mb-2 block text-indigo-800">
+                <Label htmlFor="search" className="mb-2 block text-primary-800">
                   Search
                 </Label>
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-indigo-500" />
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-primary-500" />
                   <Input
                     id="search"
                     placeholder="Search transactions..."
-                    className="pl-8 border-indigo-200 focus:border-indigo-400"
+                    className="pl-8 border-primary-200 focus:border-primary-400 bg-white/80"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
               </div>
               <div>
-                <Label htmlFor="type-filter" className="mb-2 block text-indigo-800">
+                <Label htmlFor="type-filter" className="mb-2 block text-primary-800">
                   Type
                 </Label>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger id="type-filter" className="border-indigo-200">
+                  <SelectTrigger id="type-filter" className="border-primary-200 bg-white/80">
                     <SelectValue placeholder="All Types" />
                   </SelectTrigger>
                   <SelectContent>
@@ -420,11 +493,11 @@ export default function UserTransactionsPage() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="status-filter" className="mb-2 block text-indigo-800">
+                <Label htmlFor="status-filter" className="mb-2 block text-primary-800">
                   Status
                 </Label>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger id="status-filter" className="border-indigo-200">
+                  <SelectTrigger id="status-filter" className="border-primary-200 bg-white/80">
                     <SelectValue placeholder="All Statuses" />
                   </SelectTrigger>
                   <SelectContent>
@@ -436,11 +509,11 @@ export default function UserTransactionsPage() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="date-filter" className="mb-2 block text-indigo-800">
+                <Label htmlFor="date-filter" className="mb-2 block text-primary-800">
                   Date Range
                 </Label>
                 <Select value={dateFilter} onValueChange={setDateFilter}>
-                  <SelectTrigger id="date-filter" className="border-indigo-200">
+                  <SelectTrigger id="date-filter" className="border-primary-200 bg-white/80">
                     <SelectValue placeholder="All Time" />
                   </SelectTrigger>
                   <SelectContent>
@@ -457,17 +530,17 @@ export default function UserTransactionsPage() {
                 variant="outline"
                 size="sm"
                 onClick={resetFilters}
-                className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                className="border-primary-200 text-primary-700 hover:bg-primary-50"
               >
                 <X className="mr-2 h-4 w-4" />
                 Reset Filters
               </Button>
               <div className="flex items-center gap-2">
-                <Label htmlFor="sort-field" className="text-sm text-indigo-800">
+                <Label htmlFor="sort-field" className="text-sm text-primary-800">
                   Sort by:
                 </Label>
                 <Select value={sortField} onValueChange={setSortField}>
-                  <SelectTrigger id="sort-field" className="w-[120px] border-indigo-200">
+                  <SelectTrigger id="sort-field" className="w-[120px] border-primary-200 bg-white/80">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -479,20 +552,20 @@ export default function UserTransactionsPage() {
                   variant="ghost"
                   size="icon"
                   onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
-                  className="text-indigo-700 hover:bg-indigo-100"
+                  className="text-primary-700 hover:bg-primary-100"
                 >
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </div>
             </div>
-          </CardContent>
+            </CardContent>
         </Card>
 
-        <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+        <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
           <CardHeader>
             <div className="flex justify-between items-center">
-              <CardTitle className="text-indigo-900">Transactions</CardTitle>
-              <div className="text-sm text-indigo-600">
+              <CardTitle className="text-primary-900">Transactions</CardTitle>
+              <div className="text-sm text-primary-600">
                 Showing {filteredTransactions.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}-
                 {Math.min(currentPage * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length}
               </div>
@@ -503,22 +576,22 @@ export default function UserTransactionsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b bg-indigo-50/50">
-                      <th className="text-left p-4 text-indigo-800">Date</th>
-                      <th className="text-left p-4 text-indigo-800">Description</th>
-                      <th className="text-left p-4 text-indigo-800">Type</th>
-                      <th className="text-right p-4 text-indigo-800">Amount</th>
-                      <th className="text-center p-4 text-indigo-800">Status</th>
-                      <th className="text-center p-4 text-indigo-800">Actions</th>
+                    <tr className="border-b bg-primary-50/50">
+                      <th className="text-left p-4 text-primary-800">Date</th>
+                      <th className="text-left p-4 text-primary-800">Description</th>
+                      <th className="text-left p-4 text-primary-800">Type</th>
+                      <th className="text-right p-4 text-primary-800">Amount</th>
+                      <th className="text-center p-4 text-primary-800">Status</th>
+                      <th className="text-center p-4 text-primary-800">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-indigo-100">
+                  <tbody className="divide-y divide-primary-100">
                     {currentPageItems.map((transaction) => (
-                      <tr key={transaction.id} className="hover:bg-indigo-50/50 transition-colors">
-                        <td className="p-4 text-sm text-indigo-900">
+                      <tr key={transaction.id} className="hover:bg-primary-50/50 transition-colors">
+                        <td className="p-4 text-sm text-primary-900">
                           {new Date(transaction.date).toLocaleString()}
                         </td>
-                        <td className="p-4 text-sm text-indigo-900">{transaction.description}</td>
+                        <td className="p-4 text-sm text-primary-900">{transaction.description}</td>
                         <td className="p-4">
                           <Badge
                             variant="outline"
@@ -536,7 +609,7 @@ export default function UserTransactionsPage() {
                                 : transaction.type === "interest"
                                 ? "bg-green-50 text-green-700 border-green-200"
                                 : transaction.type === "crypto_buy" || transaction.type === "crypto_sell"
-                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                ? "bg-secondary-50 text-secondary-700 border-secondary-200"
                                 : transaction.type === "refund"
                                 ? "bg-yellow-50 text-yellow-700 border-yellow-200"
                                 : "bg-gray-50 text-gray-700 border-gray-200"
@@ -545,7 +618,7 @@ export default function UserTransactionsPage() {
                             {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
                           </Badge>
                         </td>
-                        <td className="p-4 text-right text-sm text-indigo-900">
+                        <td className="p-4 text-right text-sm text-primary-900">
                           ${transaction.amount.toFixed(2)}
                         </td>
                         <td className="p-4 text-center">
@@ -567,7 +640,7 @@ export default function UserTransactionsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => openEditDialog(transaction)}
-                            className="text-indigo-700 hover:text-indigo-900"
+                            className="text-primary-700 hover:text-primary-900"
                           >
                             Edit
                           </Button>
@@ -589,19 +662,19 @@ export default function UserTransactionsPage() {
                 </table>
               </div>
             ) : (
-              <div className="py-12 text-center text-indigo-600">
+              <div className="py-12 text-center text-primary-600">
                 No transactions found matching your filters.
               </div>
             )}
 
             {filteredTransactions.length > 0 && (
               <div className="mt-6 flex items-center justify-between">
-                <div className="text-sm text-indigo-600">
+                <div className="text-sm text-primary-600">
                   Page {currentPage} of {totalPages}
                 </div>
                 <div className="flex items-center gap-2">
                   <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
-                    <SelectTrigger className="w-[100px] border-indigo-200">
+                    <SelectTrigger className="w-[100px] border-primary-200 bg-white/80">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -616,7 +689,7 @@ export default function UserTransactionsPage() {
                     size="icon"
                     onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
-                    className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                    className="border-primary-200 text-primary-700 hover:bg-primary-50"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
@@ -625,7 +698,7 @@ export default function UserTransactionsPage() {
                     size="icon"
                     onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
-                    className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                    className="border-primary-200 text-primary-700 hover:bg-primary-50"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
@@ -636,28 +709,34 @@ export default function UserTransactionsPage() {
         </Card>
 
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-[500px] backdrop-blur-sm bg-white/60 border border-indigo-100">
+          <DialogContent className="sm:max-w-[500px] backdrop-blur-sm bg-white/60 border border-primary-100">
             <DialogHeader>
-              <DialogTitle className="text-indigo-900">Edit Transaction</DialogTitle>
-              <DialogDescription className="text-indigo-600">
+              <DialogTitle className="text-primary-900">Edit Transaction</DialogTitle>
+              <DialogDescription className="text-primary-600">
                 Modify the transaction details below.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              {editFormError && (
+                <Alert variant="destructive" className="bg-red-50 border-red-200">
+                  <X className="h-4 w-4 text-red-700" />
+                  <AlertDescription className="text-red-700">{editFormError}</AlertDescription>
+                </Alert>
+              )}
               <div className="grid gap-2">
-                <Label htmlFor="edit-description" className="text-indigo-800">
+                <Label htmlFor="edit-description" className="text-primary-800">
                   Description
                 </Label>
                 <Textarea
                   id="edit-description"
                   value={editFormData.description}
                   onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                  className="border-indigo-200 focus:border-indigo-400"
+                  className="border-primary-200 focus:border-primary-400 bg-white/80"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-amount" className="text-indigo-800">
+                  <Label htmlFor="edit-amount" className="text-primary-800">
                     Amount
                   </Label>
                   <Input
@@ -665,30 +744,30 @@ export default function UserTransactionsPage() {
                     type="number"
                     step="0.01"
                     value={editFormData.amount}
-                    onChange={(e) => setEditFormData({ ...editFormData, amount: Number.parseFloat(e.target.value) })}
-                    className="border-indigo-200 focus:border-indigo-400"
+                    onChange={(e) => setEditFormData({ ...editFormData, amount: e.target.value })}
+                    className="border-primary-200 focus:border-primary-400 bg-white/80"
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-date" className="text-indigo-800">
+                  <Label htmlFor="edit-date" className="text-primary-800">
                     Date
                   </Label>
                   <Input
                     id="edit-date"
-                    type="text"
+                    type="datetime-local"
                     value={editFormData.date}
                     onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                    className="border-indigo-200 focus:border-indigo-400"
+                    className="border-primary-200 focus:border-primary-400 bg-white/80"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-type" className="text-indigo-800">
+                  <Label htmlFor="edit-type" className="text-primary-800">
                     Type
                   </Label>
                   <Select value={editFormData.type} onValueChange={(value) => setEditFormData({ ...editFormData, type: value })}>
-                    <SelectTrigger id="edit-type" className="border-indigo-200">
+                    <SelectTrigger id="edit-type" className="border-primary-200 bg-white/80">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -705,14 +784,14 @@ export default function UserTransactionsPage() {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-status" className="text-indigo-800">
+                  <Label htmlFor="edit-status" className="text-primary-800">
                     Status
                   </Label>
                   <Select
                     value={editFormData.status}
                     onValueChange={(value) => setEditFormData({ ...editFormData, status: value })}
                   >
-                    <SelectTrigger id="edit-status" className="border-indigo-200">
+                    <SelectTrigger id="edit-status" className="border-primary-200 bg-white/80">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -727,14 +806,17 @@ export default function UserTransactionsPage() {
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setIsEditDialogOpen(false)}
-                className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                onClick={() => {
+                  setIsEditDialogOpen(false);
+                  setEditFormError(null);
+                }}
+                className="border-primary-200 text-primary-700 hover:bg-primary-50"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleEditTransaction}
-                className="bg-indigo-600 text-white hover:bg-indigo-700"
+                className="bg-primary-600 text-white hover:bg-primary-700"
               >
                 Save Changes
               </Button>
@@ -743,10 +825,10 @@ export default function UserTransactionsPage() {
         </Dialog>
 
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="backdrop-blur-sm bg-white/60 border border-indigo-100">
+          <DialogContent className="backdrop-blur-sm bg-white/60 border border-primary-100">
             <DialogHeader>
-              <DialogTitle className="text-indigo-900">Delete Transaction</DialogTitle>
-              <DialogDescription className="text-indigo-600">
+              <DialogTitle className="text-primary-900">Delete Transaction</DialogTitle>
+              <DialogDescription className="text-primary-600">
                 Are you sure you want to delete this transaction? This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
@@ -757,7 +839,7 @@ export default function UserTransactionsPage() {
                   setIsDeleteDialogOpen(false);
                   setTransactionToDelete(null);
                 }}
-                className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                className="border-primary-200 text-primary-700 hover:bg-primary-50"
               >
                 Cancel
               </Button>

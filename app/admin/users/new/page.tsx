@@ -2,9 +2,10 @@
 
 import { Checkbox } from "@/components/ui/checkbox"
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import Color from "color"
 import { ArrowLeft, Check, Eye, EyeOff, Loader2, Save } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -17,8 +18,17 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
+// Interface for Colors
+interface Colors {
+  primaryColor: string;
+  secondaryColor: string;
+}
+
 export default function NewUserPage() {
   const router = useRouter()
+
+  // State for active tab
+  const [activeTab, setActiveTab] = useState<"basic" | "account" | "financial">("basic")
 
   // User form state aligned with Code-02
   const [userForm, setUserForm] = useState({
@@ -34,9 +44,9 @@ export default function NewUserPage() {
     password: "",
     confirmPassword: "",
     twoFactorEnabled: false,
-    balance: 0,
-    savingsBalance: 0,
-    cryptoBalance: 0,
+    balance: "",
+    savingsBalance: "",
+    cryptoBalance: "",
   })
 
   // Password visibility state
@@ -47,6 +57,51 @@ export default function NewUserPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Colors state
+  const [colors, setColors] = useState<Colors | null>(null)
+
+  // Fetch colors and set CSS custom properties
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch("/api/colors")
+        if (!response.ok) throw new Error("Failed to fetch colors")
+        const data: Colors = await response.json()
+        setColors(data)
+
+        const primary = Color(data.primaryColor)
+        const secondary = Color(data.secondaryColor)
+
+        const generateShades = (color: typeof Color.prototype) => ({
+          50: color.lighten(0.5).hex(),
+          100: color.lighten(0.4).hex(),
+          200: color.lighten(0.3).hex(),
+          300: color.lighten(0.2).hex(),
+          400: color.lighten(0.1).hex(),
+          500: color.hex(),
+          600: color.darken(0.1).hex(),
+          700: color.darken(0.2).hex(),
+          800: color.darken(0.3).hex(),
+          900: color.darken(0.4).hex(),
+        })
+
+        const primaryShades = generateShades(primary)
+        const secondaryShades = generateShades(secondary)
+
+        Object.entries(primaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--primary-${shade}`, color)
+        })
+
+        Object.entries(secondaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--secondary-${shade}`, color)
+        })
+      } catch (error) {
+        console.error("Error fetching colors:", error)
+      }
+    }
+    fetchColors()
+  }, [])
 
   // US states list from Code-02
   const usStates = [
@@ -72,11 +127,7 @@ export default function NewUserPage() {
   // Handle form changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    if (["balance", "savingsBalance", "cryptoBalance"].includes(name)) {
-      setUserForm({ ...userForm, [name]: value === "" ? 0 : Number(value) })
-    } else {
-      setUserForm({ ...userForm, [name]: value })
-    }
+    setUserForm({ ...userForm, [name]: value })
   }
 
   const handleSSNChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,7 +176,7 @@ export default function NewUserPage() {
     setSuccess(null)
     setError(null)
 
-    // Validate form (from Code-02)
+    // Validate form
     if (
       !userForm.fullName ||
       !userForm.email ||
@@ -174,9 +225,36 @@ export default function NewUserPage() {
       return
     }
 
+    // Validate numeric fields
+    const balance = Number.parseFloat(userForm.balance)
+    const savingsBalance = Number.parseFloat(userForm.savingsBalance)
+    const cryptoBalance = Number.parseFloat(userForm.cryptoBalance)
+
+    if (isNaN(balance) || balance < 0) {
+      setError("Initial Checking Balance must be a non-negative number")
+      setIsLoading(false)
+      return
+    }
+    if (isNaN(savingsBalance) || savingsBalance < 0) {
+      setError("Initial Savings Balance must be a non-negative number")
+      setIsLoading(false)
+      return
+    }
+    if (isNaN(cryptoBalance) || cryptoBalance < 0) {
+      setError("Initial Crypto Balance must be a non-negative number")
+      setIsLoading(false)
+      return
+    }
+
     const { confirmPassword, ...userData } = userForm
     const twoFactorCode = userData.twoFactorEnabled ? generateTwoFactorCode() : ""
-    const dataToSend = { ...userData, twoFactorCode }
+    const dataToSend = {
+      ...userData,
+      balance,
+      savingsBalance,
+      cryptoBalance,
+      twoFactorCode,
+    }
 
     try {
       const response = await fetch("/api/admin/admin-create-user", {
@@ -207,7 +285,7 @@ export default function NewUserPage() {
         `User created successfully with ID: ${result.userId}\nChecking Account: ${result.accountNumber}\nSavings Account: ${result.savingsNumber}\nCrypto Account: ${result.cryptoNumber}`
       )
 
-      // Reset form (aligned with Code-02)
+      // Reset form
       setUserForm({
         fullName: "",
         email: "",
@@ -221,32 +299,34 @@ export default function NewUserPage() {
         password: "",
         confirmPassword: "",
         twoFactorEnabled: false,
-        balance: 0,
-        savingsBalance: 0,
-        cryptoBalance: 0,
+        balance: "",
+        savingsBalance: "",
+        cryptoBalance: "",
       })
-    } catch (error: any) {
-      setError(error.message || "An unexpected error occurred")
+      setActiveTab("basic")
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred"
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-indigo-50">
+    <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
       <div className="p-6 max-w-5xl mx-auto">
         <div className="mb-6">
           <Button
             variant="ghost"
             asChild
-            className="p-0 mb-2 text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100 transition-colors"
+            className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
           >
             <Link href="/admin/users">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Users
             </Link>
           </Button>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
             Create New User
           </h1>
         </div>
@@ -266,26 +346,23 @@ export default function NewUserPage() {
         )}
 
         <form onSubmit={handleSubmit}>
-          <Tabs defaultValue="basic">
-            <TabsList className="grid w-full grid-cols-3 mb-6 bg-indigo-100/70 p-1 rounded-lg">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "basic" | "account" | "financial")}>
+            <TabsList className="grid w-full grid-cols-3 mb-6 bg-primary-100/70 p-1 rounded-lg">
               <TabsTrigger
                 value="basic"
-                id="basic-tab"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
               >
                 Basic Information
               </TabsTrigger>
               <TabsTrigger
                 value="account"
-                id="account-tab"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
               >
                 Account Settings
               </TabsTrigger>
               <TabsTrigger
                 value="financial"
-                id="financial-tab"
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
               >
                 Financial Details
               </TabsTrigger>
@@ -293,15 +370,15 @@ export default function NewUserPage() {
 
             {/* Basic Information Tab */}
             <TabsContent value="basic">
-              <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+              <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-indigo-900">Basic Information</CardTitle>
-                  <CardDescription className="text-indigo-600">Enter the user's personal information</CardDescription>
+                  <CardTitle className="text-primary-900">Basic Information</CardTitle>
+                  <CardDescription className="text-primary-600">Enter the user's personal information</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="fullName" className="text-indigo-800">
+                      <Label htmlFor="fullName" className="text-primary-800">
                         Full Name <span className="text-red-500">*</span>
                       </Label>
                       <Input
@@ -310,11 +387,11 @@ export default function NewUserPage() {
                         value={userForm.fullName}
                         onChange={handleChange}
                         required
-                        className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="email">
+                      <Label htmlFor="email" className="text-primary-800">
                         Email Address <span className="text-red-500">*</span>
                       </Label>
                       <Input
@@ -324,13 +401,14 @@ export default function NewUserPage() {
                         value={userForm.email}
                         onChange={handleChange}
                         required
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="phone">
+                      <Label htmlFor="phone" className="text-primary-800">
                         Phone Number <span className="text-red-500">*</span>
                       </Label>
                       <Input
@@ -341,10 +419,11 @@ export default function NewUserPage() {
                         value={userForm.phone}
                         onChange={handlePhoneChange}
                         required
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ssn">
+                      <Label htmlFor="ssn" className="text-primary-800">
                         SSN <span className="text-red-500">*</span>
                       </Label>
                       <Input
@@ -355,12 +434,13 @@ export default function NewUserPage() {
                         value={userForm.ssn}
                         onChange={handleSSNChange}
                         required
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="streetAddress">
+                    <Label htmlFor="streetAddress" className="text-primary-800">
                       Street Address <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -369,12 +449,13 @@ export default function NewUserPage() {
                       value={userForm.streetAddress}
                       onChange={handleChange}
                       required
+                      className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                     />
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-2">
-                      <Label htmlFor="city">
+                      <Label htmlFor="city" className="text-primary-800">
                         City <span className="text-red-500">*</span>
                       </Label>
                       <Input
@@ -383,14 +464,15 @@ export default function NewUserPage() {
                         value={userForm.city}
                         onChange={handleChange}
                         required
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="state">
+                      <Label htmlFor="state" className="text-primary-800">
                         State <span className="text-red-500">*</span>
                       </Label>
                       <Select value={userForm.state} onValueChange={(value) => handleSelectChange("state", value)}>
-                        <SelectTrigger id="state">
+                        <SelectTrigger id="state" className="border-primary-200 bg-white/80">
                           <SelectValue placeholder="Select state" />
                         </SelectTrigger>
                         <SelectContent>
@@ -403,7 +485,7 @@ export default function NewUserPage() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="zipCode">
+                      <Label htmlFor="zipCode" className="text-primary-800">
                         Zip Code <span className="text-red-500">*</span>
                       </Label>
                       <Input
@@ -413,22 +495,30 @@ export default function NewUserPage() {
                         value={userForm.zipCode}
                         onChange={handleZipChange}
                         required
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="username">
+                      <Label htmlFor="username" className="text-primary-800">
                         Username <span className="text-red-500">*</span>
                       </Label>
-                      <Input id="username" name="username" value={userForm.username} onChange={handleChange} required />
+                      <Input
+                        id="username"
+                        name="username"
+                        value={userForm.username}
+                        onChange={handleChange}
+                        required
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                      />
                     </div>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="password">
+                      <Label htmlFor="password" className="text-primary-800">
                         Password <span className="text-red-500">*</span>
                       </Label>
                       <div className="relative">
@@ -439,6 +529,7 @@ export default function NewUserPage() {
                           value={userForm.password}
                           onChange={handleChange}
                           required
+                          className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                         />
                         <button
                           type="button"
@@ -454,7 +545,7 @@ export default function NewUserPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">
+                      <Label htmlFor="confirmPassword" className="text-primary-800">
                         Confirm Password <span className="text-red-500">*</span>
                       </Label>
                       <div className="relative">
@@ -465,6 +556,7 @@ export default function NewUserPage() {
                           value={userForm.confirmPassword}
                           onChange={handleChange}
                           required
+                          className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                         />
                         <button
                           type="button"
@@ -485,14 +577,14 @@ export default function NewUserPage() {
                   <Button
                     variant="outline"
                     asChild
-                    className="bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300"
+                    className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
                   >
                     <Link href="/admin/users">Cancel</Link>
                   </Button>
                   <Button
                     type="button"
-                    onClick={() => document.getElementById("account-tab")?.click()}
-                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                    onClick={() => setActiveTab("account")}
+                    className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
                   >
                     Next: Account Settings
                   </Button>
@@ -501,17 +593,17 @@ export default function NewUserPage() {
             </TabsContent>
 
             {/* Account Settings Tab */}
-            <TabsContent value="account" id="account-tab">
-              <Card>
+            <TabsContent value="account">
+              <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
                 <CardHeader>
-                  <CardTitle>Account Settings</CardTitle>
-                  <CardDescription>Configure the user's account settings</CardDescription>
+                  <CardTitle className="text-primary-900">Account Settings</CardTitle>
+                  <CardDescription className="text-primary-600">Configure the user's account settings</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-medium">Two-Factor Authentication</h3>
-                      <p className="text-sm text-muted-foreground">Enable two-factor authentication for this user</p>
+                      <h3 className="font-medium text-primary-900">Two-Factor Authentication</h3>
+                      <p className="text-sm text-primary-600">Enable two-factor authentication for this user</p>
                     </div>
                     <Switch
                       checked={userForm.twoFactorEnabled}
@@ -520,10 +612,19 @@ export default function NewUserPage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex justify-between">
-                  <Button type="button" variant="outline" onClick={() => document.getElementById("basic-tab")?.click()}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setActiveTab("basic")}
+                    className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
+                  >
                     Previous: Basic Information
                   </Button>
-                  <Button type="button" onClick={() => document.getElementById("financial-tab")?.click()}>
+                  <Button
+                    type="button"
+                    onClick={() => setActiveTab("financial")}
+                    className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
+                  >
                     Next: Financial Details
                   </Button>
                 </CardFooter>
@@ -531,16 +632,16 @@ export default function NewUserPage() {
             </TabsContent>
 
             {/* Financial Details Tab */}
-            <TabsContent value="financial" id="financial-tab">
-              <Card>
+            <TabsContent value="financial">
+              <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
                 <CardHeader>
-                  <CardTitle>Financial Details</CardTitle>
-                  <CardDescription>Set up the user's financial accounts</CardDescription>
+                  <CardTitle className="text-primary-900">Financial Details</CardTitle>
+                  <CardDescription className="text-primary-600">Set up the user's financial accounts</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-2">
-                      <Label htmlFor="balance">Initial Checking Balance</Label>
+                      <Label htmlFor="balance" className="text-primary-800">Initial Checking Balance</Label>
                       <Input
                         id="balance"
                         name="balance"
@@ -549,10 +650,11 @@ export default function NewUserPage() {
                         step="0.01"
                         value={userForm.balance}
                         onChange={handleChange}
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="savingsBalance">Initial Savings Balance</Label>
+                      <Label htmlFor="savingsBalance" className="text-primary-800">Initial Savings Balance</Label>
                       <Input
                         id="savingsBalance"
                         name="savingsBalance"
@@ -561,10 +663,11 @@ export default function NewUserPage() {
                         step="0.01"
                         value={userForm.savingsBalance}
                         onChange={handleChange}
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="cryptoBalance">Initial Crypto Balance</Label>
+                      <Label htmlFor="cryptoBalance" className="text-primary-800">Initial Crypto Balance</Label>
                       <Input
                         id="cryptoBalance"
                         name="cryptoBalance"
@@ -573,6 +676,7 @@ export default function NewUserPage() {
                         step="0.01"
                         value={userForm.cryptoBalance}
                         onChange={handleChange}
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                   </div>
@@ -581,16 +685,28 @@ export default function NewUserPage() {
 
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-2">
-                      <Label>Checking Account Number</Label>
-                      <Input value="Generated on creation (CHK-XXXXXXXX)" disabled />
+                      <Label className="text-primary-800">Checking Account Number</Label>
+                      <Input
+                        value="Generated on creation (CHK-XXXXXXXX)"
+                        disabled
+                        className="border-primary-200 bg-white/80"
+                      />
                     </div>
                     <div className="space-y-2">
-                      <Label>Savings Account Number</Label>
-                      <Input value="Generated on creation (SAV-XXXXXXXX)" disabled />
+                      <Label className="text-primary-800">Savings Account Number</Label>
+                      <Input
+                        value="Generated on creation (SAV-XXXXXXXX)"
+                        disabled
+                        className="border-primary-200 bg-white/80"
+                      />
                     </div>
                     <div className="space-y-2">
-                      <Label>Crypto Account Number</Label>
-                      <Input value="Generated on creation (BTC-XXXXXXXX)" disabled />
+                      <Label className="text-primary-800">Crypto Account Number</Label>
+                      <Input
+                        value="Generated on creation (BTC-XXXXXXXX)"
+                        disabled
+                        className="border-primary-200 bg-white/80"
+                      />
                     </div>
                   </div>
                 </CardContent>
@@ -598,14 +714,15 @@ export default function NewUserPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => document.getElementById("account-tab")?.click()}
+                    onClick={() => setActiveTab("account")}
+                    className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
                   >
                     Previous: Account Settings
                   </Button>
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                    className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
                   >
                     {isLoading ? (
                       <>

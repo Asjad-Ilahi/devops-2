@@ -1,22 +1,69 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import Color from "color"
 import { ArrowLeft, Loader2, ShieldAlert } from "lucide-react"
-
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
+// Interface for Colors
+interface Colors {
+  primaryColor: string
+  secondaryColor: string
+}
+
 export default function AdminForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [colors, setColors] = useState<Colors | null>(null)
+
+  // Fetch colors and set CSS custom properties
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch("/api/colors")
+        if (!response.ok) throw new Error("Failed to fetch colors")
+        const data: Colors = await response.json()
+        setColors(data)
+
+        const primary = Color(data.primaryColor)
+        const secondary = Color(data.secondaryColor)
+
+        const generateShades = (color: typeof Color.prototype) => ({
+          50: color.lighten(0.5).hex(),
+          100: color.lighten(0.4).hex(),
+          200: color.lighten(0.3).hex(),
+          300: color.lighten(0.2).hex(),
+          400: color.lighten(0.1).hex(),
+          500: color.hex(),
+          600: color.darken(0.1).hex(),
+          700: color.darken(0.2).hex(),
+          800: color.darken(0.3).hex(),
+          900: color.darken(0.4).hex(),
+        })
+
+        const primaryShades = generateShades(primary)
+        const secondaryShades = generateShades(secondary)
+
+        Object.entries(primaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--primary-${shade}`, color)
+        })
+
+        Object.entries(secondaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--secondary-${shade}`, color)
+        })
+      } catch (error) {
+        console.error("Error fetching colors:", error)
+      }
+    }
+    fetchColors()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,7 +82,7 @@ export default function AdminForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-indigo-50">
+    <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
       <div className="flex items-center justify-center h-full px-4 py-12">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
@@ -49,10 +96,10 @@ export default function AdminForgotPasswordPage() {
             </p>
           </div>
 
-          <Card className="border-indigo-100 bg-white/60 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
+          <Card className="border-primary-100 bg-white/60 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
             <CardHeader className="border-b border-gray-100 bg-gray-50">
               <CardTitle className="flex items-center text-xl text-gray-800">
-                <ShieldAlert className="mr-2 h-5 w-5 text-blue-600" />
+                <ShieldAlert className="mr-2 h-5 w-5 text-primary-600" />
                 Password Recovery
               </CardTitle>
               <CardDescription className="text-gray-600">
@@ -61,8 +108,8 @@ export default function AdminForgotPasswordPage() {
             </CardHeader>
 
             {error && (
-              <Alert variant="destructive" className="mx-6 mt-6">
-                <AlertDescription>{error}</AlertDescription>
+              <Alert variant="destructive" className="mx-6 mt-6 bg-red-50 border-red-200">
+                <AlertDescription className="text-red-700">{error}</AlertDescription>
               </Alert>
             )}
 
@@ -90,7 +137,7 @@ export default function AdminForgotPasswordPage() {
 
                   <Button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                    className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
                     disabled={isLoading}
                   >
                     {isLoading ? (

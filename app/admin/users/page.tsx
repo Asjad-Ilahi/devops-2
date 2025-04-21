@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Color from "color"
 import { ArrowLeft, Check, Loader2, MoreHorizontal, Plus, Search, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -28,6 +29,12 @@ import {
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 
+// Interface for Colors
+interface Colors {
+  primaryColor: string
+  secondaryColor: string
+}
+
 interface User {
   id: string
   name: string
@@ -46,7 +53,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null) // Added error state
+  const [error, setError] = useState<string | null>(null)
 
   // Filters state
   const [searchTerm, setSearchTerm] = useState("")
@@ -57,6 +64,51 @@ export default function UsersPage() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
   const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false)
   const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false)
+
+  // Colors state
+  const [colors, setColors] = useState<Colors | null>(null)
+
+  // Fetch colors and set CSS custom properties
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch("/api/colors")
+        if (!response.ok) throw new Error("Failed to fetch colors")
+        const data: Colors = await response.json()
+        setColors(data)
+
+        const primary = Color(data.primaryColor)
+        const secondary = Color(data.secondaryColor)
+
+        const generateShades = (color: typeof Color.prototype) => ({
+          50: color.lighten(0.5).hex(),
+          100: color.lighten(0.4).hex(),
+          200: color.lighten(0.3).hex(),
+          300: color.lighten(0.2).hex(),
+          400: color.lighten(0.1).hex(),
+          500: color.hex(),
+          600: color.darken(0.1).hex(),
+          700: color.darken(0.2).hex(),
+          800: color.darken(0.3).hex(),
+          900: color.darken(0.4).hex(),
+        })
+
+        const primaryShades = generateShades(primary)
+        const secondaryShades = generateShades(secondary)
+
+        Object.entries(primaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--primary-${shade}`, color)
+        })
+
+        Object.entries(secondaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--secondary-${shade}`, color)
+        })
+      } catch (error) {
+        console.error("Error fetching colors:", error)
+      }
+    }
+    fetchColors()
+  }, [])
 
   // Load users from API
   useEffect(() => {
@@ -89,9 +141,10 @@ export default function UsersPage() {
         }))
         setUsers(formattedUsers)
         setFilteredUsers(formattedUsers)
-      } catch (error) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Failed to load users"
+        setError(errorMessage)
         console.error("Error fetching users:", error)
-        setError(error instanceof Error ? error.message : "Failed to load users")
       } finally {
         setLoading(false)
       }
@@ -175,13 +228,14 @@ export default function UsersPage() {
       )
       setSelectedUsers([])
       setIsApproveDialogOpen(false)
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to approve users"
+      setError(errorMessage)
       console.error("Error approving users:", error)
-      setError(error instanceof Error ? error.message : "Failed to approve users")
     }
   }
 
-  // Handle bulk suspend (simulated, as in original Code-01)
+  // Handle bulk suspend (simulated, as in original code)
   const handleBulkSuspend = () => {
     setUsers((prev) =>
       prev.map((user) =>
@@ -217,9 +271,10 @@ export default function UsersPage() {
       setUsers((prev) =>
         prev.map((user) => (user.id === userId ? { ...user, status: newStatus } : user)),
       )
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update user status"
+      setError(errorMessage)
       console.error("Error updating user status:", error)
-      setError(error instanceof Error ? error.message : "Failed to update user status")
     }
   }
 
@@ -230,42 +285,54 @@ export default function UsersPage() {
     setTwoFactorFilter("all")
   }
 
+  // Map user status to badge variant
+  const getBadgeVariant = (status: User["status"]): "default" | "secondary" | "destructive" => {
+    switch (status) {
+      case "active":
+        return "default"
+      case "pending":
+        return "secondary"
+      case "suspended":
+        return "destructive"
+    }
+  }
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-indigo-50">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-indigo-50">
+    <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
       <div className="p-6 max-w-7xl mx-auto">
         <Button
           variant="ghost"
           asChild
-          className="p-0 mb-2 text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100 transition-colors"
+          className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
         >
           <Link href="/admin/dashboard">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
           User Management
         </h1>
 
         {/* Filters */}
-        <Card className="mb-6 backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
+        <Card className="mb-6 backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle className="text-indigo-900">Users</CardTitle>
-                <CardDescription className="text-indigo-600">Manage user accounts and permissions</CardDescription>
+                <CardTitle className="text-primary-900">Users</CardTitle>
+                <CardDescription className="text-primary-600">Manage user accounts and permissions</CardDescription>
               </div>
               <Button
                 asChild
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
               >
                 <Link href="/admin/users/new">
                   <Plus className="mr-2 h-4 w-4" />
@@ -277,11 +344,11 @@ export default function UsersPage() {
           <CardContent>
             <div className="flex flex-col sm:flex-row gap-4 mb-4">
               <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-indigo-600" />
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-primary-600" />
                 <Input
                   type="search"
                   placeholder="Search users..."
-                  className="pl-8 border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                  className="pl-8 border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -289,7 +356,7 @@ export default function UsersPage() {
 
               <div className="flex gap-2">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[150px] border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                  <SelectTrigger className="w-[150px] border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -301,7 +368,7 @@ export default function UsersPage() {
                 </Select>
 
                 <Select value={twoFactorFilter} onValueChange={setTwoFactorFilter}>
-                  <SelectTrigger className="w-[150px]">
+                  <SelectTrigger className="w-[150px] border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50">
                     <SelectValue placeholder="2FA Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -311,7 +378,12 @@ export default function UsersPage() {
                   </SelectContent>
                 </Select>
 
-                <Button variant="outline" size="icon" onClick={resetFilters}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={resetFilters}
+                  className="border-primary-200 text-primary-700 hover:bg-primary-50"
+                >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -327,7 +399,13 @@ export default function UsersPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setIsApproveDialogOpen(true)}
-                    disabled={!selectedUsers.some((id) => users.find((user) => user.id === id)?.status === "pending")}
+                    disabled={
+                      !selectedUsers.some((id) => {
+                        const user = users.find((user) => user.id === id)
+                        return user?.status === "pending"
+                      })
+                    }
+                    className="border-primary-200 text-primary-700 hover:bg-primary-50"
                   >
                     <Check className="mr-2 h-4 w-4" />
                     Approve
@@ -336,12 +414,23 @@ export default function UsersPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setIsSuspendDialogOpen(true)}
-                    disabled={!selectedUsers.some((id) => users.find((user) => user.id === id)?.status === "active")}
+                    disabled={
+                      !selectedUsers.some((id) => {
+                        const user = users.find((user) => user.id === id)
+                        return user?.status === "active"
+                      })
+                    }
+                    className="border-primary-200 text-primary-700 hover:bg-primary-50"
                   >
                     <X className="mr-2 h-4 w-4" />
                     Suspend
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedUsers([])}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedUsers([])}
+                    className="text-primary-700 hover:bg-primary-50"
+                  >
                     Clear Selection
                   </Button>
                 </div>
@@ -357,27 +446,27 @@ export default function UsersPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b bg-indigo-50/50">
-                    <th className="text-left p-4 w-[40px] text-indigo-800">
+                  <tr className="border-b bg-primary-50/50">
+                    <th className="text-left p-4 w-[40px] text-primary-800">
                       <Checkbox
                         checked={filteredUsers.length > 0 && selectedUsers.length === filteredUsers.length}
                         onCheckedChange={handleSelectAll}
                         aria-label="Select all users"
                       />
                     </th>
-                    <th className="text-left p-4 text-indigo-800">User</th>
-                    <th className="text-left p-4 text-indigo-800">Account #</th>
-                    <th className="text-right p-4 text-indigo-800">Balance</th>
-                    <th className="text-center p-4 text-indigo-800">Status</th>
-                    <th className="text-center p-4 text-indigo-800">2FA</th>
-                    <th className="text-left p-4 text-indigo-800">Created</th>
-                    <th className="text-left p-4 text-indigo-800">Last Login</th>
-                    <th className="text-center p-4 text-indigo-800">Actions</th>
+                    <th className="text-left p-4 text-primary-800">User</th>
+                    <th className="text-left p-4 text-primary-800">Account #</th>
+                    <th className="text-right p-4 text-primary-800">Balance</th>
+                    <th className="text-center p-4 text-primary-800">Status</th>
+                    <th className="text-center p-4 text-primary-800">2FA</th>
+                    <th className="text-left p-4 text-primary-800">Created</th>
+                    <th className="text-left p-4 text-primary-800">Last Login</th>
+                    <th className="text-center p-4 text-primary-800">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-indigo-100">
+                <tbody className="divide-y divide-primary-100">
                   {filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-indigo-50/50 transition-colors">
+                    <tr key={user.id} className="hover:bg-primary-50/50 transition-colors">
                       <td className="p-4">
                         <Checkbox
                           checked={selectedUsers.includes(user.id)}
@@ -387,8 +476,8 @@ export default function UsersPage() {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8 border-2 border-indigo-100">
-                            <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+                          <Avatar className="h-8 w-8 border-2 border-primary-100">
+                            <AvatarFallback className="bg-gradient-to-br from-primary-500 to-secondary-500 text-white">
                               {user.name
                                 .split(" ")
                                 .map((n) => n[0])
@@ -396,23 +485,15 @@ export default function UsersPage() {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-medium text-indigo-900">{user.name}</div>
-                            <div className="text-sm text-indigo-600">{user.email}</div>
+                            <div className="font-medium text-primary-900">{user.name}</div>
+                            <div className="text-sm text-primary-600">{user.email}</div>
                           </div>
                         </div>
                       </td>
                       <td className="p-4 font-mono text-sm">{user.accountNumber}</td>
                       <td className="p-4 text-right font-medium">${user.balance.toFixed(2)}</td>
                       <td className="p-4 text-center">
-                        <Badge
-                          variant={
-                            user.status === "active"
-                              ? "default"
-                              : user.status === "pending"
-                                ? "secondary"
-                                : "destructive"
-                          }
-                        >
+                        <Badge variant={getBadgeVariant(user.status)}>
                           {user.status}
                         </Badge>
                       </td>
@@ -481,48 +562,75 @@ export default function UsersPage() {
 
         {/* Approve Dialog */}
         <Dialog open={isApproveDialogOpen} onOpenChange={setIsApproveDialogOpen}>
-          <DialogContent className="bg-white/95 backdrop-blur-sm border border-indigo-100">
+          <DialogContent className="bg-white/95 backdrop-blur-sm border border-primary-100">
             <DialogHeader>
-              <DialogTitle className="text-indigo-900">Approve Users</DialogTitle>
-              <DialogDescription className="text-indigo-600">
+              <DialogTitle className="text-primary-900">Approve Users</DialogTitle>
+              <DialogDescription className="text-primary-600">
                 Are you sure you want to approve the selected users? This will change their status to "Active".
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">
               <div className="text-sm">
-                {selectedUsers.filter((id) => users.find((user) => user.id === id)?.status === "pending").length}{" "}
+                {
+                  selectedUsers.filter((id) => {
+                    const user = users.find((user) => user.id === id)
+                    return user?.status === "pending"
+                  }).length
+                }{" "}
                 user(s) will be approved.
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsApproveDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setIsApproveDialogOpen(false)}
+                className="border-primary-200 text-primary-700 hover:bg-primary-50"
+              >
                 Cancel
               </Button>
-              <Button onClick={handleBulkApprove}>Approve Users</Button>
+              <Button
+                onClick={handleBulkApprove}
+                className="bg-primary-600 hover:bg-primary-700 text-white"
+              >
+                Approve Users
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Suspend Dialog */}
         <Dialog open={isSuspendDialogOpen} onOpenChange={setIsSuspendDialogOpen}>
-          <DialogContent>
+          <DialogContent className="bg-white/95 backdrop-blur-sm border border-primary-100">
             <DialogHeader>
-              <DialogTitle>Suspend Users</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-primary-900">Suspend Users</DialogTitle>
+              <DialogDescription className="text-primary-600">
                 Are you sure you want to suspend the selected users? This will change their status to "Suspended".
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">
               <div className="text-sm">
-                {selectedUsers.filter((id) => users.find((user) => user.id === id)?.status === "active").length} user(s)
-                will be suspended.
+                {
+                  selectedUsers.filter((id) => {
+                    const user = users.find((user) => user.id === id)
+                    return user?.status === "active"
+                  }).length
+                }{" "}
+                user(s) will be suspended.
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsSuspendDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setIsSuspendDialogOpen(false)}
+                className="border-primary-200 text-primary-700 hover:bg-primary-50"
+              >
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleBulkSuspend}>
+              <Button
+                variant="destructive"
+                onClick={handleBulkSuspend}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
                 Suspend Users
               </Button>
             </DialogFooter>

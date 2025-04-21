@@ -4,6 +4,7 @@ import type React from "react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import Color from "color";
 import { ArrowLeft, Check, CreditCard, Edit2, Key, Loader2, Mail, Shield, User, AlertCircle, Phone } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// Interface for Colors
+interface Colors {
+  primaryColor: string;
+  secondaryColor: string;
+}
 
 interface Transaction {
   id: string;
@@ -85,10 +93,55 @@ export default function UserManagementPage() {
   // Add transaction dialog
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   const [newTransaction, setNewTransaction] = useState({
-    type: "deposit",
+    type: "deposit" as Transaction["type"],
     amount: "",
     description: "",
   });
+
+  // Colors state
+  const [colors, setColors] = useState<Colors | null>(null);
+
+  // Fetch colors and set CSS custom properties
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch("/api/colors");
+        if (!response.ok) throw new Error("Failed to fetch colors");
+        const data: Colors = await response.json();
+        setColors(data);
+
+        const primary = Color(data.primaryColor);
+        const secondary = Color(data.secondaryColor);
+
+        const generateShades = (color: typeof Color.prototype) => ({
+          50: color.lighten(0.5).hex(),
+          100: color.lighten(0.4).hex(),
+          200: color.lighten(0.3).hex(),
+          300: color.lighten(0.2).hex(),
+          400: color.lighten(0.1).hex(),
+          500: color.hex(),
+          600: color.darken(0.1).hex(),
+          700: color.darken(0.2).hex(),
+          800: color.darken(0.3).hex(),
+          900: color.darken(0.4).hex(),
+        });
+
+        const primaryShades = generateShades(primary);
+        const secondaryShades = generateShades(secondary);
+
+        Object.entries(primaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--primary-${shade}`, color);
+        });
+
+        Object.entries(secondaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--secondary-${shade}`, color);
+        });
+      } catch (error) {
+        console.error("Error fetching colors:", error);
+      }
+    };
+    fetchColors();
+  }, []);
 
   // Fetch user data and transactions from API
   useEffect(() => {
@@ -105,7 +158,7 @@ export default function UserManagementPage() {
           const data = await userResponse.json();
           throw new Error(data.error || "Failed to fetch user");
         }
-        const { user: userData } = await userResponse.json(); // Adjusted for { user: {...} }
+        const { user: userData } = await userResponse.json();
         if (!userData) {
           throw new Error("No user data returned");
         }
@@ -155,8 +208,9 @@ export default function UserManagementPage() {
             status: txn.status,
           }))
         );
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load user data");
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to load user data";
+        setError(errorMessage);
         setUser(null);
       } finally {
         setLoading(false);
@@ -166,7 +220,7 @@ export default function UserManagementPage() {
     if (userId) {
       fetchUserData();
     }
-  }, [userId]);
+  }, [userId, router]);
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -202,8 +256,9 @@ export default function UserManagementPage() {
       }));
       setSuccess("Profile updated successfully");
       setIsEditingProfile(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update profile");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to update profile";
+      setError(errorMessage);
     }
   };
 
@@ -232,8 +287,9 @@ export default function UserManagementPage() {
       setIsResetPasswordOpen(false);
       setNewPassword("");
       setConfirmPassword("");
-    } catch (err) {
-      setPasswordError(err instanceof Error ? err.message : "Failed to reset password");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to reset password";
+      setPasswordError(errorMessage);
     }
   };
 
@@ -252,12 +308,14 @@ export default function UserManagementPage() {
       setUser((prev) => ({ ...prev!, twoFactorEnabled: enabled }));
       setSuccess(`Two-factor authentication ${enabled ? "enabled" : "reset"} successfully`);
       setIs2FADialogOpen(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update 2FA settings");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to update 2FA settings";
+      setError(errorMessage);
     }
   };
 
   const handleAddTransaction = async () => {
+    setError(null);
     if (!newTransaction.amount || !newTransaction.description) {
       setError("Please fill in all fields");
       return;
@@ -302,29 +360,42 @@ export default function UserManagementPage() {
       setSuccess("Transaction added successfully");
       setIsAddTransactionOpen(false);
       setNewTransaction({ type: "deposit", amount: "", description: "" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add transaction");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to add transaction";
+      setError(errorMessage);
+    }
+  };
+
+  // Map user status to badge variant
+  const getBadgeVariant = (status: User["status"]): "default" | "secondary" | "destructive" => {
+    switch (status) {
+      case "active":
+        return "default";
+      case "pending":
+        return "secondary";
+      case "suspended":
+        return "destructive";
     }
   };
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-indigo-50">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-indigo-50">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50">
         <div className="text-center">
           <AlertCircle className="mx-auto h-12 w-12 text-red-500" />
-          <h2 className="mt-4 text-2xl font-bold">User Not Found</h2>
-          <p className="mt-2 text-muted-foreground">The requested user could not be found.</p>
+          <h2 className="mt-4 text-2xl font-bold text-primary-900">User Not Found</h2>
+          <p className="mt-2 text-primary-600">The requested user could not be found.</p>
           <Button
             asChild
-            className="mt-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+            className="mt-6 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
           >
             <Link href="/admin/users">Back to Users</Link>
           </Button>
@@ -334,19 +405,19 @@ export default function UserManagementPage() {
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-6 bg-gradient-to-br from-primary-50 to-secondary-50 min-h-screen">
       <div className="mb-6">
         <Button
           variant="ghost"
           asChild
-          className="p-0 mb-2 text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100 transition-colors"
+          className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
         >
           <Link href="/admin/users">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Users
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
           User Management
         </h1>
       </div>
@@ -366,15 +437,15 @@ export default function UserManagementPage() {
       )}
 
       <div className="grid gap-6 md:grid-cols-3 mb-8">
-        <Card className="md:col-span-1 backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
+        <Card className="md:col-span-1 backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader>
-            <CardTitle className="text-indigo-900">User Profile</CardTitle>
-            <CardDescription className="text-indigo-600">Manage user information</CardDescription>
+            <CardTitle className="text-primary-900">User Profile</CardTitle>
+            <CardDescription className="text-primary-600">Manage user information</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col items-center mb-6">
-              <Avatar className="h-24 w-24 mb-4 border-4 border-indigo-100">
-                <AvatarFallback className="text-2xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+              <Avatar className="h-24 w-24 mb-4 border-4 border-primary-100">
+                <AvatarFallback className="text-2xl bg-gradient-to-br from-primary-500 to-secondary-500 text-white">
                   {user.name
                     .split(" ")
                     .map((n: string) => n[0])
@@ -382,13 +453,11 @@ export default function UserManagementPage() {
                 </AvatarFallback>
               </Avatar>
               <div className="text-center">
-                <h3 className="text-xl font-bold text-indigo-900">{user.name}</h3>
-                <p className="text-indigo-600">{user.username}</p>
+                <h3 className="text-xl font-bold text-primary-900">{user.name}</h3>
+                <p className="text-primary-600">{user.username}</p>
                 <div className="flex justify-center mt-2">
                   <Badge
-                    variant={
-                      user.status === "active" ? "default" : user.status === "pending" ? "secondary" : "destructive"
-                    }
+                    variant={getBadgeVariant(user.status)}
                     className={
                       user.status === "active"
                         ? "bg-green-100 text-green-800 border-green-200"
@@ -404,40 +473,40 @@ export default function UserManagementPage() {
             </div>
 
             <div className="space-y-3">
-              <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
-                <span className="text-indigo-600">Checking #:</span>
-                <span className="font-mono text-indigo-900">{user.checkingAccountNumber}</span>
+              <div className="flex justify-between items-center pb-2 border-b border-primary-100">
+                <span className="text-primary-600">Checking #:</span>
+                <span className="font-mono text-primary-900">{user.checkingAccountNumber}</span>
               </div>
-              <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
-                <span className="text-indigo-600">Checking Balance:</span>
-                <span className="font-bold text-indigo-900">${user.checkingBalance.toFixed(2)}</span>
+              <div className="flex justify-between items-center pb-2 border-b border-primary-100">
+                <span className="text-primary-600">Checking Balance:</span>
+                <span className="font-bold text-primary-900">${user.checkingBalance.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
-                <span className="text-indigo-600">Savings #:</span>
-                <span className="font-mono text-indigo-900">{user.savingsAccountNumber}</span>
+              <div className="flex justify-between items-center pb-2 border-b border-primary-100">
+                <span className="text-primary-600">Savings #:</span>
+                <span className="font-mono text-primary-900">{user.savingsAccountNumber}</span>
               </div>
-              <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
-                <span className="text-indigo-600">Savings Balance:</span>
-                <span className="font-bold text-indigo-900">${user.savingsBalance.toFixed(2)}</span>
+              <div className="flex justify-between items-center pb-2 border-b border-primary-100">
+                <span className="text-primary-600">Savings Balance:</span>
+                <span className="font-bold text-primary-900">${user.savingsBalance.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
-                <span className="text-indigo-600">Crypto Wallet #:</span>
-                <span className="font-mono text-indigo-900">{user.cryptoWalletNumber}</span>
+              <div className="flex justify-between items-center pb-2 border-b border-primary-100">
+                <span className="text-primary-600">Crypto Wallet #:</span>
+                <span className="font-mono text-primary-900">{user.cryptoWalletNumber}</span>
               </div>
-              <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
-                <span className="text-indigo-600">Crypto Balance:</span>
-                <span className="font-bold text-indigo-900">{user.cryptoBalance.toFixed(2)} BTC</span>
+              <div className="flex justify-between items-center pb-2 border-b border-primary-100">
+                <span className="text-primary-600">Crypto Balance:</span>
+                <span className="font-bold text-primary-900">{user.cryptoBalance.toFixed(2)} BTC</span>
               </div>
-              <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
-                <span className="text-indigo-600">Created:</span>
-                <span className="text-indigo-900">{user.createdAt}</span>
+              <div className="flex justify-between items-center pb-2 border-b border-primary-100">
+                <span className="text-primary-600">Created:</span>
+                <span className="text-primary-900">{user.createdAt}</span>
               </div>
-              <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
-                <span className="text-indigo-600">Last Login:</span>
-                <span className="text-indigo-900">{user.lastLogin}</span>
+              <div className="flex justify-between items-center pb-2 border-b border-primary-100">
+                <span className="text-primary-600">Last Login:</span>
+                <span className="text-primary-900">{user.lastLogin}</span>
               </div>
-              <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
-                <span className="text-indigo-600">2FA Status:</span>
+              <div className="flex justify-between items-center pb-2 border-b border-primary-100">
+                <span className="text-primary-600">2FA Status:</span>
                 <Badge
                   variant={user.twoFactorEnabled ? "outline" : "secondary"}
                   className={user.twoFactorEnabled ? "bg-green-50 text-green-600 border-green-200" : ""}
@@ -451,7 +520,7 @@ export default function UserManagementPage() {
               <Button
                 variant="outline"
                 onClick={() => setIsResetPasswordOpen(true)}
-                className="justify-start bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300"
+                className="justify-start bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
               >
                 <Key className="mr-2 h-4 w-4" />
                 Reset Password
@@ -459,14 +528,14 @@ export default function UserManagementPage() {
               <Button
                 variant="outline"
                 onClick={() => setIs2FADialogOpen(true)}
-                className="justify-start bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300"
+                className="justify-start bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
               >
                 <Shield className="mr-2 h-4 w-4" />
                 Manage 2FA
               </Button>
               <Button
                 variant="outline"
-                className="justify-start bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300"
+                className="justify-start bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
                 asChild
               >
                 <Link href={`/admin/users/${userId}/transactions`}>
@@ -478,19 +547,19 @@ export default function UserManagementPage() {
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-2 backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
+        <Card className="md:col-span-2 backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg hover:shadow-xl transition-all duration-300">
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle className="text-indigo-900">Account Details</CardTitle>
-                <CardDescription className="text-indigo-600">View and edit user account information</CardDescription>
+                <CardTitle className="text-primary-900">Account Details</CardTitle>
+                <CardDescription className="text-primary-600">View and edit user account information</CardDescription>
               </div>
               {!isEditingProfile && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setIsEditingProfile(true)}
-                  className="bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300"
+                  className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
                 >
                   <Edit2 className="mr-2 h-4 w-4" />
                   Edit
@@ -502,7 +571,7 @@ export default function UserManagementPage() {
             {isEditingProfile ? (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-indigo-800">
+                  <Label htmlFor="name" className="text-primary-800">
                     Full Name
                   </Label>
                   <Input
@@ -510,11 +579,11 @@ export default function UserManagementPage() {
                     name="name"
                     value={profileForm.name}
                     onChange={handleProfileChange}
-                    className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                    className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-indigo-800">
+                  <Label htmlFor="email" className="text-primary-800">
                     Email Address
                   </Label>
                   <Input
@@ -523,11 +592,11 @@ export default function UserManagementPage() {
                     type="email"
                     value={profileForm.email}
                     onChange={handleProfileChange}
-                    className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                    className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="username" className="text-indigo-800">
+                  <Label htmlFor="username" className="text-primary-800">
                     Username
                   </Label>
                   <Input
@@ -535,11 +604,11 @@ export default function UserManagementPage() {
                     name="username"
                     value={profileForm.username}
                     onChange={handleProfileChange}
-                    className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                    className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phoneNumber" className="text-indigo-800">
+                  <Label htmlFor="phoneNumber" className="text-primary-800">
                     Phone Number
                   </Label>
                   <Input
@@ -547,7 +616,7 @@ export default function UserManagementPage() {
                     name="phoneNumber"
                     value={profileForm.phoneNumber}
                     onChange={handleProfileChange}
-                    className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                    className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                   />
                 </div>
                 <div className="flex justify-end gap-2 mt-6">
@@ -562,13 +631,13 @@ export default function UserManagementPage() {
                         phoneNumber: user.phoneNumber,
                       });
                     }}
-                    className="bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300"
+                    className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
                   >
                     Cancel
                   </Button>
                   <Button
                     onClick={handleProfileUpdate}
-                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                    className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
                   >
                     Save Changes
                   </Button>
@@ -577,39 +646,39 @@ export default function UserManagementPage() {
             ) : (
               <div className="space-y-6">
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-indigo-100">
-                    <User className="h-4 w-4 text-indigo-600" />
-                    <Label className="text-indigo-600">Full Name:</Label>
-                    <span className="ml-auto text-indigo-900">{user.name}</span>
+                  <div className="flex items-center gap-2 pb-2 border-b border-primary-100">
+                    <User className="h-4 w-4 text-primary-600" />
+                    <Label className="text-primary-600">Full Name:</Label>
+                    <span className="ml-auto text-primary-900">{user.name}</span>
                   </div>
-                  <div className="flex items-center gap-2 pb-2 border-b border-indigo-100">
-                    <Mail className="h-4 w-4 text-indigo-600" />
-                    <Label className="text-indigo-600">Email:</Label>
-                    <span className="ml-auto text-indigo-900">{user.email}</span>
+                  <div className="flex items-center gap-2 pb-2 border-b border-primary-100">
+                    <Mail className="h-4 w-4 text-primary-600" />
+                    <Label className="text-primary-600">Email:</Label>
+                    <span className="ml-auto text-primary-900">{user.email}</span>
                   </div>
-                  <div className="flex items-center gap-2 pb-2 border-b border-indigo-100">
-                    <User className="h-4 w-4 text-indigo-600" />
-                    <Label className="text-indigo-600">Username:</Label>
-                    <span className="ml-auto text-indigo-900">{user.username}</span>
+                  <div className="flex items-center gap-2 pb-2 border-b border-primary-100">
+                    <User className="h-4 w-4 text-primary-600" />
+                    <Label className="text-primary-600">Username:</Label>
+                    <span className="ml-auto text-primary-900">{user.username}</span>
                   </div>
-                  <div className="flex items-center gap-2 pb-2 border-b border-indigo-100">
-                    <Phone className="h-4 w-4 text-indigo-600" />
-                    <Label className="text-indigo-600">Phone:</Label>
-                    <span className="ml-auto text-indigo-900">{user.phoneNumber}</span>
+                  <div className="flex items-center gap-2 pb-2 border-b border-primary-100">
+                    <Phone className="h-4 w-4 text-primary-600" />
+                    <Label className="text-primary-600">Phone:</Label>
+                    <span className="ml-auto text-primary-900">{user.phoneNumber}</span>
                   </div>
                 </div>
 
                 <Tabs defaultValue="transactions">
-                  <TabsList className="grid w-full grid-cols-2 bg-indigo-100/70 p-1 rounded-lg">
+                  <TabsList className="grid w-full grid-cols-2 bg-primary-100/70 p-1 rounded-lg">
                     <TabsTrigger
                       value="transactions"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
                     >
                       Recent Transactions
                     </TabsTrigger>
                     <TabsTrigger
                       value="add"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
                     >
                       Add Transaction
                     </TabsTrigger>
@@ -620,11 +689,11 @@ export default function UserManagementPage() {
                         {transactions.map((transaction) => (
                           <div
                             key={transaction.id}
-                            className="flex items-center justify-between p-3 border border-indigo-100 rounded-md bg-white/80 hover:bg-white transition-colors"
+                            className="flex items-center justify-between p-3 border border-primary-100 rounded-md bg-white/80 hover:bg-white transition-colors"
                           >
                             <div>
-                              <div className="font-medium text-indigo-900">{transaction.description}</div>
-                              <div className="text-sm text-indigo-600">{transaction.date}</div>
+                              <div className="font-medium text-primary-900">{transaction.description}</div>
+                              <div className="text-sm text-primary-600">{transaction.date}</div>
                             </div>
                             <div className={`font-bold ${transaction.amount > 0 ? "text-green-600" : "text-red-600"}`}>
                               {transaction.amount > 0 ? "+" : ""}
@@ -634,61 +703,69 @@ export default function UserManagementPage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-8 text-indigo-600">No transactions found</div>
+                      <div className="text-center py-8 text-primary-600">No transactions found</div>
                     )}
                   </TabsContent>
                   <TabsContent value="add" className="pt-4">
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="transactionType" className="text-indigo-800">
+                        <Label htmlFor="transactionType" className="text-primary-800">
                           Transaction Type
                         </Label>
-                        <select
-                          id="transactionType"
-                          className="w-full rounded-md border border-indigo-200 bg-white/80 px-3 py-2 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                        <Select
                           value={newTransaction.type}
-                          onChange={(e) => setNewTransaction({ ...newTransaction, type: e.target.value })}
+                          onValueChange={(value) =>
+                            setNewTransaction({ ...newTransaction, type: value as Transaction["type"] })
+                          }
                         >
-                          <option value="deposit">Deposit</option>
-                          <option value="withdrawal">Withdrawal</option>
-                          <option value="transfer">Transfer</option>
-                          <option value="adjustment">Adjustment</option>
-                        </select>
+                          <SelectTrigger
+                            id="transactionType"
+                            className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                          >
+                            <SelectValue placeholder="Select transaction type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="deposit">Deposit</SelectItem>
+                            <SelectItem value="withdrawal">Withdrawal</SelectItem>
+                            <SelectItem value="transfer">Transfer</SelectItem>
+                            <SelectItem value="adjustment">Adjustment</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="amount" className="text-indigo-800">
+                        <Label htmlFor="amount" className="text-primary-800">
                           Amount
                         </Label>
                         <div className="relative">
-                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-600">$</div>
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-600">$</div>
                           <Input
                             id="amount"
                             type="number"
                             step="0.01"
-                            className="pl-7 border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                            className="pl-7 border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                             placeholder="0.00"
                             value={newTransaction.amount}
                             onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
                           />
                         </div>
-                        <p className="text-sm text-indigo-600">
+                        <p className="text-sm text-primary-600">
                           Use negative values for withdrawals and adjustments that reduce balance.
                         </p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="description" className="text-indigo-800">
+                        <Label htmlFor="description" className="text-primary-800">
                           Description
                         </Label>
                         <Input
                           id="description"
                           placeholder="Enter transaction description"
-                          className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                          className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                           value={newTransaction.description}
                           onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
                         />
                       </div>
                       <Button
-                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
+                        className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
                         onClick={handleAddTransaction}
                       >
                         Add Transaction
@@ -703,10 +780,10 @@ export default function UserManagementPage() {
       </div>
 
       <Dialog open={isResetPasswordOpen} onOpenChange={setIsResetPasswordOpen}>
-        <DialogContent className="bg-white/95 backdrop-blur-sm border border-indigo-100">
+        <DialogContent className="bg-white/95 backdrop-blur-sm border border-primary-100">
           <DialogHeader>
-            <DialogTitle className="text-indigo-900">Reset User Password</DialogTitle>
-            <DialogDescription className="text-indigo-600">Create a new password for {user.name}.</DialogDescription>
+            <DialogTitle className="text-primary-900">Reset User Password</DialogTitle>
+            <DialogDescription className="text-primary-600">Create a new password for {user.name}.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {passwordError && (
@@ -716,7 +793,7 @@ export default function UserManagementPage() {
               </Alert>
             )}
             <div className="space-y-2">
-              <Label htmlFor="newPassword" className="text-indigo-800">
+              <Label htmlFor="newPassword" className="text-primary-800">
                 New Password
               </Label>
               <Input
@@ -724,11 +801,11 @@ export default function UserManagementPage() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-indigo-800">
+              <Label htmlFor="confirmPassword" className="text-primary-800">
                 Confirm Password
               </Label>
               <Input
@@ -736,7 +813,7 @@ export default function UserManagementPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
               />
             </div>
           </div>
@@ -749,13 +826,13 @@ export default function UserManagementPage() {
                 setConfirmPassword("");
                 setPasswordError(null);
               }}
-              className="bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300"
+              className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
             >
               Cancel
             </Button>
             <Button
               onClick={handlePasswordReset}
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+              className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
             >
               Reset Password
             </Button>
@@ -764,18 +841,18 @@ export default function UserManagementPage() {
       </Dialog>
 
       <Dialog open={is2FADialogOpen} onOpenChange={setIs2FADialogOpen}>
-        <DialogContent className="bg-white/95 backdrop-blur-sm border border-indigo-100">
+        <DialogContent className="bg-white/95 backdrop-blur-sm border border-primary-100">
           <DialogHeader>
-            <DialogTitle className="text-indigo-900">Two-Factor Authentication</DialogTitle>
-            <DialogDescription className="text-indigo-600">
+            <DialogTitle className="text-primary-900">Two-Factor Authentication</DialogTitle>
+            <DialogDescription className="text-primary-600">
               Manage two-factor authentication settings for {user.name}.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h4 className="font-medium text-indigo-900">2FA Status</h4>
-                <p className="text-sm text-indigo-600">
+                <h4 className="font-medium text-primary-900">2FA Status</h4>
+                <p className="text-sm text-primary-600">
                   {user.twoFactorEnabled
                     ? "Two-factor authentication is currently enabled."
                     : "Two-factor authentication is currently disabled."}
@@ -807,7 +884,7 @@ export default function UserManagementPage() {
           <DialogFooter>
             <Button
               onClick={() => setIs2FADialogOpen(false)}
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+              className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
             >
               Close
             </Button>
