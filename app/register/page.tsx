@@ -1,16 +1,16 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { AlertCircle, Check, Eye, EyeOff, Loader2 } from "lucide-react"
-
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import Color from 'color'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -36,6 +36,51 @@ export default function RegisterPage() {
   const [pendingUserId, setPendingUserId] = useState<string | null>(null)
   const [step, setStep] = useState(1)
   const [success, setSuccess] = useState(false)
+  const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
+
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch('/api/colors')
+        if (response.ok) {
+          const data = await response.json()
+          setColors(data)
+
+          const primary = Color(data.primaryColor)
+          const secondary = Color(data.secondaryColor)
+
+          const generateShades = (color: typeof Color.prototype) => ({
+            50: color.lighten(0.5).hex(),
+            100: color.lighten(0.4).hex(),
+            200: color.lighten(0.3).hex(),
+            300: color.lighten(0.2).hex(),
+            400: color.lighten(0.1).hex(),
+            500: color.hex(),
+            600: color.darken(0.1).hex(),
+            700: color.darken(0.2).hex(),
+            800: color.darken(0.3).hex(),
+            900: color.darken(0.4).hex(),
+          })
+
+          const primaryShades = generateShades(primary)
+          const secondaryShades = generateShades(secondary)
+
+          Object.entries(primaryShades).forEach(([shade, color]) => {
+            document.documentElement.style.setProperty(`--primary-${shade}`, color)
+          })
+
+          Object.entries(secondaryShades).forEach(([shade, color]) => {
+            document.documentElement.style.setProperty(`--secondary-${shade}`, color)
+          })
+        } else {
+          console.error('Failed to fetch colors')
+        }
+      } catch (error) {
+        console.error('Error fetching colors:', error)
+      }
+    }
+    fetchColors()
+  }, [])
 
   const usStates = [
     { value: "AL", label: "Alabama" },
@@ -88,7 +133,7 @@ export default function RegisterPage() {
     { value: "WV", label: "West Virginia" },
     { value: "WI", label: "Wisconsin" },
     { value: "WY", label: "Wyoming" },
-    { value: "DC", label: "District KYof Columbia" },
+    { value: "DC", label: "District of Columbia" },
   ]
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,7 +206,6 @@ export default function RegisterPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  // Backend logic from Code-02
   const handleFirstStep = async () => {
     if (!validateFirstStep()) return
 
@@ -179,7 +223,7 @@ export default function RegisterPage() {
           city: formData.city,
           state: formData.state,
           zipCode: formData.zipCode,
-          step: "requestCode", // Explicitly include step parameter
+          step: "requestCode",
         }),
       })
 
@@ -250,10 +294,9 @@ export default function RegisterPage() {
         return
       }
 
-      // Using Code-01's success page logic instead of immediate redirect
       setSuccess(true)
       setTimeout(() => {
-        router.push("/login") // Keeping Code-01's redirect to /login
+        router.push("/login")
       }, 3000)
     } catch (error) {
       setErrors({ form: "An unexpected error occurred. Please try again." })
@@ -287,7 +330,7 @@ export default function RegisterPage() {
           city: formData.city,
           state: formData.state,
           zipCode: formData.zipCode,
-          step: "requestCode", // Ensure step is included for resend
+          step: "requestCode",
         }),
       })
 
@@ -333,11 +376,11 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-blue-50 px-4 py-12 relative overflow-hidden">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 px-4 py-12 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
           <div className="absolute top-10 left-10 w-72 h-72 bg-green-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-          <div className="absolute top-0 right-10 w-72 h-72 bg-indigo-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-          <div className="absolute bottom-10 left-20 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
+          <div className="absolute top-0 right-10 w-72 h-72 bg-primary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
+          <div className="absolute bottom-10 left-20 w-72 h-72 bg-secondary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
         </div>
 
         <div className="w-full max-w-md text-center space-y-6 backdrop-blur-sm bg-white/70 p-8 rounded-xl shadow-xl border border-green-100 z-10">
@@ -347,12 +390,12 @@ export default function RegisterPage() {
           <h2 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
             Registration Successful
           </h2>
-          <p className="text-indigo-700">
+          <p className="text-primary-700">
             Your account has been created. You will be redirected to the login page shortly.
           </p>
           <Button
             asChild
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
+            className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
           >
             <Link href="/login">Return to Login</Link>
           </Button>
@@ -362,22 +405,22 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-blue-50 px-4 py-12 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 px-4 py-12 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-        <div className="absolute top-10 left-10 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-        <div className="absolute top-0 right-10 w-72 h-72 bg-indigo-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-10 left-20 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
+        <div className="absolute top-10 left-10 w-72 h-72 bg-primary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
+        <div className="absolute top-0 right-10 w-72 h-72 bg-secondary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div className="absolute bottom-10 left-20 w-72 h-72 bg-primary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
       </div>
 
       <div className="w-full max-w-md space-y-8 z-10">
         <div className="text-center">
           <img src="/zelle-logo.svg" alt="Zelle" className="h-16 w-auto mx-auto drop-shadow-md" />
-          <h2 className="mt-6 text-4xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          <h2 className="mt-6 text-4xl font-extrabold tracking-tight bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
             Create your account
           </h2>
-          <p className="mt-2 text-sm text-indigo-700">
+          <p className="mt-2 text-sm text-primary-700">
             Already have an account?{" "}
-            <Link href="/login" className="font-medium text-purple-600 hover:text-purple-500 transition-colors">
+            <Link href="/login" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
               Sign in
             </Link>
           </p>
@@ -392,40 +435,40 @@ export default function RegisterPage() {
 
         <div className="mt-8">
           <div className="relative">
-            <div className="absolute left-0 top-1/3 h-0.5 w-full bg-gradient-to-r from-indigo-200 via-purple-200 to-indigo-200"></div>
+            <div className="absolute left-0 top-1/3 h-0.5 w-full bg-gradient-to-r from-primary-200 via-secondary-200 to-primary-200"></div>
             <div className="relative flex justify-between">
               <div className="flex flex-col items-center">
                 <div
-                  className={`rounded-full ${step >= 1 ? "bg-gradient-to-r from-indigo-600 to-purple-600" : "bg-gray-200"} text-white flex items-center justify-center h-10 w-10 text-sm shadow-md`}
+                  className={`rounded-full ${step >= 1 ? "bg-gradient-to-r from-primary-600 to-secondary-600" : "bg-gray-200"} text-white flex items-center justify-center h-10 w-10 text-sm shadow-md`}
                 >
                   1
                 </div>
-                <div className="text-xs mt-1 font-medium text-indigo-700">Personal Info</div>
+                <div className="text-xs mt-1 font-medium text-primary-700">Personal Info</div>
               </div>
               <div className="flex flex-col items-center">
                 <div
-                  className={`rounded-full ${step >= 2 ? "bg-gradient-to-r from-indigo-600 to-purple-600" : "bg-gray-200"} text-white flex items-center justify-center h-10 w-10 text-sm shadow-md`}
+                  className={`rounded-full ${step >= 2 ? "bg-gradient-to-r from-primary-600 to-secondary-600" : "bg-gray-200"} text-white flex items-center justify-center h-10 w-10 text-sm shadow-md`}
                 >
                   2
                 </div>
-                <div className="text-xs mt-1 font-medium text-indigo-700">Verification</div>
+                <div className="text-xs mt-1 font-medium text-primary-700">Verification</div>
               </div>
               <div className="flex flex-col items-center">
                 <div
-                  className={`rounded-full ${step >= 3 ? "bg-gradient-to-r from-indigo-600 to-purple-600" : "bg-gray-200"} text-white flex items-center justify-center h-10 w-10 text-sm shadow-md`}
+                  className={`rounded-full ${step >= 3 ? "bg-gradient-to-r from-primary-600 to-secondary-600" : "bg-gray-200"} text-white flex items-center justify-center h-10 w-10 text-sm shadow-md`}
                 >
                   3
                 </div>
-                <div className="text-xs mt-1 font-medium text-indigo-700">Account Setup</div>
+                <div className="text-xs mt-1 font-medium text-primary-700">Account Setup</div>
               </div>
             </div>
           </div>
 
           <form className="mt-8 space-y-6" onSubmit={(e) => e.preventDefault()}>
             {step === 1 && (
-              <div className="space-y-4 backdrop-blur-sm bg-white/70 p-6 rounded-xl shadow-xl border border-indigo-100">
+              <div className="space-y-4 backdrop-blur-sm bg-white/70 p-6 rounded-xl shadow-xl border border-primary-100">
                 <div>
-                  <Label htmlFor="fullName" className="text-indigo-800 font-medium">
+                  <Label htmlFor="fullName" className="text-primary-800 font-medium">
                     Full Name
                   </Label>
                   <Input
@@ -436,13 +479,13 @@ export default function RegisterPage() {
                     value={formData.fullName}
                     onChange={handleChange}
                     placeholder="Enter your full name"
-                    className={`${errors.fullName ? "border-red-500" : "border-indigo-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all`}
+                    className={`${errors.fullName ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
                   />
                   {errors.fullName && <p className="text-sm text-red-500 mt-1">{errors.fullName}</p>}
                 </div>
 
                 <div>
-                  <Label htmlFor="email" className="text-indigo-800 font-medium">
+                  <Label htmlFor="email" className="text-primary-800 font-medium">
                     Email Address
                   </Label>
                   <Input
@@ -453,13 +496,13 @@ export default function RegisterPage() {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="Enter your email address"
-                    className={`${errors.email ? "border-red-500" : "border-indigo-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all`}
+                    className={`${errors.email ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
                   />
                   {errors.email && <p className="text-sm text-red-500 mt-1">{errors.email}</p>}
                 </div>
 
                 <div>
-                  <Label htmlFor="phone" className="text-indigo-800 font-medium">
+                  <Label htmlFor="phone" className="text-primary-800 font-medium">
                     Phone Number
                   </Label>
                   <Input
@@ -470,13 +513,13 @@ export default function RegisterPage() {
                     value={formData.phone}
                     onChange={handleChange}
                     placeholder="Enter your phone number"
-                    className={`${errors.phone ? "border-red-500" : "border-indigo-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all`}
+                    className={`${errors.phone ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
                   />
                   {errors.phone && <p className="text-sm text-red-500 mt-1">{errors.phone}</p>}
                 </div>
 
                 <div>
-                  <Label htmlFor="ssn" className="text-indigo-800 font-medium">
+                  <Label htmlFor="ssn" className="text-primary-800 font-medium">
                     Social Security Number (SSN)
                   </Label>
                   <Input
@@ -487,15 +530,15 @@ export default function RegisterPage() {
                     value={formData.ssn}
                     onChange={handleSSNChange}
                     placeholder="XXX-XX-XXXX"
-                    className={`${errors.ssn ? "border-red-500" : "border-indigo-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all`}
+                    className={`${errors.ssn ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
                     maxLength={11}
                   />
                   {errors.ssn && <p className="text-sm text-red-500 mt-1">{errors.ssn}</p>}
-                  <p className="text-xs text-indigo-600 mt-1">Your SSN is securely encrypted and stored</p>
+                  <p className="text-xs text-primary-600 mt-1">Your SSN is securely encrypted and stored</p>
                 </div>
 
                 <div>
-                  <Label htmlFor="streetAddress" className="text-indigo-800 font-medium">
+                  <Label htmlFor="streetAddress" className="text-primary-800 font-medium">
                     Street Address
                   </Label>
                   <Input
@@ -506,14 +549,14 @@ export default function RegisterPage() {
                     value={formData.streetAddress}
                     onChange={handleChange}
                     placeholder="Enter your street address"
-                    className={`${errors.streetAddress ? "border-red-500" : "border-indigo-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all`}
+                    className={`${errors.streetAddress ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
                   />
                   {errors.streetAddress && <p className="text-sm text-red-500 mt-1">{errors.streetAddress}</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="city" className="text-indigo-800 font-medium">
+                    <Label htmlFor="city" className="text-primary-800 font-medium">
                       City
                     </Label>
                     <Input
@@ -524,19 +567,19 @@ export default function RegisterPage() {
                       value={formData.city}
                       onChange={handleChange}
                       placeholder="Enter your city"
-                      className={`${errors.city ? "border-red-500" : "border-indigo-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all`}
+                      className={`${errors.city ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
                     />
                     {errors.city && <p className="text-sm text-red-500 mt-1">{errors.city}</p>}
                   </div>
 
                   <div>
-                    <Label htmlFor="state" className="text-indigo-800 font-medium">
+                    <Label htmlFor="state" className="text-primary-800 font-medium">
                       State
                     </Label>
                     <Select value={formData.state} onValueChange={(value) => handleSelectChange(value, "state")}>
                       <SelectTrigger
                         id="state"
-                        className={`${errors.state ? "border-red-500" : "border-indigo-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all`}
+                        className={`${errors.state ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
                       >
                         <SelectValue placeholder="Select state" />
                       </SelectTrigger>
@@ -553,7 +596,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="zipCode" className="text-indigo-800 font-medium">
+                  <Label htmlFor="zipCode" className="text-primary-800 font-medium">
                     ZIP Code
                   </Label>
                   <Input
@@ -564,7 +607,7 @@ export default function RegisterPage() {
                     value={formData.zipCode}
                     onChange={handleZipChange}
                     placeholder="Enter 5-digit ZIP code"
-                    className={`${errors.zipCode ? "border-red-500" : "border-indigo-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all`}
+                    className={`${errors.zipCode ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
                     maxLength={5}
                   />
                   {errors.zipCode && <p className="text-sm text-red-500 mt-1">{errors.zipCode}</p>}
@@ -572,7 +615,7 @@ export default function RegisterPage() {
 
                 <Button
                   type="button"
-                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
+                  className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
                   onClick={handleNextStep}
                   disabled={isLoading}
                 >
@@ -589,15 +632,15 @@ export default function RegisterPage() {
             )}
 
             {step === 2 && (
-              <div className="space-y-4 backdrop-blur-sm bg-white/70 p-6 rounded-xl shadow-xl border border-indigo-100">
+              <div className="space-y-4 backdrop-blur-sm bg-white/70 p-6 rounded-xl shadow-xl border border-primary-100">
                 <div>
-                  <Alert className="bg-indigo-50 border-indigo-200 text-indigo-700">
+                  <Alert className="bg-primary-50 border-primary-200 text-primary-700">
                     <AlertDescription>A verification code has been sent to your email address.</AlertDescription>
                   </Alert>
                 </div>
 
                 <div>
-                  <Label htmlFor="emailVerificationCode" className="text-indigo-800 font-medium">
+                  <Label htmlFor="emailVerificationCode" className="text-primary-800 font-medium">
                     Verification Code
                   </Label>
                   <Input
@@ -608,7 +651,7 @@ export default function RegisterPage() {
                     value={formData.emailVerificationCode}
                     onChange={handleChange}
                     placeholder="Enter verification code"
-                    className={`${errors.emailVerificationCode ? "border-red-500" : "border-indigo-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all`}
+                    className={`${errors.emailVerificationCode ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
                   />
                   {errors.emailVerificationCode && (
                     <p className="mt-1 text-sm text-red-500">{errors.emailVerificationCode}</p>
@@ -618,7 +661,7 @@ export default function RegisterPage() {
                 <div className="text-center">
                   <button
                     type="button"
-                    className="text-sm text-purple-600 hover:text-purple-500 transition-colors"
+                    className="text-sm text-secondary-600 hover:text-secondary-500 transition-colors"
                     onClick={handleResendCode}
                     disabled={isLoading}
                   >
@@ -630,14 +673,14 @@ export default function RegisterPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="flex-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50 transition-all"
+                    className="flex-1 border-primary-300 text-primary-700 hover:bg-primary-50 transition-all"
                     onClick={handlePrevStep}
                   >
                     Back
                   </Button>
                   <Button
                     type="button"
-                    className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
+                    className="flex-1 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
                     onClick={handleNextStep}
                     disabled={isLoading}
                   >
@@ -655,9 +698,9 @@ export default function RegisterPage() {
             )}
 
             {step === 3 && (
-              <div className="space-y-4 backdrop-blur-sm bg-white/70 p-6 rounded-xl shadow-xl border border-indigo-100">
+              <div className="space-y-4 backdrop-blur-sm bg-white/70 p-6 rounded-xl shadow-xl border border-primary-100">
                 <div>
-                  <Label htmlFor="username" className="text-indigo-800 font-medium">
+                  <Label htmlFor="username" className="text-primary-800 font-medium">
                     Username
                   </Label>
                   <Input
@@ -668,13 +711,13 @@ export default function RegisterPage() {
                     value={formData.username}
                     onChange={handleChange}
                     placeholder="Choose a username"
-                    className={`${errors.username ? "border-red-500" : "border-indigo-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all`}
+                    className={`${errors.username ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
                   />
                   {errors.username && <p className="text-sm text-red-500 mt-1">{errors.username}</p>}
                 </div>
 
                 <div>
-                  <Label htmlFor="password" className="text-indigo-800 font-medium">
+                  <Label htmlFor="password" className="text-primary-800 font-medium">
                     Password
                   </Label>
                   <div className="relative">
@@ -686,11 +729,11 @@ export default function RegisterPage() {
                       value={formData.password}
                       onChange={handleChange}
                       placeholder="Create a password"
-                      className={`${errors.password ? "border-red-500" : "border-indigo-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all pr-10`}
+                      className={`${errors.password ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all pr-10`}
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-3 cristiano items-center text-indigo-500 hover:text-indigo-700 transition-colors"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-primary-500 hover:text-primary-700 transition-colors"
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -700,7 +743,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="confirmPassword" className="text-indigo-800 font-medium">
+                  <Label htmlFor="confirmPassword" className="text-primary-800 font-medium">
                     Confirm Password
                   </Label>
                   <div className="relative">
@@ -712,11 +755,11 @@ export default function RegisterPage() {
                       value={formData.confirmPassword}
                       onChange={handleChange}
                       placeholder="Confirm your password"
-                      className={`${errors.confirmPassword ? "border-red-500" : "border-indigo-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all pr-10`}
+                      className={`${errors.confirmPassword ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all pr-10`}
                     />
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-indigo-500 hover:text-indigo-700 transition-colors"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-primary-500 hover:text-primary-700 transition-colors"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     >
                       {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -726,7 +769,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="verificationMethod" className="text-indigo-800 font-medium">
+                  <Label htmlFor="verificationMethod" className="text-primary-800 font-medium">
                     Preferred 2FA Method
                   </Label>
                   <Select
@@ -735,7 +778,7 @@ export default function RegisterPage() {
                   >
                     <SelectTrigger
                       id="verificationMethod"
-                      className="border-indigo-200 mt-1 bg-white/50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                      className="border-primary-200 mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                     >
                       <SelectValue placeholder="Select verification method" />
                     </SelectTrigger>
@@ -750,20 +793,20 @@ export default function RegisterPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="flex-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50 transition-all"
+                    className="flex-1 border-primary-300 text-primary-700 hover:bg-primary-50 transition-all"
                     onClick={handlePrevStep}
                   >
                     Back
                   </Button>
                   <Button
                     type="button"
-                    className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
+                    className="flex-1 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
                     onClick={handleNextStep}
                     disabled={isLoading}
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        < Loader2 className="mr-2 h-5 w-5 animate-spin" />
                         Creating...
                       </>
                     ) : (
@@ -775,13 +818,13 @@ export default function RegisterPage() {
             )}
 
             <div className="text-center">
-              <p className="text-sm text-indigo-700">
+              <p className="text-sm text-primary-700">
                 By creating an account, you agree to our{" "}
-                <Link href="#" className="font-medium text-purple-600 hover:text-purple-500 transition-colors">
+                <Link href="#" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
                   Terms of Service
                 </Link>{" "}
                 and{" "}
-                <Link href="#" className="font-medium text-purple-600 hover:text-purple-500 transition-colors">
+                <Link href="#" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
                   Privacy Policy
                 </Link>
               </p>

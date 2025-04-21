@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ArrowLeft, Eye, EyeOff, History, Bitcoin, Plus, ArrowUp, ArrowDown } from "lucide-react"
+import Color from 'color'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -35,8 +36,54 @@ export default function AccountsPage() {
   const [btcPrice, setBtcPrice] = useState(44256.32)
   const [priceChange, setPriceChange] = useState(2.34)
   const [error, setError] = useState<string | null>(null)
+  const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
 
-  // Static transaction data (unchanged from Code-01)
+  // Fetch colors
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch('/api/colors')
+        if (response.ok) {
+          const data = await response.json()
+          setColors(data)
+
+          const primary = Color(data.primaryColor)
+          const secondary = Color(data.secondaryColor)
+
+          const generateShades = (color: typeof Color.prototype) => ({
+            50: color.lighten(0.5).hex(),
+            100: color.lighten(0.4).hex(),
+            200: color.lighten(0.3).hex(),
+            300: color.lighten(0.2).hex(),
+            400: color.lighten(0.1).hex(),
+            500: color.hex(),
+            600: color.darken(0.1).hex(),
+            700: color.darken(0.2).hex(),
+            800: color.darken(0.3).hex(),
+            900: color.darken(0.4).hex(),
+          })
+
+          const primaryShades = generateShades(primary)
+          const secondaryShades = generateShades(secondary)
+
+          Object.entries(primaryShades).forEach(([shade, color]) => {
+            document.documentElement.style.setProperty(`--primary-${shade}`, color)
+          })
+
+          Object.entries(secondaryShades).forEach(([shade, color]) => {
+            document.documentElement.style.setProperty(`--secondary-${shade}`, color)
+          })
+        } else {
+          console.error('Failed to fetch colors')
+        }
+      } catch (error) {
+        console.error('Error fetching colors:', error)
+      }
+    }
+    fetchColors()
+  }, [])
+
+  // Static transaction data
   const transactions: Transaction[] = [
     {
       id: "txn-001",
@@ -80,7 +127,7 @@ export default function AccountsPage() {
     },
   ]
 
-  // Fetch accounts from API (backend logic from Code-02)
+  // Fetch accounts from API
   useEffect(() => {
     const fetchAccounts = async () => {
       const token = localStorage.getItem("token")
@@ -173,7 +220,7 @@ export default function AccountsPage() {
     fetchAccounts()
   }, [])
 
-  // Simulate BTC price updates (optimized from Code-01)
+  // Simulate BTC price updates
   useEffect(() => {
     const interval = setInterval(() => {
       setBtcPrice((prevPrice) => {
@@ -187,25 +234,24 @@ export default function AccountsPage() {
   }, [])
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-indigo-50">
+    <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
       <div className="p-6 max-w-5xl mx-auto">
         <div className="mb-6">
           <Button
             variant="ghost"
             asChild
-            className="p-0 mb-2 text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100 transition-colors"
+            className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
           >
             <Link href="/dashboard">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Dashboard
             </Link>
           </Button>
-          <h1 className="text-3xl font-extrabold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-extrabold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
             My Accounts
           </h1>
         </div>
 
-        {/* Error display from Code-02 */}
         {error && (
           <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-md">
             {error}
@@ -213,38 +259,37 @@ export default function AccountsPage() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-          <TabsList className="grid w-full grid-cols-3 bg-indigo-100/70 p-1 rounded-lg mb-6">
+          <TabsList className="grid w-full grid-cols-3 bg-primary-100/70 p-1 rounded-lg mb-6">
             <TabsTrigger
               value="checking"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
             >
               Checking Account
             </TabsTrigger>
             <TabsTrigger
               value="savings"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
             >
               Savings Account
             </TabsTrigger>
             <TabsTrigger
               value="crypto"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
             >
               Crypto Wallet
             </TabsTrigger>
           </TabsList>
 
           {accounts.map((account) => {
-            // Calculate cryptoValue dynamically in render
             const cryptoValue = account.type === "crypto" ? account.balance * btcPrice : 0
             return (
               <TabsContent key={account.type} value={account.type}>
                 <div className="grid gap-6 md:grid-cols-2">
-                  <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
+                  <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
                     <div
                       className={`absolute inset-0 opacity-50 group-hover:opacity-70 transition-opacity ${
                         account.type === "checking"
-                          ? "bg-gradient-to-br from-indigo-500/10 to-blue-500/10"
+                          ? "bg-gradient-to-br from-primary-500/10 to-blue-500/10"
                           : account.type === "savings"
                             ? "bg-gradient-to-br from-emerald-500/10 to-green-500/10"
                             : "bg-gradient-to-br from-amber-500/10 to-orange-500/10"
@@ -253,8 +298,8 @@ export default function AccountsPage() {
                     <CardHeader className="relative z-10">
                       <div className="flex justify-between items-center">
                         <div>
-                          <CardTitle className="text-xl font-bold text-indigo-900">{account.name}</CardTitle>
-                          <CardDescription className="text-indigo-700">Account Details</CardDescription>
+                          <CardTitle className="text-xl font-bold text-primary-900">{account.name}</CardTitle>
+                          <CardDescription className="text-primary-700">Account Details</CardDescription>
                         </div>
                         <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-none">
                           {account.status}
@@ -264,11 +309,11 @@ export default function AccountsPage() {
                     <CardContent className="space-y-4 relative z-10">
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
-                          <span className="text-indigo-600 font-medium">
+                          <span className="text-primary-600 font-medium">
                             {account.type === "crypto" ? "Bitcoin Balance" : "Current Balance"}
                           </span>
                           <div className="flex items-center">
-                            <span className="font-bold text-lg text-indigo-900">
+                            <span className="font-bold text-lg text-primary-900">
                               {account.type === "crypto"
                                 ? `${account.balance.toFixed(6)} BTC`
                                 : `$${account.balance.toFixed(2)}`}
@@ -279,13 +324,13 @@ export default function AccountsPage() {
                         {account.type === "crypto" && (
                           <>
                             <div className="flex justify-between text-sm">
-                              <span className="text-indigo-600 font-medium">USD Value</span>
-                              <span className="font-medium text-indigo-900">${cryptoValue.toFixed(2)}</span>
+                              <span className="text-primary-600 font-medium">USD Value</span>
+                              <span className="font-medium text-primary-900">${cryptoValue.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                              <span className="text-indigo-600 font-medium">Current BTC Price</span>
+                              <span className="text-primary-600 font-medium">Current BTC Price</span>
                               <div className="flex items-center">
-                                <span className="font-medium text-indigo-900">${btcPrice.toFixed(2)}</span>
+                                <span className="font-medium text-primary-900">${btcPrice.toFixed(2)}</span>
                                 <div
                                   className={`ml-2 flex items-center ${
                                     priceChange >= 0 ? "text-emerald-500" : "text-red-500"
@@ -304,13 +349,13 @@ export default function AccountsPage() {
                         )}
                       </div>
 
-                      <div className="pt-4 border-t border-indigo-100 space-y-2">
+                      <div className="pt-4 border-t border-primary-100 space-y-2">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-indigo-600 font-medium">
+                          <span className="text-sm text-primary-600 font-medium">
                             {account.type === "crypto" ? "Wallet Number" : "Account Number"}
                           </span>
                           <div className="flex items-center">
-                            <span className="font-mono mr-2 text-indigo-900">
+                            <span className="font-mono mr-2 text-primary-900">
                               {account.type === "crypto" && showWalletNumber
                                 ? account.fullNumber
                                 : showAccountNumber
@@ -320,7 +365,7 @@ export default function AccountsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100"
+                              className="h-6 w-6 text-primary-600 hover:text-primary-800 hover:bg-primary-100"
                               onClick={() =>
                                 account.type === "crypto"
                                   ? setShowWalletNumber(!showWalletNumber)
@@ -336,19 +381,19 @@ export default function AccountsPage() {
                           </div>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-indigo-600 font-medium">Account Type</span>
-                          <span className="capitalize text-indigo-900">{account.type}</span>
+                          <span className="text-primary-600 font-medium">Account Type</span>
+                          <span className="capitalize text-primary-900">{account.type}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-indigo-600 font-medium">Opened On</span>
-                          <span className="text-indigo-900">{account.openedDate}</span>
+                          <span className="text-primary-600 font-medium">Opened On</span>
+                          <span className="text-primary-900">{account.openedDate}</span>
                         </div>
                       </div>
                     </CardContent>
                     <CardFooter className="flex justify-end relative z-10">
                       <Button
                         asChild
-                        className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all"
+                        className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white shadow-md hover:shadow-lg transition-all"
                       >
                         <Link href={account.type === "crypto" ? "/dashboard/crypto" : "/dashboard/transfers"}>
                           {account.type === "crypto" ? (
@@ -363,12 +408,12 @@ export default function AccountsPage() {
                   </Card>
 
                   <div className="space-y-6">
-                    <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg hover:shadow-xl transition-all duration-300">
+                    <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg hover:shadow-xl transition-all duration-300">
                       <CardHeader>
-                        <CardTitle className="text-xl font-bold text-indigo-900">
+                        <CardTitle className="text-xl font-bold text-primary-900">
                           Recent {account.name} Transactions
                         </CardTitle>
-                        <CardDescription className="text-indigo-700">Last 5 transactions on this account</CardDescription>
+                        <CardDescription className="text-primary-700">Last 5 transactions on this account</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
@@ -378,11 +423,11 @@ export default function AccountsPage() {
                             .map((tx) => (
                               <div
                                 key={tx.id}
-                                className="flex justify-between items-center p-3 rounded-lg hover:bg-indigo-50/50 transition-colors"
+                                className="flex justify-between items-center p-3 rounded-lg hover:bg-primary-50/50 transition-colors"
                               >
                                 <div>
-                                  <div className="font-medium text-indigo-900">{tx.description}</div>
-                                  <div className="text-sm text-indigo-600">{new Date(tx.date).toLocaleDateString()}</div>
+                                  <div className="font-medium text-primary-900">{tx.description}</div>
+                                  <div className="text-sm text-primary-600">{new Date(tx.date).toLocaleDateString()}</div>
                                 </div>
                                 <div className={`font-bold ${tx.amount > 0 ? "text-emerald-600" : "text-red-600"}`}>
                                   {tx.amount > 0 ? "+" : ""}
@@ -393,14 +438,14 @@ export default function AccountsPage() {
                               </div>
                             ))}
                           {transactions.filter((tx) => tx.accountType === account.type).length === 0 && (
-                            <div className="text-center text-indigo-600">No transactions found.</div>
+                            <div className="text-center text-primary-600">No transactions found.</div>
                           )}
                         </div>
                       </CardContent>
                       <CardFooter>
                         <Button
                           variant="outline"
-                          className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                          className="w-full border-primary-200 text-primary-700 hover:bg-primary-50"
                           asChild
                         >
                           <Link href="/dashboard/transactions">
@@ -414,6 +459,7 @@ export default function AccountsPage() {
                 </div>
               </TabsContent>
             )
+ Revelation: true
           })}
         </Tabs>
       </div>
