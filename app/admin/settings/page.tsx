@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Color from 'color';
 
 export default function AdminSettingsPage() {
   const router = useRouter();
@@ -42,8 +43,9 @@ export default function AdminSettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null);
 
-  // Fetch settings after authentication check
+  // Fetch settings and colors
   useEffect(() => {
     const checkAuthAndFetchSettings = async () => {
       try {
@@ -93,8 +95,44 @@ export default function AdminSettingsPage() {
           checkingIcon: data.checkingIcon || "square",
           savingsIcon: data.savingsIcon || "circle",
         });
+
+        // Fetch colors from API
+        const colorsResponse = await fetch('/api/colors');
+        if (colorsResponse.ok) {
+          const colorsData = await colorsResponse.json();
+          setColors(colorsData);
+
+          const primary = Color(colorsData.primaryColor);
+          const secondary = Color(colorsData.secondaryColor);
+
+          const generateShades = (color: typeof Color.prototype) => ({
+            50: color.lighten(0.5).hex(),
+            100: color.lighten(0.4).hex(),
+            200: color.lighten(0.3).hex(),
+            300: color.lighten(0.2).hex(),
+            400: color.lighten(0.1).hex(),
+            500: color.hex(),
+            600: color.darken(0.1).hex(),
+            700: color.darken(0.2).hex(),
+            800: color.darken(0.3).hex(),
+            900: color.darken(0.4).hex(),
+          });
+
+          const primaryShades = generateShades(primary);
+          const secondaryShades = generateShades(secondary);
+
+          Object.entries(primaryShades).forEach(([shade, color]) => {
+            document.documentElement.style.setProperty(`--primary-${shade}`, color);
+          });
+
+          Object.entries(secondaryShades).forEach(([shade, color]) => {
+            document.documentElement.style.setProperty(`--secondary-${shade}`, color);
+          });
+        } else {
+          console.error('Failed to fetch colors');
+        }
       } catch (error: any) {
-        console.error("Error fetching settings:", error);
+        console.error("Error fetching settings or colors:", error);
         if (!error.message.includes("Unauthorized")) {
           setError("Failed to load settings from the server. Using default values.");
         }
@@ -173,19 +211,19 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 to-indigo-50">
+    <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
       <div className="p-6 max-w-5xl mx-auto">
         <Button
           variant="ghost"
           asChild
-          className="p-0 mb-2 text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100 transition-colors"
+          className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
         >
           <Link href="/admin/dashboard">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
           Admin Settings
         </h1>
 
@@ -202,17 +240,17 @@ export default function AdminSettingsPage() {
         )}
 
         <Tabs defaultValue="general">
-          <TabsList className="grid w-full grid-cols-2 mb-6 bg-indigo-100/70 p-1 rounded-lg">
+          <TabsList className="grid w-full grid-cols-2 mb-6 bg-primary-100/70 p-1 rounded-lg">
             <TabsTrigger
               value="general"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
             >
               <Globe className="mr-2 h-4 w-4" />
               General
             </TabsTrigger>
             <TabsTrigger
               value="appearance"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-md transition-all"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
             >
               <Palette className="mr-2 h-4 w-4" />
               Appearance
@@ -220,17 +258,17 @@ export default function AdminSettingsPage() {
           </TabsList>
 
           <TabsContent value="general">
-            <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+            <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
               <CardHeader>
-                <CardTitle className="text-indigo-900">General Settings</CardTitle>
-                <CardDescription className="text-indigo-600">
+                <CardTitle className="text-primary-900">General Settings</CardTitle>
+                <CardDescription className="text-primary-600">
                   Configure basic site settings and information
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="siteName" className="text-indigo-800">
+                    <Label htmlFor="siteName" className="text-primary-800">
                       Site Name
                     </Label>
                     <Input
@@ -238,13 +276,13 @@ export default function AdminSettingsPage() {
                       name="siteName"
                       value={settings.siteName}
                       onChange={handleChange}
-                      className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                      className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                     />
                   </div>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="supportEmail" className="text-indigo-800">
+                    <Label htmlFor="supportEmail" className="text-primary-800">
                       Support Email
                     </Label>
                     <Input
@@ -253,11 +291,11 @@ export default function AdminSettingsPage() {
                       type="email"
                       value={settings.supportEmail}
                       onChange={handleChange}
-                      className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                      className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="supportPhone" className="text-indigo-800">
+                    <Label htmlFor="supportPhone" className="text-primary-800">
                       Support Phone
                     </Label>
                     <Input
@@ -265,15 +303,15 @@ export default function AdminSettingsPage() {
                       name="supportPhone"
                       value={settings.supportPhone}
                       onChange={handleChange}
-                      className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                      className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                     />
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-indigo-900">Social Media Links</h3>
+                  <h3 className="text-lg font-semibold text-primary-900">Social Media Links</h3>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="instagramUrl" className="text-indigo-800">
+                      <Label htmlFor="instagramUrl" className="text-primary-800">
                         Instagram URL
                       </Label>
                       <Input
@@ -283,11 +321,11 @@ export default function AdminSettingsPage() {
                         value={settings.instagramUrl}
                         onChange={handleChange}
                         placeholder="https://instagram.com/yourprofile"
-                        className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="twitterUrl" className="text-indigo-800">
+                      <Label htmlFor="twitterUrl" className="text-primary-800">
                         Twitter URL
                       </Label>
                       <Input
@@ -297,11 +335,11 @@ export default function AdminSettingsPage() {
                         value={settings.twitterUrl}
                         onChange={handleChange}
                         placeholder="https://twitter.com/yourprofile"
-                        className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="facebookUrl" className="text-indigo-800">
+                      <Label htmlFor="facebookUrl" className="text-primary-800">
                         Facebook URL
                       </Label>
                       <Input
@@ -311,16 +349,16 @@ export default function AdminSettingsPage() {
                         value={settings.facebookUrl}
                         onChange={handleChange}
                         placeholder="https://facebook.com/yourprofile"
-                        className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-indigo-900">Legal Information</h3>
+                  <h3 className="text-lg font-semibold text-primary-900">Legal Information</h3>
                   <div className="grid gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="privacyPolicy" className="text-indigo-800">
+                      <Label htmlFor="privacyPolicy" className="text-primary-800">
                         Privacy Policy
                       </Label>
                       <Textarea
@@ -330,11 +368,11 @@ export default function AdminSettingsPage() {
                         onChange={handleChange}
                         placeholder="Enter your privacy policy here..."
                         rows={6}
-                        className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="termsOfService" className="text-indigo-800">
+                      <Label htmlFor="termsOfService" className="text-primary-800">
                         Terms of Service
                       </Label>
                       <Textarea
@@ -344,7 +382,7 @@ export default function AdminSettingsPage() {
                         onChange={handleChange}
                         placeholder="Enter your terms of service here..."
                         rows={6}
-                        className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                     </div>
                   </div>
@@ -354,7 +392,7 @@ export default function AdminSettingsPage() {
                 <Button
                   onClick={handleSaveSettings}
                   disabled={isLoading}
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                  className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
                 >
                   {isLoading ? (
                     <>
@@ -373,16 +411,16 @@ export default function AdminSettingsPage() {
           </TabsContent>
 
           <TabsContent value="appearance">
-            <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
+            <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
               <CardHeader>
-                <CardTitle className="text-indigo-900">Appearance Settings</CardTitle>
-                <CardDescription className="text-indigo-600">
+                <CardTitle className="text-primary-900">Appearance Settings</CardTitle>
+                <CardDescription className="text-primary-600">
                   Customize the look and feel of the application
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="primaryColor" className="text-indigo-800">
+                  <Label htmlFor="primaryColor" className="text-primary-800">
                     Primary Color
                   </Label>
                   <div className="flex gap-2">
@@ -392,18 +430,18 @@ export default function AdminSettingsPage() {
                       type="color"
                       value={settings.primaryColor}
                       onChange={handleChange}
-                      className="w-12 h-10 p-1 border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                      className="w-12 h-10 p-1 border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                     />
                     <Input
                       value={settings.primaryColor}
                       onChange={handleChange}
                       name="primaryColor"
-                      className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                      className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="secondaryColor" className="text-indigo-800">
+                  <Label htmlFor="secondaryColor" className="text-primary-800">
                     Secondary Color
                   </Label>
                   <div className="flex gap-2">
@@ -413,18 +451,18 @@ export default function AdminSettingsPage() {
                       type="color"
                       value={settings.secondaryColor}
                       onChange={handleChange}
-                      className="w-12 h-10 p-1 border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                      className="w-12 h-10 p-1 border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                     />
                     <Input
                       value={settings.secondaryColor}
                       onChange={handleChange}
                       name="secondaryColor"
-                      className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                      className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-indigo-800">Site Logo</Label>
+                  <Label className="text-primary-800">Site Logo</Label>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                       <Input
@@ -437,7 +475,9 @@ export default function AdminSettingsPage() {
                       <Button
                         variant="outline"
                         onClick={() => document.getElementById("logoUpload")?.click()}
-                        className="bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300"
+                        className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary- •
+
+50 hover:text-primary-800 hover:border-primary-300"
                       >
                         <Upload className="mr-2 h-4 w-4" />
                         Upload Logo
@@ -449,7 +489,7 @@ export default function AdminSettingsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-indigo-800">Zelle Logo</Label>
+                  <Label className="text-primary-800">Zelle Logo</Label>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                       <Input
@@ -462,7 +502,7 @@ export default function AdminSettingsPage() {
                       <Button
                         variant="outline"
                         onClick={() => document.getElementById("zelleLogoUpload")?.click()}
-                        className="bg-white/60 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 hover:border-indigo-300"
+                        className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
                       >
                         <Upload className="mr-2 h-4 w-4" />
                         Upload Zelle Logo
@@ -474,10 +514,10 @@ export default function AdminSettingsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-indigo-800">Account Icons</Label>
+                  <Label className="text-primary-800">Account Icons</Label>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="checkingIcon" className="text-indigo-800">
+                      <Label htmlFor="checkingIcon" className="text-primary-800">
                         Checking Account Icon
                       </Label>
                       <Select
@@ -486,7 +526,7 @@ export default function AdminSettingsPage() {
                       >
                         <SelectTrigger
                           id="checkingIcon"
-                          className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                          className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                         >
                           <SelectValue placeholder="Select icon shape" />
                         </SelectTrigger>
@@ -498,7 +538,7 @@ export default function AdminSettingsPage() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="savingsIcon" className="text-indigo-800">
+                      <Label htmlFor="savingsIcon" className="text-primary-800">
                         Savings Account Icon
                       </Label>
                       <Select
@@ -507,7 +547,7 @@ export default function AdminSettingsPage() {
                       >
                         <SelectTrigger
                           id="savingsIcon"
-                          className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                          className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                         >
                           <SelectValue placeholder="Select icon shape" />
                         </SelectTrigger>
@@ -552,7 +592,7 @@ export default function AdminSettingsPage() {
                 <Button
                   onClick={handleSaveSettings}
                   disabled={isLoading}
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                  className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
                 >
                   {isLoading ? (
                     <>
