@@ -10,6 +10,7 @@ export interface ISettings extends Document {
   privacyPolicy: string;
   termsOfService: string;
   primaryColor?: string;
+  secondaryColor?: string;
   logoUrl?: string;
   zelleLogoUrl?: string;
   checkingIcon?: string;
@@ -28,6 +29,7 @@ const SettingsSchema: Schema = new Schema({
   privacyPolicy: { type: String, required: true },
   termsOfService: { type: String, required: true },
   primaryColor: { type: String, required: false },
+  secondaryColor: { type: String, required: false },
   logoUrl: { type: String, required: false },
   zelleLogoUrl: { type: String, required: false },
   checkingIcon: { type: String, required: false },

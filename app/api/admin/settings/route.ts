@@ -65,6 +65,7 @@ export async function PUT(request: NextRequest) {
         privacyPolicy: data.privacyPolicy,
         termsOfService: data.termsOfService,
         primaryColor: data.primaryColor || '',
+        secondaryColor: data.secondaryColor || '',
         logoUrl: data.logoUrl || '',
         zelleLogoUrl: data.zelleLogoUrl || '',
         checkingIcon: data.checkingIcon || '',

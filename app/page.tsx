@@ -111,8 +111,8 @@ const enhancedStyles = `
 function FeatureItem({ icon: Icon, title, description }: FeatureItemProps) {
   return (
     <div className="flex items-start group hover:bg-primary-50 p-3 rounded-lg transition-all duration-300">
-      <div className="p-2 bg-indigo-100 rounded-full mr-4 group-hover:bg-indigo-200 transition-colors duration-300">
-        <Icon className="h-5 w-5 text-indigo-600 group-hover:text-indigo-700 transition-colors duration-300" />
+      <div className="p-2 bg-primary-100 rounded-full mr-4 group-hover:bg-primary-200 transition-colors duration-300">
+        <Icon className="h-5 w-5 text-primary-600 group-hover:text-primary-700 transition-colors duration-300" />
       </div>
       <div>
         <h3 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors duration-300">
@@ -161,8 +161,8 @@ function FaqItem({ question, answer }: FaqItemProps) {
 function FeatureCard({ icon: Icon, title, description, checkItems }: FeatureCardProps) {
   return (
     <div className="flex flex-col h-full p-6 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-xl hover:border-primary-200 transition-all duration-300 hover:-translate-y-1 group">
-      <div className="p-3 bg-indigo-100 rounded-full w-12 h-12 flex items-center justify-center mb-4 group-hover:bg-primary-100 transition-colors duration-300">
-        <Icon className="h-6 w-6 text-indigo-600 group-hover:text-primary-600 transition-colors duration-300" />
+      <div className="p-3 bg-primary-100 rounded-full w-12 h-12 flex items-center justify-center mb-4 group-hover:bg-primary-100 transition-colors duration-300">
+        <Icon className="h-6 w-6 text-primary-600 group-hover:text-primary-600 transition-colors duration-300" />
       </div>
       <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-primary-600 transition-colors duration-300">
         {title}
@@ -183,7 +183,7 @@ function FeatureCard({ icon: Icon, title, description, checkItems }: FeatureCard
 function TrustBadge({ icon: Icon, text }: TrustBadgeProps) {
   return (
     <div className="flex items-center transition-all duration-300 hover:scale-110 hover:text-primary-600 group">
-      <Icon className="h-6 w-6 text-indigo-600 mr-2 group-hover:text-indigo-700" />
+      <Icon className="h-6 w-6 text-primary-600 mr-2 group-hover:text-primary-700" />
       <span className="text-gray-700 font-medium group-hover:text-primary-600">{text}</span>
     </div>
   )
@@ -240,7 +240,7 @@ function AnimatedCounter({ end, duration = 2000, prefix = "", suffix = "" }: Ani
     return () => cancelAnimationFrame(animationFrame)
   }, [end, duration])
   return (
-    <span className="font-bold text-4xl text-indigo-600">
+    <span className="font-bold text-4xl text-primary-600">
       {prefix}
       {count.toLocaleString()}
       {suffix}
@@ -271,7 +271,7 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
       <style jsx global>{`${enhancedStyles}`}</style>
-      <header className="border-b border-border bg-gradient-to-r from-indigo-800 to-purple-900 sticky top-0 z-50 shadow-sm">
+      <header className="border-b border-border bg-gradient-to-r from-primary-800 to-secondary-900 sticky top-0 z-50 shadow-sm">
         <div className="container flex h-16 items-center px-4 sm:px-6 lg:px-8">
           <div className="flex items-center">
             <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto" />
@@ -279,7 +279,7 @@ export default function Home() {
           <div className="ml-auto flex items-center gap-4">
             <Button
               variant="outline"
-              className="bg-white text-indigo-600 border-white hover:bg-indigo-600 hover:text-white"
+              className="bg-white text-primary-600 border-white hover:bg-primary-600 hover:text-white"
               asChild
             >
               <Link href="/login">Sign In</Link>
@@ -292,14 +292,14 @@ export default function Home() {
       </header>
       <main className="flex-1">
         {/* Hero Section */}
-        <AnimatedBackground className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+        <AnimatedBackground className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-br from-primary-50 via-white to-secondary-50">
           <div className="container px-4 md:px-6">
             <div className="grid gap-6 lg:grid-cols-2 lg:gap-12 items-center">
               <div className="space-y-6">
-                <div className="inline-block rounded-full bg-indigo-100 px-3 py-1 text-sm text-indigo-700 animate-shimmer">
+                <div className="inline-block rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-700 animate-shimmer">
                   Banking Reimagined
                 </div>
-                <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+                <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-600">
                   Banking made simple, secure, and fast
                 </h1>
                 <p className="text-gray-600 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed max-w-[600px]">
@@ -308,7 +308,7 @@ export default function Home() {
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                   <Button
                     size="lg"
-                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:bg-gradient-to-r hover:from-indigo-700 hover:to-purple-700 text-white animate-pulse-glow"
+                    className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:bg-gradient-to-r hover:from-primary-700 hover:to-secondary-700 text-white animate-pulse-glow"
                     asChild
                   >
                     <Link href="/register">
@@ -318,7 +318,7 @@ export default function Home() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="bg-white text-indigo-600 border-indigo-600 hover:bg-indigo-600 hover:text-white"
+                    className="bg-white text-primary-600 border-primary-600 hover:bg-primary-600 hover:text-white"
                     asChild
                   >
                     <Link href="/login">Sign In</Link>
@@ -340,23 +340,23 @@ export default function Home() {
         </AnimatedBackground>
 
         {/* Stats Section */}
-        <section className="w-full py-10 bg-gradient-to-r from-indigo-50 to-white">
+        <section className="w-full py-10 bg-gradient-to-r from-primary-50 to-white">
           <div className="container px-4 md:px-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
               <div className="space-y-2">
-                <h3 className="text-3xl font-bold text-indigo-600">Zelle</h3>
+                <h3 className="text-3xl font-bold text-primary-600">Zelle</h3>
                 <p className="text-gray-600">Instant Transfers</p>
               </div>
               <div className="space-y-2">
-                <h3 className="text-3xl font-bold text-indigo-600">Free</h3>
+                <h3 className="text-3xl font-bold text-primary-600">Free</h3>
                 <p className="text-gray-600">Checking Account</p>
               </div>
               <div className="space-y-2">
-                <h3 className="text-3xl font-bold text-indigo-600">Free</h3>
+                <h3 className="text-3xl font-bold text-primary-600">Free</h3>
                 <p className="text-gray-600">Savings Account</p>
               </div>
               <div className="space-y-2">
-                <h3 className="text-3xl font-bold text-indigo-600">AES-256</h3>
+                <h3 className="text-3xl font-bold text-primary-600">AES-256</h3>
                 <p className="text-gray-600">Wire Transfers</p>
               </div>
             </div>
@@ -469,7 +469,7 @@ export default function Home() {
             </div>
             <div className="mt-8 text-center">
               <Button
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:bg-gradient-to-r hover:from-indigo-700 hover:to-purple-700 text-white animate-pulse-glow"
+                className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:bg-gradient-to-r hover:from-primary-700 hover:to-secondary-700 text-white animate-pulse-glow"
                 asChild
               >
                 <Link href="/register">
@@ -485,7 +485,7 @@ export default function Home() {
           <div className="container px-4 md:px-6">
             <div className="grid gap-10 lg:grid-cols-2 lg:gap-16 items-center">
               <div className="order-2 lg:order-1 space-y-6">
-                <div className="inline-block rounded-full bg-indigo-100 px-3 py-1 text-sm text-indigo-700 animate-shimmer">
+                <div className="inline-block rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-700 animate-shimmer">
                   Bank-Grade Security
                 </div>
                 <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl text-gray-900">
@@ -544,7 +544,7 @@ export default function Home() {
                 <DecorativeCircle size="md" position="bottom-right" color="secondary" className="-bottom-6 -right-6" />
               </div>
               <div className="space-y-6">
-                <div className="inline-block rounded-full bg-indigo-100 px-3 py-1 text-sm text-indigo-700 animate-shimmer">
+                <div className="inline-block rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-700 animate-shimmer">
                   Full Transparency
                 </div>
                 <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl text-gray-900">
@@ -581,7 +581,7 @@ export default function Home() {
           <div className="container px-4 md:px-6">
             <div className="grid gap-10 lg:grid-cols-2 lg:gap-16 items-center">
               <div className="space-y-6">
-                <div className="inline-block rounded-full bg-indigo-100 px-3 py-1 text-sm text-indigo-700 animate-shimmer">
+                <div className="inline-block rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-700 animate-shimmer">
                   Here For You
                 </div>
                 <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl text-gray-900">5 Day A Week Customer Support</h2>
@@ -629,10 +629,10 @@ export default function Home() {
           <div className="absolute bottom-1/3 left-1/3 w-16 h-16 bg-primary-300 rounded-full opacity-20 animate-float-fast"></div>
           <div className="container px-4 md:px-6 relative z-10">
             <div className="text-center space-y-4 mb-12">
-              <div className="inline-flex items-center justify-center p-1 px-3 rounded-full bg-indigo-100 text-indigo-700 text-sm font-medium mb-2 animate-shimmer">
+              <div className="inline-flex items-center justify-center p-1 px-3 rounded-full bg-primary-100 text-primary-700 text-sm font-medium mb-2 animate-shimmer">
                 Got Questions?
               </div>
-              <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-600">
                 Frequently Asked Questions
               </h2>
               <p className="mx-auto max-w-[700px] text-gray-600 md:text-xl/relaxed">
@@ -671,7 +671,7 @@ export default function Home() {
         </section>
 
         {/* CTA Section */}
-        <section className="w-full py-12 md:py-24 bg-gradient-to-r from-indigo-800 to-purple-900 relative overflow-hidden">
+        <section className="w-full py-12 md:py-24 bg-gradient-to-r from-primary-800 to-secondary-900 relative overflow-hidden">
           <DecorativeCircle size="xl" position="top-right" className="opacity-10 -top-32 -right-32" />
           <DecorativeCircle size="lg" position="bottom-left" className="opacity-10 -bottom-24 -left-24" />
           <div className="container px-4 md:px-6 text-center relative z-10">
@@ -691,7 +691,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="bg-white text-indigo-600 border-white hover:bg-indigo-600 hover:text-white"
+                  className="bg-white text-primary-600 border-white hover:bg-primary-600 hover:text-white"
                   asChild
                 >
                   <Link href="/login">Sign In</Link>
@@ -703,7 +703,7 @@ export default function Home() {
       </main>
 
       {/* Redesigned Footer */}
-      <footer className="bg-gradient-to-b from-indigo-900 to-purple-950 text-white py-8">
+      <footer className="bg-gradient-to-b from-primary-900 to-secondary-950 text-white py-8">
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
             <div className="flex items-center gap-4">
@@ -712,7 +712,7 @@ export default function Home() {
             </div>
             <div className="flex space-x-6">
               {settings?.facebookUrl && (
-                <Link href={settings.facebookUrl} className="text-gray-400 hover:text-indigo-300 transition-colors duration-300">
+                <Link href={settings.facebookUrl} className="text-gray-400 hover:text-primary-300 transition-colors duration-300">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="24"
@@ -730,7 +730,7 @@ export default function Home() {
                 </Link>
               )}
               {settings?.twitterUrl && (
-                <Link href={settings.twitterUrl} className="text-gray-400 hover:text-indigo-300 transition-colors duration-300">
+                <Link href={settings.twitterUrl} className="text-gray-400 hover:text-primary-300 transition-colors duration-300">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="24"
@@ -748,7 +748,7 @@ export default function Home() {
                 </Link>
               )}
               {settings?.instagramUrl && (
-                <Link href={settings.instagramUrl} className="text-gray-400 hover:text-indigo-300 transition-colors duration-300">
+                <Link href={settings.instagramUrl} className="text-gray-400 hover:text-primary-300 transition-colors duration-300">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="24"

@@ -32,6 +32,7 @@ export default function AdminSettingsPage() {
     privacyPolicy: "",
     termsOfService: "",
     primaryColor: "#6D1ED4",
+    secondaryColor: "#000000",
     logoUrl: "/zelle-logo.svg",
     zelleLogoUrl: "/zelle-logo.svg",
     checkingIcon: "square",
@@ -86,6 +87,7 @@ export default function AdminSettingsPage() {
           privacyPolicy: data.privacyPolicy || "",
           termsOfService: data.termsOfService || "",
           primaryColor: data.primaryColor || "#6D1ED4",
+          secondaryColor: data.secondaryColor || "#000000",
           logoUrl: data.logoUrl || "/zelle-logo.svg",
           zelleLogoUrl: data.zelleLogoUrl || "/zelle-logo.svg",
           checkingIcon: data.checkingIcon || "square",
@@ -401,6 +403,27 @@ export default function AdminSettingsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="secondaryColor" className="text-indigo-800">
+                    Secondary Color
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="secondaryColor"
+                      name="secondaryColor"
+                      type="color"
+                      value={settings.secondaryColor}
+                      onChange={handleChange}
+                      className="w-12 h-10 p-1 border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                    />
+                    <Input
+                      value={settings.secondaryColor}
+                      onChange={handleChange}
+                      name="secondaryColor"
+                      className="border-indigo-200 bg-white/80 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
                   <Label className="text-indigo-800">Site Logo</Label>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
@@ -515,6 +538,10 @@ export default function AdminSettingsPage() {
                             Primary Button
                           </Button>
                           <Button variant="outline">Secondary Button</Button>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2">
+                          <div style={{ backgroundColor: settings.secondaryColor, width: '20px', height: '20px', borderRadius: '4px' }}></div>
+                          <span className="text-sm text-gray-600">Secondary Color</span>
                         </div>
                       </div>
                     </div>
