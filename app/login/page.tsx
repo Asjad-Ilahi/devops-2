@@ -1,39 +1,44 @@
-"use client"
+// app/login.tsx
+"use client";
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import Color from 'color'
+import type React from "react";
+import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import Color from "color";
+import { RecaptchaVerifier, auth } from "@/firebase";
+import { sendVerificationSMS } from "@/lib/email";
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [isLoginLoading, setIsLoginLoading] = useState(false)
-  const [isTwoFactorLoading, setIsTwoFactorLoading] = useState(false)
-  const [showTwoFactor, setShowTwoFactor] = useState(false)
-  const [twoFactorCode, setTwoFactorCode] = useState("")
-  const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
+  const router = useRouter();
+  const recaptchaVerifierRef = useRef<any>(null);
+  const confirmationResultRef = useRef<any>(null);
+
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoginLoading, setIsLoginLoading] = useState(false);
+  const [isTwoFactorLoading, setIsTwoFactorLoading] = useState(false);
+  const [showTwoFactor, setShowTwoFactor] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [verificationMethod, setVerificationMethod] = useState<"email" | "phone">("email");
+  const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null);
 
   useEffect(() => {
     const fetchColors = async () => {
       try {
-        const response = await fetch('/api/colors')
+        const response = await fetch("/api/colors");
         if (response.ok) {
-          const data = await response.json()
-          setColors(data)
-
-          const primary = Color(data.primaryColor)
-          const secondary = Color(data.secondaryColor)
-
+          const data = await response.json();
+          setColors(data);
+          const primary = Color(data.primaryColor);
+          const secondary = Color(data.secondaryColor);
           const generateShades = (color: typeof Color.prototype) => ({
             50: color.lighten(0.5).hex(),
             100: color.lighten(0.4).hex(),
@@ -45,81 +50,99 @@ export default function LoginPage() {
             700: color.darken(0.2).hex(),
             800: color.darken(0.3).hex(),
             900: color.darken(0.4).hex(),
-          })
-
-          const primaryShades = generateShades(primary)
-          const secondaryShades = generateShades(secondary)
-
+          });
+          const primaryShades = generateShades(primary);
+          const secondaryShades = generateShades(secondary);
           Object.entries(primaryShades).forEach(([shade, color]) => {
-            document.documentElement.style.setProperty(`--primary-${shade}`, color)
-          })
-
+            document.documentElement.style.setProperty(`--primary-${shade}`, color);
+          });
           Object.entries(secondaryShades).forEach(([shade, color]) => {
-            document.documentElement.style.setProperty(`--secondary-${shade}`, color)
-          })
+            document.documentElement.style.setProperty(`--secondary-${shade}`, color);
+          });
         } else {
-          console.error('Failed to fetch colors')
+          console.error("Failed to fetch colors");
         }
       } catch (error) {
-        console.error('Error fetching colors:', error)
+        console.error("Error fetching colors:", error);
       }
+    };
+    fetchColors();
+  }, []);
+
+  useEffect(() => {
+    if (showTwoFactor && verificationMethod === "phone" && !recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current = new RecaptchaVerifier(
+        "recaptcha-container",
+        {
+          size: "invisible",
+          callback: () => {},
+        },
+        auth
+      );
     }
-    fetchColors()
-  }, [])
+  }, [showTwoFactor, verificationMethod]);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsLoginLoading(true)
+    e.preventDefault();
+    setError(null);
+    setIsLoginLoading(true);
 
     try {
       const response = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, step: "requestCode" }),
-      })
-
-      const data = await response.json()
+      });
+      const data = await response.json();
       if (!response.ok) {
-        setError(data.error)
-        setIsLoginLoading(false)
-        return
+        setError(data.error);
+        setIsLoginLoading(false);
+        return;
       }
 
-      setShowTwoFactor(true)
-      setIsLoginLoading(false)
+      setVerificationMethod(data.verificationMethod || "email");
+      if (data.verificationMethod === "phone") {
+        const confirmationResult = await sendVerificationSMS(data.phone, recaptchaVerifierRef.current);
+        confirmationResultRef.current = confirmationResult;
+      }
+
+      setShowTwoFactor(true);
+      setIsLoginLoading(false);
     } catch (error) {
-      setError("An error occurred. Please try again later.")
-      setIsLoginLoading(false)
+      setError("An error occurred. Please try again later.");
+      setIsLoginLoading(false);
     }
-  }
+  };
 
   const handleTwoFactorSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsTwoFactorLoading(true)
+    e.preventDefault();
+    setError(null);
+    setIsTwoFactorLoading(true);
 
     try {
+      if (verificationMethod === "phone") {
+        await confirmationResultRef.current.confirm(twoFactorCode);
+      }
+
       const response = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, twoFactorCode, step: "verifyCode" }),
-      })
-
-      const data = await response.json()
+      });
+      const data = await response.json();
       if (!response.ok) {
-        setError(data.error)
-        setIsTwoFactorLoading(false)
-        return
+        setError(data.error);
+        setIsTwoFactorLoading(false);
+        return;
       }
 
-      localStorage.setItem("token", data.token)
-      router.push(data.redirect)
+      localStorage.setItem("token", data.token);
+      router.push(data.redirect);
     } catch (error) {
-      setError("An error occurred. Please try again later.")
-      setIsTwoFactorLoading(false)
+      setError("Invalid verification code or an error occurred.");
+      setIsTwoFactorLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 px-4 py-12">
@@ -143,13 +166,11 @@ export default function LoginPage() {
             </Link>
           </p>
         </div>
-
         {error && (
           <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-
         <div className="relative">
           <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-xl blur-sm opacity-30"></div>
           <div className="relative bg-white p-6 sm:p-8 rounded-xl shadow-xl">
@@ -172,7 +193,6 @@ export default function LoginPage() {
                       className="mt-1 bg-primary-50 border-primary-200 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                     />
                   </div>
-
                   <div>
                     <div className="flex items-center justify-between">
                       <Label htmlFor="password" className="text-primary-700">
@@ -211,7 +231,6 @@ export default function LoginPage() {
                     </div>
                   </div>
                 </div>
-
                 <Button
                   type="submit"
                   className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium shadow-md hover:shadow-lg transition-all"
@@ -226,7 +245,6 @@ export default function LoginPage() {
                     "Sign in"
                   )}
                 </Button>
-
                 <div className="text-center">
                   <p className="text-sm text-primary-600">
                     By signing in, you agree to our{" "}
@@ -246,7 +264,9 @@ export default function LoginPage() {
                   <Label htmlFor="twoFactorCode" className="text-primary-700">
                     Verification Code
                   </Label>
-                  <p className="text-sm text-primary-600 mb-2">We've sent a code to your email. Please enter it below.</p>
+                  <p className="text-sm text-primary-600 mb-2">
+                    We've sent a code to your {verificationMethod === "email" ? "email" : "phone"}. Please enter it below.
+                  </p>
                   <Input
                     id="twoFactorCode"
                     name="twoFactorCode"
@@ -259,7 +279,7 @@ export default function LoginPage() {
                     maxLength={6}
                   />
                 </div>
-
+                <div id="recaptcha-container"></div>
                 <Button
                   type="submit"
                   className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium shadow-md hover:shadow-lg transition-all"
@@ -274,7 +294,6 @@ export default function LoginPage() {
                     "Verify"
                   )}
                 </Button>
-
                 <Button
                   type="button"
                   variant="link"
@@ -287,7 +306,6 @@ export default function LoginPage() {
             )}
           </div>
         </div>
-
         <div className="mt-8 text-center">
           <p className="text-xs text-primary-600">
             Bank Administrator?{" "}
@@ -298,5 +316,5 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

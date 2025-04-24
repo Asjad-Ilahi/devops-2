@@ -1,19 +1,25 @@
-"use client"
+// app/register.tsx
+"use client";
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { AlertCircle, Check, Eye, EyeOff, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import Color from 'color'
+import type React from "react";
+import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { AlertCircle, Check, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Color from "color";
+import { RecaptchaVerifier, auth } from "@/firebase";
+import { sendVerificationEmail, sendVerificationSMS } from "@/lib/email";
 
 export default function RegisterPage() {
-  const router = useRouter()
+  const router = useRouter();
+  const recaptchaVerifierRef = useRef<any>(null);
+  const confirmationResultRef = useRef<any>(null);
+
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -24,31 +30,31 @@ export default function RegisterPage() {
     state: "",
     zipCode: "",
     emailVerificationCode: "",
+    smsVerificationCode: "",
     username: "",
     password: "",
     confirmPassword: "",
     verificationMethod: "email",
-  })
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [errors, setErrors] = useState<{ [key: string]: string }>({})
-  const [isLoading, setIsLoading] = useState(false)
-  const [pendingUserId, setPendingUserId] = useState<string | null>(null)
-  const [step, setStep] = useState(1)
-  const [success, setSuccess] = useState(false)
-  const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
+  });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [step, setStep] = useState(1);
+  const [success, setSuccess] = useState(false);
+  const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null);
 
   useEffect(() => {
     const fetchColors = async () => {
       try {
-        const response = await fetch('/api/colors')
+        const response = await fetch("/api/colors");
         if (response.ok) {
-          const data = await response.json()
-          setColors(data)
-
-          const primary = Color(data.primaryColor)
-          const secondary = Color(data.secondaryColor)
-
+          const data = await response.json();
+          setColors(data);
+          const primary = Color(data.primaryColor);
+          const secondary = Color(data.secondaryColor);
           const generateShades = (color: typeof Color.prototype) => ({
             50: color.lighten(0.5).hex(),
             100: color.lighten(0.4).hex(),
@@ -60,27 +66,39 @@ export default function RegisterPage() {
             700: color.darken(0.2).hex(),
             800: color.darken(0.3).hex(),
             900: color.darken(0.4).hex(),
-          })
-
-          const primaryShades = generateShades(primary)
-          const secondaryShades = generateShades(secondary)
-
+          });
+          const primaryShades = generateShades(primary);
+          const secondaryShades = generateShades(secondary);
           Object.entries(primaryShades).forEach(([shade, color]) => {
-            document.documentElement.style.setProperty(`--primary-${shade}`, color)
-          })
-
+            document.documentElement.style.setProperty(`--primary-${shade}`, color);
+          });
           Object.entries(secondaryShades).forEach(([shade, color]) => {
-            document.documentElement.style.setProperty(`--secondary-${shade}`, color)
-          })
+            document.documentElement.style.setProperty(`--secondary-${shade}`, color);
+          });
         } else {
-          console.error('Failed to fetch colors')
+          console.error("Failed to fetch colors");
         }
       } catch (error) {
-        console.error('Error fetching colors:', error)
+        console.error("Error fetching colors:", error);
       }
+    };
+    fetchColors();
+  }, []);
+
+  useEffect(() => {
+    // Initialize reCAPTCHA verifier
+    if (step === 2 && !recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current = new RecaptchaVerifier(
+        "recaptcha-container",
+        {
+          size: "invisible",
+          callback: () => {},
+        },
+        auth
+      );
     }
-    fetchColors()
-  }, [])
+  }, [step]);
+
 
   const usStates = [
     { value: "AL", label: "Alabama" },
@@ -135,83 +153,99 @@ export default function RegisterPage() {
     { value: "WY", label: "Wyoming" },
     { value: "DC", label: "District of Columbia" },
   ]
+  
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData({ ...formData, [name]: value })
-    if (errors[name]) setErrors({ ...errors, [name]: "" })
-  }
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    if (errors[name]) setErrors({ ...errors, [name]: "" });
+  };
 
   const handleSelectChange = (value: string, name: string) => {
-    setFormData({ ...formData, [name]: value })
-    if (errors[name]) setErrors({ ...errors, [name]: "" })
-  }
+    setFormData({ ...formData, [name]: value });
+    if (errors[name]) setErrors({ ...errors, [name]: "" });
+  };
 
   const validateFirstStep = () => {
-    const newErrors: { [key: string]: string } = {}
-    if (!formData.fullName.trim()) newErrors.fullName = "Full name is required"
+    const newErrors: { [key: string]: string } = {};
+    if (!formData.fullName.trim()) newErrors.fullName = "Full name is required";
     if (!formData.email.trim()) {
-      newErrors.email = "Email is required"
+      newErrors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid"
+      newErrors.email = "Email is invalid";
     }
     if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required"
+      newErrors.phone = "Phone number is required";
     } else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ""))) {
-      newErrors.phone = "Phone number is invalid"
+      newErrors.phone = "Phone number must be 10 digits";
     }
     if (!formData.ssn.trim()) {
-      newErrors.ssn = "Social Security Number is required"
+      newErrors.ssn = "Social Security Number is required";
     } else {
-      const ssnDigits = formData.ssn.replace(/\D/g, "")
-      if (ssnDigits.length !== 9) newErrors.ssn = "SSN must be 9 digits"
+      const ssnDigits = formData.ssn.replace(/\D/g, "");
+      if (ssnDigits.length !== 9) newErrors.ssn = "SSN must be 9 digits";
     }
-    if (!formData.streetAddress.trim()) newErrors.streetAddress = "Street address is required"
-    if (!formData.city.trim()) newErrors.city = "City is required"
-    if (!formData.state) newErrors.state = "State is required"
+    if (!formData.streetAddress.trim()) newErrors.streetAddress = "Street address is required";
+    if (!formData.city.trim()) newErrors.city = "City is required";
+    if (!formData.state) newErrors.state = "State is required";
     if (!formData.zipCode.trim()) {
-      newErrors.zipCode = "ZIP code is required"
+      newErrors.zipCode = "ZIP code is required";
     } else if (!/^\d{5}$/.test(formData.zipCode.replace(/\D/g, ""))) {
-      newErrors.zipCode = "ZIP code must be 5 digits"
+      newErrors.zipCode = "ZIP code must be 5 digits";
     }
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const validateSecondStep = () => {
-    const newErrors: { [key: string]: string } = {}
+    const newErrors: { [key: string]: string } = {};
     if (!formData.emailVerificationCode.trim()) {
-      newErrors.emailVerificationCode = "Verification code is required"
+      newErrors.emailVerificationCode = "Email verification code is required";
     }
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    if (!formData.smsVerificationCode.trim()) {
+      newErrors.smsVerificationCode = "SMS verification code is required";
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const validateThirdStep = () => {
-    const newErrors: { [key: string]: string } = {}
+    const newErrors: { [key: string]: string } = {};
     if (!formData.username.trim()) {
-      newErrors.username = "Username is required"
+      newErrors.username = "Username is required";
     } else if (formData.username.length < 4) {
-      newErrors.username = "Username must be at least 4 characters"
+      newErrors.username = "Username must be at least 4 characters";
     }
     if (!formData.password) {
-      newErrors.password = "Password is required"
+      newErrors.password = "Password is required";
     } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters"
+      newErrors.password = "Password must be at least 8 characters";
     }
     if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match"
+      newErrors.confirmPassword = nedErrors: { [key: string]: string } = {};
+    if (!formData.username.trim()) {
+      newErrors.username = "Username is required";
+    } else if (formData.username.length < 4) {
+      newErrors.username = "Username must be at least 4 characters";
     }
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    if (!formData.password) {
+      newErrors.password = "Password is required";
+    } else if (formData.password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters";
+    }
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleFirstStep = async () => {
-    if (!validateFirstStep()) return
-
-    setIsLoading(true)
+    if (!validateFirstStep()) return;
+    setIsLoading(true);
     try {
-      const response = await fetch("/api/register", {
+      // Send email verification
+      const emailResponse = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -225,57 +259,67 @@ export default function RegisterPage() {
           zipCode: formData.zipCode,
           step: "requestCode",
         }),
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        setErrors({ form: data.error || "Failed to send verification code" })
-        setIsLoading(false)
-        return
+      });
+      const emailData = await emailResponse.json();
+      if (!emailResponse.ok) {
+        setErrors({ form: emailData.error || "Failed to send email verification code" });
+        setIsLoading(false);
+        return;
       }
 
-      setPendingUserId(data.pendingUserId)
-      setStep(2)
+      // Send SMS verification
+      const confirmationResult = await sendVerificationSMS(formData.phone, recaptchaVerifierRef.current);
+      confirmationResultRef.current = confirmationResult;
+
+      setPendingUserId(emailData.pendingUserId);
+      setStep(2);
     } catch (error) {
-      setErrors({ form: "An unexpected error occurred. Please try again." })
+      setErrors({ form: "An unexpected error occurred. Please try again." });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleSecondStep = async () => {
-    if (!validateSecondStep()) return
-
-    setIsLoading(true)
+    if (!validateSecondStep()) return;
+    setIsLoading(true);
     try {
-      const response = await fetch("/api/verify-email", {
+      // Verify email code
+      const emailResponse = await fetch("/api/verify-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pendingUserId,
           code: formData.emailVerificationCode,
         }),
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        setErrors({ emailVerificationCode: data.error || "Invalid verification code" })
-        setIsLoading(false)
-        return
+      });
+      const emailData = await emailResponse.json();
+      if (!emailResponse.ok) {
+        setErrors({ emailVerificationCode: emailData.error || "Invalid email verification code" });
+        setIsLoading(false);
+        return;
       }
 
-      setStep(3)
+      // Verify SMS code
+      try {
+        await confirmationResultRef.current.confirm(formData.smsVerificationCode);
+      } catch (error) {
+        setErrors({ smsVerificationCode: "Invalid SMS verification code" });
+        setIsLoading(false);
+        return;
+      }
+
+      setStep(3);
     } catch (error) {
-      setErrors({ emailVerificationCode: "Verification failed. Please try again." })
+      setErrors({ form: "Verification failed. Please try again." });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleThirdStep = async () => {
-    if (!validateThirdStep()) return
-
-    setIsLoading(true)
+    if (!validateThirdStep()) return;
+    setIsLoading(true);
     try {
       const response = await fetch("/api/complete-registration", {
         method: "POST",
@@ -285,40 +329,39 @@ export default function RegisterPage() {
           username: formData.username,
           password: formData.password,
         }),
-      })
-
-      const data = await response.json()
+      });
+      const data = await response.json();
       if (!response.ok) {
-        setErrors({ form: data.error || "Failed to complete registration" })
-        setIsLoading(false)
-        return
+        setErrors({ form: data.error || "Failed to complete registration" });
+        setIsLoading(false);
+        return;
       }
-
-      setSuccess(true)
+      setSuccess(true);
       setTimeout(() => {
-        router.push("/login")
-      }, 3000)
+        router.push("/login");
+      }, 3000);
     } catch (error) {
-      setErrors({ form: "An unexpected error occurred. Please try again." })
+      setErrors({ form: "An unexpected error occurred. Please try again." });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleNextStep = () => {
-    if (step === 1) handleFirstStep()
-    else if (step === 2) handleSecondStep()
-    else if (step === 3) handleThirdStep()
-  }
+    if (step === 1) handleFirstStep();
+    else if (step === 2) handleSecondStep();
+    else if (step === 3) handleThirdStep();
+  };
 
   const handlePrevStep = () => {
-    if (step > 1) setStep(step - 1)
-  }
+    if (step > 1) setStep(step - 1);
+  };
 
   const handleResendCode = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const response = await fetch("/api/register", {
+      // Resend email verification
+      const emailResponse = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -332,57 +375,60 @@ export default function RegisterPage() {
           zipCode: formData.zipCode,
           step: "requestCode",
         }),
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        setErrors({ form: data.error || "Failed to resend code" })
-      } else {
-        setErrors({})
-        setPendingUserId(data.pendingUserId)
-        alert("Verification code resent successfully")
+      });
+      const emailData = await emailResponse.json();
+      if (!emailResponse.ok) {
+        setErrors({ form: emailData.error || "Failed to resend email code" });
+        setIsLoading(false);
+        return;
       }
+
+      // Resend SMS verification
+      const confirmationResult = await sendVerificationSMS(formData.phone, recaptchaVerifierRef.current);
+      confirmationResultRef.current = confirmationResult;
+
+      setPendingUserId(emailData.pendingUserId);
+      alert("Verification codes resent successfully");
     } catch (error) {
-      setErrors({ form: "Failed to resend code. Please try again." })
+      setErrors({ form: "Failed to resend codes. Please try again." });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const formatSSN = (value: string) => {
-    const digits = value.replace(/\D/g, "")
-    let formatted = ""
+    const digits = value.replace(/\D/g, "");
+    let formatted = "";
     if (digits.length > 0) {
-      formatted += digits.substring(0, Math.min(3, digits.length))
-      if (digits.length > 3) formatted += "-" + digits.substring(3, Math.min(5, digits.length))
-      if (digits.length > 5) formatted += "-" + digits.substring(5, Math.min(9, digits.length))
+      formatted += digits.substring(0, Math.min(3, digits.length));
+      if (digits.length > 3) formatted += "-" + digits.substring(3, Math.min(5, digits.length));
+      if (digits.length > 5) formatted += "-" + digits.substring(5, Math.min(9, digits.length));
     }
-    return formatted
-  }
+    return formatted;
+  };
 
   const handleSSNChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target
-    const formattedValue = formatSSN(value)
-    setFormData({ ...formData, ssn: formattedValue })
-    if (errors.ssn) setErrors({ ...errors, ssn: "" })
-  }
+    const { value } = e.target;
+    const formattedValue = formatSSN(value);
+    setFormData({ ...formData, ssn: formattedValue });
+    if (errors.ssn) setErrors({ ...errors, ssn: "" });
+  };
 
   const handleZipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target
-    const digits = value.replace(/\D/g, "").substring(0, 5)
-    setFormData({ ...formData, zipCode: digits })
-    if (errors.zipCode) setErrors({ ...errors, zipCode: "" })
-  }
+    const { value } = e.target;
+    const digits = value.replace(/\D/g, "").substring(0, 5);
+    setFormData({ ...formData, zipCode: digits });
+    if (errors.zipCode) setErrors({ ...errors, zipCode: "" });
+  };
 
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 px-4 py-12 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-          <div className="absolute top-10 left-10 w-72 h-72 bg-green-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
+          <div className="absolute top-10 left-10 w-72 h-72 bg-green-300 rounded-full mix-bi-multiply filter blur-xl opacity-20 animate-blob"></div>
           <div className="absolute top-0 right-10 w-72 h-72 bg-primary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
           <div className="absolute bottom-10 left-20 w-72 h-72 bg-secondary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
         </div>
-
         <div className="w-full max-w-md text-center space-y-6 backdrop-blur-sm bg-white/70 p-8 rounded-xl shadow-xl border border-green-100 z-10">
           <div className="mx-auto w-20 h-20 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
             <Check className="h-10 w-10 text-white" />
@@ -401,7 +447,7 @@ export default function RegisterPage() {
           </Button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -411,7 +457,6 @@ export default function RegisterPage() {
         <div className="absolute top-0 right-10 w-72 h-72 bg-secondary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
         <div className="absolute bottom-10 left-20 w-72 h-72 bg-primary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
       </div>
-
       <div className="w-full max-w-md space-y-8 z-10">
         <div className="text-center">
           <img src="/zelle-logo.svg" alt="Zelle" className="h-16 w-auto mx-auto drop-shadow-md" />
@@ -425,14 +470,12 @@ export default function RegisterPage() {
             </Link>
           </p>
         </div>
-
         {errors.form && (
           <Alert variant="destructive" className="bg-red-50 border border-red-200 text-red-800">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{errors.form}</AlertDescription>
           </Alert>
         )}
-
         <div className="mt-8">
           <div className="relative">
             <div className="absolute left-0 top-1/3 h-0.5 w-full bg-gradient-to-r from-primary-200 via-secondary-200 to-primary-200"></div>
@@ -463,7 +506,6 @@ export default function RegisterPage() {
               </div>
             </div>
           </div>
-
           <form className="mt-8 space-y-6" onSubmit={(e) => e.preventDefault()}>
             {step === 1 && (
               <div className="space-y-4 backdrop-blur-sm bg-white/70 p-6 rounded-xl shadow-xl border border-primary-100">
@@ -483,7 +525,6 @@ export default function RegisterPage() {
                   />
                   {errors.fullName && <p className="text-sm text-red-500 mt-1">{errors.fullName}</p>}
                 </div>
-
                 <div>
                   <Label htmlFor="email" className="text-primary-800 font-medium">
                     Email Address
@@ -500,7 +541,6 @@ export default function RegisterPage() {
                   />
                   {errors.email && <p className="text-sm text-red-500 mt-1">{errors.email}</p>}
                 </div>
-
                 <div>
                   <Label htmlFor="phone" className="text-primary-800 font-medium">
                     Phone Number
@@ -517,7 +557,6 @@ export default function RegisterPage() {
                   />
                   {errors.phone && <p className="text-sm text-red-500 mt-1">{errors.phone}</p>}
                 </div>
-
                 <div>
                   <Label htmlFor="ssn" className="text-primary-800 font-medium">
                     Social Security Number (SSN)
@@ -536,7 +575,6 @@ export default function RegisterPage() {
                   {errors.ssn && <p className="text-sm text-red-500 mt-1">{errors.ssn}</p>}
                   <p className="text-xs text-primary-600 mt-1">Your SSN is securely encrypted and stored</p>
                 </div>
-
                 <div>
                   <Label htmlFor="streetAddress" className="text-primary-800 font-medium">
                     Street Address
@@ -553,7 +591,6 @@ export default function RegisterPage() {
                   />
                   {errors.streetAddress && <p className="text-sm text-red-500 mt-1">{errors.streetAddress}</p>}
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="city" className="text-primary-800 font-medium">
@@ -571,7 +608,6 @@ export default function RegisterPage() {
                     />
                     {errors.city && <p className="text-sm text-red-500 mt-1">{errors.city}</p>}
                   </div>
-
                   <div>
                     <Label htmlFor="state" className="text-primary-800 font-medium">
                       State
@@ -594,7 +630,6 @@ export default function RegisterPage() {
                     {errors.state && <p className="text-sm text-red-500 mt-1">{errors.state}</p>}
                   </div>
                 </div>
-
                 <div>
                   <Label htmlFor="zipCode" className="text-primary-800 font-medium">
                     ZIP Code
@@ -612,7 +647,6 @@ export default function RegisterPage() {
                   />
                   {errors.zipCode && <p className="text-sm text-red-500 mt-1">{errors.zipCode}</p>}
                 </div>
-
                 <Button
                   type="button"
                   className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
@@ -622,7 +656,7 @@ export default function RegisterPage() {
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Sending Code...
+                      Sending Codes...
                     </>
                   ) : (
                     "Continue"
@@ -630,18 +664,19 @@ export default function RegisterPage() {
                 </Button>
               </div>
             )}
-
             {step === 2 && (
               <div className="space-y-4 backdrop-blur-sm bg-white/70 p-6 rounded-xl shadow-xl border border-primary-100">
                 <div>
                   <Alert className="bg-primary-50 border-primary-200 text-primary-700">
-                    <AlertDescription>A verification code has been sent to your email address.</AlertDescription>
+                    <AlertDescription>
+                      Verification codes have been sent to your email and phone.
+                    </AlertDescription>
                   </Alert>
                 </div>
-
+                <div id="recaptcha-container"></div>
                 <div>
                   <Label htmlFor="emailVerificationCode" className="text-primary-800 font-medium">
-                    Verification Code
+                    Email Verification Code
                   </Label>
                   <Input
                     id="emailVerificationCode"
@@ -650,14 +685,31 @@ export default function RegisterPage() {
                     required
                     value={formData.emailVerificationCode}
                     onChange={handleChange}
-                    placeholder="Enter verification code"
+                    placeholder="Enter email verification code"
                     className={`${errors.emailVerificationCode ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
                   />
                   {errors.emailVerificationCode && (
                     <p className="mt-1 text-sm text-red-500">{errors.emailVerificationCode}</p>
                   )}
                 </div>
-
+                <div>
+                  <Label htmlFor="smsVerificationCode" className="text-primary-800 font-medium">
+                    SMS Verification Code
+                  </Label>
+                  <Input
+                    id="smsVerificationCode"
+                    name="smsVerificationCode"
+                    type="text"
+                    required
+                    value={formData.smsVerificationCode}
+                    onChange={handleChange}
+                    placeholder="Enter SMS verification code"
+                    className={`${errors.smsVerificationCode ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
+                  />
+                  {errors.smsVerificationCode && (
+                    <p className="mt-1 text-sm text-red-500">{errors.smsVerificationCode}</p>
+                  )}
+                </div>
                 <div className="text-center">
                   <button
                     type="button"
@@ -665,10 +717,9 @@ export default function RegisterPage() {
                     onClick={handleResendCode}
                     disabled={isLoading}
                   >
-                    {isLoading ? "Sending..." : "Didn't receive code? Resend"}
+                    {isLoading ? "Sending..." : "Didn't receive codes? Resend"}
                   </button>
                 </div>
-
                 <div className="flex gap-4">
                   <Button
                     type="button"
@@ -696,7 +747,6 @@ export default function RegisterPage() {
                 </div>
               </div>
             )}
-
             {step === 3 && (
               <div className="space-y-4 backdrop-blur-sm bg-white/70 p-6 rounded-xl shadow-xl border border-primary-100">
                 <div>
@@ -715,7 +765,6 @@ export default function RegisterPage() {
                   />
                   {errors.username && <p className="text-sm text-red-500 mt-1">{errors.username}</p>}
                 </div>
-
                 <div>
                   <Label htmlFor="password" className="text-primary-800 font-medium">
                     Password
@@ -741,7 +790,6 @@ export default function RegisterPage() {
                   </div>
                   {errors.password && <p className="text-sm text-red-500 mt-1">{errors.password}</p>}
                 </div>
-
                 <div>
                   <Label htmlFor="confirmPassword" className="text-primary-800 font-medium">
                     Confirm Password
@@ -767,7 +815,6 @@ export default function RegisterPage() {
                   </div>
                   {errors.confirmPassword && <p className="text-sm text-red-500 mt-1">{errors.confirmPassword}</p>}
                 </div>
-
                 <div>
                   <Label htmlFor="verificationMethod" className="text-primary-800 font-medium">
                     Preferred 2FA Method
@@ -788,7 +835,6 @@ export default function RegisterPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div className="flex gap-4">
                   <Button
                     type="button"
@@ -806,7 +852,7 @@ export default function RegisterPage() {
                   >
                     {isLoading ? (
                       <>
-                        < Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                         Creating...
                       </>
                     ) : (
@@ -816,7 +862,6 @@ export default function RegisterPage() {
                 </div>
               </div>
             )}
-
             <div className="text-center">
               <p className="text-sm text-primary-700">
                 By creating an account, you agree to our{" "}
@@ -833,5 +878,9 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
+
+
+
+

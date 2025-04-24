@@ -1,4 +1,6 @@
+// lib/email.ts
 import nodemailer from "nodemailer";
+import { auth, RecaptchaVerifier, signInWithPhoneNumber } from "@/firebase";
 
 function ensureString(value: string | undefined, name: string): asserts value is string {
   if (!value) {
@@ -38,6 +40,18 @@ export async function sendVerificationEmail(to: string, code: string) {
   } catch (error) {
     console.error("Error sending email:", error);
     throw new Error("Failed to send verification email");
+  }
+}
+
+export async function sendVerificationSMS(phone: string, recaptchaVerifier: any) {
+  try {
+    const phoneNumber = `+1${phone}`; // Adjust country code as needed
+    const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+    console.log("SMS verification code sent to:", phone);
+    return confirmationResult;
+  } catch (error) {
+    console.error("Error sending SMS:", error);
+    throw new Error("Failed to send SMS verification code");
   }
 }
 

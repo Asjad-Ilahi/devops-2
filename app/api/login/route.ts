@@ -1,78 +1,74 @@
+// app/api/login/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import crypto from "crypto";
 import { sendVerificationEmail } from "@/lib/email";
+import crypto from "crypto";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET is not defined in environment variables");
-}
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 export async function POST(req: NextRequest) {
-  try {
-    await dbConnect();
-    const { username, password, twoFactorCode, step } = await req.json();
+  await dbConnect();
+  const { username, password, twoFactorCode, step } = await req.json();
 
-    if (!step || !["requestCode", "verifyCode"].includes(step)) {
-      return NextResponse.json({ error: "Invalid or missing step parameter" }, { status: 400 });
-    }
-
-    if (step === "requestCode") {
-      if (!username || !password) {
-        return NextResponse.json({ error: "Username and password are required" }, { status: 400 });
-      }
-
+  if (step === "requestCode") {
+    try {
       const user = await User.findOne({ username });
       if (!user) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 });
-      }
-
-      if (user.status !== "active") {
-        return NextResponse.json({ error: "Account is not active" }, { status: 403 });
+        return NextResponse.json({ error: "Invalid username or password" }, { status: 401 });
       }
 
       const isPasswordValid = await bcrypt.compare(password, user.password);
       if (!isPasswordValid) {
-        return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+        return NextResponse.json({ error: "Invalid username or password" }, { status: 401 });
       }
 
-      const twoFactorCode = crypto.randomBytes(3).toString("hex").toUpperCase();
-      user.twoFactorCode = twoFactorCode;
+      if (!user.isApproved) {
+        return NextResponse.json({ error: "Account not yet approved" }, { status: 403 });
+      }
+
+      const verificationCode = crypto.randomBytes(3).toString("hex").toUpperCase();
+      user.twoFactorCode = verificationCode;
+      user.twoFactorCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
       await user.save();
 
-      await sendVerificationEmail(user.email, twoFactorCode);
-
-      return NextResponse.json({ message: "Verification code sent to your email" }, { status: 200 });
-    } else if (step === "verifyCode") {
-      if (!username || !twoFactorCode) {
-        return NextResponse.json({ error: "Username and verification code are required" }, { status: 400 });
+      if (user.verificationMethod === "email") {
+        await sendVerificationEmail(user.email, verificationCode);
       }
 
+      return NextResponse.json({
+        message: "Verification code sent",
+        verificationMethod: user.verificationMethod,
+        phone: user.verificationMethod === "phone" ? user.phone : undefined,
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+  } else if (step === "verifyCode") {
+    try {
       const user = await User.findOne({ username });
       if (!user) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 });
+        return NextResponse.json({ error: "Invalid username" }, { status: 401 });
       }
 
-      if (user.twoFactorCode !== twoFactorCode) {
-        return NextResponse.json({ error: "Invalid verification code" }, { status: 401 });
+      if (!user.twoFactorCode || user.twoFactorCode !== twoFactorCode || user.twoFactorCodeExpires < new Date()) {
+        return NextResponse.json({ error: "Invalid or expired verification code" }, { status: 401 });
       }
 
-      user.twoFactorCode = undefined;
-      user.lastLogin = new Date();
+      user.twoFactorCode = null;
+      user.twoFactorCodeExpires = null;
       await user.save();
 
-      const token = jwt.sign({ userId: user._id.toString() }, JWT_SECRET!, { expiresIn: "1h" });
-
-      return NextResponse.json({ token, redirect: "/dashboard" }, { status: 200 });
+      const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "1h" });
+      return NextResponse.json({ token, redirect: "/dashboard" });
+    } catch (error) {
+      console.error("Verification error:", error);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
-  } catch (error: any) {
-    console.error("Login error:", error);
-    return NextResponse.json(
-      { error: error.message || "An unexpected error occurred during login" },
-      { status: 500 }
-    );
   }
+
+  return NextResponse.json({ error: "Invalid step" }, { status: 400 });
 }

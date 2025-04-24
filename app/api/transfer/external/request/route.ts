@@ -1,9 +1,11 @@
+// app/api/transfer/external/request/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { sendVerificationEmail } from "@/lib/email";
+import { sendVerificationEmail, sendVerificationSMS } from "@/lib/email";
+import { RecaptchaVerifier, auth } from "@/firebase";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -58,7 +60,6 @@ export async function POST(req: NextRequest) {
     }
 
     const verificationCode = crypto.randomBytes(3).toString("hex").toUpperCase();
-
     user.pendingExternalTransfer = {
       from,
       amount,
@@ -75,7 +76,17 @@ export async function POST(req: NextRequest) {
     };
     await user.save();
 
-    await sendVerificationEmail(user.email, verificationCode);
+    if (user.verificationMethod === "email") {
+      await sendVerificationEmail(user.email, verificationCode);
+    } else {
+      const recaptchaVerifier = new RecaptchaVerifier(
+        "recaptcha-container-server",
+        { size: "invisible" },
+        auth
+      );
+      await sendVerificationSMS(user.phone, recaptchaVerifier);
+    }
+
     return NextResponse.json({ message: "Verification code sent to your email" }, { status: 200 });
   } catch (error) {
     console.error("External transfer request error:", error);

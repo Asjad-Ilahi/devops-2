@@ -1,9 +1,11 @@
+// app/api/transfer/zelle/request/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { sendVerificationEmail } from "@/lib/email";
+import { sendVerificationEmail, sendVerificationSMS } from "@/lib/email";
+import { RecaptchaVerifier, auth } from "@/firebase";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -35,6 +37,7 @@ export async function POST(req: NextRequest) {
     if (!recipientUser) {
       return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
     }
+
     if (recipientUser._id.toString() === sender._id.toString()) {
       return NextResponse.json({ error: "Cannot send money to yourself" }, { status: 400 });
     }
@@ -44,7 +47,6 @@ export async function POST(req: NextRequest) {
     }
 
     const verificationCode = crypto.randomBytes(3).toString("hex").toUpperCase();
-
     sender.pendingZelleTransfer = {
       recipientId: recipientUser._id.toString(),
       amount,
@@ -54,7 +56,16 @@ export async function POST(req: NextRequest) {
     };
     await sender.save();
 
-    await sendVerificationEmail(sender.email, verificationCode);
+    if (sender.verificationMethod === "email") {
+      await sendVerificationEmail(sender.email, verificationCode);
+    } else {
+      const recaptchaVerifier = new RecaptchaVerifier(
+        "recaptcha-container-server",
+        { size: "invisible" },
+        auth
+      );
+      await sendVerificationSMS(sender.phone, recaptchaVerifier);
+    }
 
     return NextResponse.json({ message: "Verification code sent to your email" }, { status: 200 });
   } catch (error) {
