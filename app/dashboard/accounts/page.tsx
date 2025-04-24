@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from '@/lib/auth'
+import { apiFetch } from '@/lib/api'
 
 interface Account {
   name: string
@@ -29,6 +31,8 @@ interface Transaction {
 }
 
 export default function AccountsPage() {
+  useAuth() // Proactively check token validity and handle expiration
+
   const [showAccountNumber, setShowAccountNumber] = useState(false)
   const [showWalletNumber, setShowWalletNumber] = useState(false)
   const [activeTab, setActiveTab] = useState("checking")
@@ -38,46 +42,45 @@ export default function AccountsPage() {
   const [error, setError] = useState<string | null>(null)
   const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
 
-  // Fetch colors
+  // Fetch colors (public endpoint, no auth required)
   useEffect(() => {
     const fetchColors = async () => {
       try {
         const response = await fetch('/api/colors')
-        if (response.ok) {
-          const data = await response.json()
-          setColors(data)
-
-          const primary = Color(data.primaryColor)
-          const secondary = Color(data.secondaryColor)
-
-          const generateShades = (color: typeof Color.prototype) => ({
-            50: color.lighten(0.5).hex(),
-            100: color.lighten(0.4).hex(),
-            200: color.lighten(0.3).hex(),
-            300: color.lighten(0.2).hex(),
-            400: color.lighten(0.1).hex(),
-            500: color.hex(),
-            600: color.darken(0.1).hex(),
-            700: color.darken(0.2).hex(),
-            800: color.darken(0.3).hex(),
-            900: color.darken(0.4).hex(),
-          })
-
-          const primaryShades = generateShades(primary)
-          const secondaryShades = generateShades(secondary)
-
-          Object.entries(primaryShades).forEach(([shade, color]) => {
-            document.documentElement.style.setProperty(`--primary-${shade}`, color)
-          })
-
-          Object.entries(secondaryShades).forEach(([shade, color]) => {
-            document.documentElement.style.setProperty(`--secondary-${shade}`, color)
-          })
-        } else {
-          console.error('Failed to fetch colors')
+        if (!response.ok) {
+          throw new Error('Failed to fetch colors')
         }
-      } catch (error) {
-        console.error('Error fetching colors:', error)
+        const data = await response.json()
+        setColors(data)
+
+        const primary = Color(data.primaryColor)
+        const secondary = Color(data.secondaryColor)
+
+        const generateShades = (color: typeof Color.prototype) => ({
+          50: color.lighten(0.5).hex(),
+          100: color.lighten(0.4).hex(),
+          200: color.lighten(0.3).hex(),
+          300: color.lighten(0.2).hex(),
+          400: color.lighten(0.1).hex(),
+          500: color.hex(),
+          600: color.darken(0.1).hex(),
+          700: color.darken(0.2).hex(),
+          800: color.darken(0.3).hex(),
+          900: color.darken(0.4).hex(),
+        })
+
+        const primaryShades = generateShades(primary)
+        const secondaryShades = generateShades(secondary)
+
+        Object.entries(primaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--primary-${shade}`, color)
+        })
+
+        Object.entries(secondaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--secondary-${shade}`, color)
+        })
+      } catch (error: unknown) {
+        console.error('Error fetching colors:', error instanceof Error ? error.message : 'Unknown error')
       }
     }
     fetchColors()
@@ -130,19 +133,9 @@ export default function AccountsPage() {
   // Fetch accounts from API
   useEffect(() => {
     const fetchAccounts = async () => {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        setError("Please log in to view accounts")
-        return
-      }
-
       try {
-        const response = await fetch("/api/accounts", {
+        const response = await apiFetch("/api/accounts", {
           method: "GET",
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
         })
 
         if (!response.ok) {
@@ -182,38 +175,40 @@ export default function AccountsPage() {
         ]
         setAccounts(newAccounts)
         setError(null)
-      } catch (error) {
-        console.error("Fetch error:", error)
-        setError(error instanceof Error ? error.message : "Failed to load accounts")
-        setAccounts([
-          {
-            name: "Checking Account",
-            number: "xxxx-xxxx-xxxx",
-            fullNumber: "Not Available",
-            balance: 0,
-            type: "checking",
-            status: "active",
-            openedDate: "N/A",
-          },
-          {
-            name: "Savings Account",
-            number: "xxxx-xxxx-xxxx",
-            fullNumber: "Not Available",
-            balance: 0,
-            type: "savings",
-            status: "active",
-            openedDate: "N/A",
-          },
-          {
-            name: "Bitcoin Wallet",
-            number: "xxxx-xxxx-xxxx",
-            fullNumber: "Not Available",
-            balance: 0,
-            type: "crypto",
-            status: "active",
-            openedDate: "N/A",
-          },
-        ])
+      } catch (error: unknown) {
+        if (error instanceof Error && error.message !== 'Unauthorized') {
+          console.error("Fetch error:", error.message)
+          setError(error.message)
+          setAccounts([
+            {
+              name: "Checking Account",
+              number: "xxxx-xxxx-xxxx",
+              fullNumber: "Not Available",
+              balance: 0,
+              type: "checking",
+              status: "active",
+              openedDate: "N/A",
+            },
+            {
+              name: "Savings Account",
+              number: "xxxx-xxxx-xxxx",
+              fullNumber: "Not Available",
+              balance: 0,
+              type: "savings",
+              status: "active",
+              openedDate: "N/A",
+            },
+            {
+              name: "Bitcoin Wallet",
+              number: "xxxx-xxxx-xxxx",
+              fullNumber: "Not Available",
+              balance: 0,
+              type: "crypto",
+              status: "active",
+              openedDate: "N/A",
+            },
+          ])
+        }
       }
     }
 
@@ -459,7 +454,6 @@ export default function AccountsPage() {
                 </div>
               </TabsContent>
             )
- Revelation: true
           })}
         </Tabs>
       </div>

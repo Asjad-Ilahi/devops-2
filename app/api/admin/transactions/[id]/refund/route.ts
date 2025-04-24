@@ -37,8 +37,6 @@ async function verifyAdminToken(req: NextRequest) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 }
-
-// POST: Process a refund for the transactions
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   console.log("DEBUG: Starting POST handler for refund...");
   await dbConnect();
@@ -56,9 +54,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const body = await req.json();
     console.log("DEBUG: Request body:", body);
 
-    const { senderTransactionId, receiverTransactionId } = body;
+    const { senderTransactionId, receiverTransactionId, isInternalTransfer } = body;
     console.log("DEBUG: Sender Transaction ID:", senderTransactionId);
     console.log("DEBUG: Receiver Transaction ID:", receiverTransactionId || "Not provided");
+    console.log("DEBUG: Is Internal Transfer:", isInternalTransfer);
 
     const { id } = await params;
     console.log("DEBUG: URL Param ID:", id);
@@ -89,90 +88,148 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const refundTransactions = [];
-    const usersToUpdate = new Map<string, { balanceChange: number; savingsBalanceChange: number; cryptoBalanceChange: number }>();
+    const usersToUpdate = new Map<string, { balanceChange: number; savingsBalanceChange: number }>();
 
-    for (const originalTransaction of transactions) {
-      console.log(`DEBUG: Processing transaction ${originalTransaction._id}...`);
+    if (isInternalTransfer) {
+      // Handle internal transfer refund
+      console.log("DEBUG: Processing internal transfer refund...");
+      const senderTx = transactions.find((tx) => tx.amount < 0);
+      const receiverTx = transactions.find((tx) => tx.amount > 0);
 
-      if (originalTransaction.type === "refund") {
-        console.log(`DEBUG: Transaction ${originalTransaction._id} is already a refund`);
+      if (!senderTx || !receiverTx) {
+        console.log("DEBUG: Invalid internal transfer: missing sender or receiver transaction");
         await session.abortTransaction();
         session.endSession();
-        return NextResponse.json({ error: "Cannot refund a refund transaction" }, { status: 400 });
+        return NextResponse.json({ error: "Invalid internal transfer" }, { status: 400 });
       }
 
       // Check if already refunded
-      const existingRefund = await Transaction.findOne({ relatedTransactionId: originalTransaction._id }).session(session);
+      const existingRefund = await Transaction.findOne({
+        relatedTransactionId: { $in: [senderTx._id, receiverTx._id] },
+      }).session(session);
       if (existingRefund) {
-        console.log(`DEBUG: Transaction ${originalTransaction._id} already refunded`);
+        console.log("DEBUG: Transaction already refunded");
         await session.abortTransaction();
         session.endSession();
         return NextResponse.json({ error: "Transaction already refunded" }, { status: 400 });
       }
 
-      const isTransfer = originalTransaction.category === "Transfer" ? true : false;
-      const isCrypto = originalTransaction.type === "crypto_buy" || originalTransaction.type === "crypto_sell";
-
-      // Process refund for the transaction
-      const refund = new Transaction({
-        userId: originalTransaction.userId._id,
-        description: `Refund for ${originalTransaction.description}`,
-        amount: -originalTransaction.amount,
+      // Create two refund transactions to reverse the transfer
+      const refundSender = new Transaction({
+        userId: senderTx.userId._id,
+        description: `Refund for ${senderTx.description}`,
+        amount: Math.abs(senderTx.amount), // Credit the source account
         date: new Date(),
-        type: "refund",
-        category: originalTransaction.category,
-        accountType: originalTransaction.accountType,
+        type: "transfer",
+        category: "Transfer",
+        accountType: senderTx.accountType, // Original source account (e.g., savings)
         status: "completed",
-        memo: `Refund for transaction ${originalTransaction._id}`,
-        relatedTransactionId: originalTransaction._id,
-        transferId: originalTransaction.transferId,
-        cryptoAmount: isCrypto ? -originalTransaction.cryptoAmount : undefined,
-        cryptoPrice: isCrypto ? originalTransaction.cryptoPrice : undefined,
+        memo: `Refund for transaction ${senderTx._id}`,
+        relatedTransactionId: senderTx._id,
+        transferId: new mongoose.Types.ObjectId(), // New transferId for the refund pair
       });
-      console.log(`DEBUG: Created refund transaction for ${originalTransaction._id}:`, JSON.stringify(refund, null, 2));
-      refundTransactions.push(refund);
 
-      // Update user balances based on transaction type
-      const userId = originalTransaction.userId._id.toString();
-      const userUpdate = usersToUpdate.get(userId) || { balanceChange: 0, savingsBalanceChange: 0, cryptoBalanceChange: 0 };
+      const refundReceiver = new Transaction({
+        userId: receiverTx.userId._id,
+        description: `Refund for ${receiverTx.description}`,
+        amount: -Math.abs(receiverTx.amount), // Debit the destination account
+        date: new Date(),
+        type: "transfer",
+        category: "Transfer",
+        accountType: receiverTx.accountType, // Original destination account (e.g., checking)
+        status: "completed",
+        memo: `Refund for transaction ${receiverTx._id}`,
+        relatedTransactionId: receiverTx._id,
+        transferId: refundSender.transferId, // Same transferId to link the pair
+      });
 
-      if (isTransfer) {
-        // Handle transfer refunds
-        if (originalTransaction.accountType === "checking") {
-          userUpdate.balanceChange -= originalTransaction.amount;
-          userUpdate.savingsBalanceChange += originalTransaction.amount;
-        } else if (originalTransaction.accountType === "savings") {
-          userUpdate.savingsBalanceChange -= originalTransaction.amount;
-          userUpdate.balanceChange += originalTransaction.amount;
+      console.log("DEBUG: Created refund transactions:", {
+        sender: JSON.stringify(refundSender, null, 2),
+        receiver: JSON.stringify(refundReceiver, null, 2),
+      });
+      console.log("DEBUG: Created refund transactions:", {
+        sender: JSON.stringify(refundSender, null, 2),
+        receiver: JSON.stringify(refundReceiver, null, 2),
+      });
+
+      refundTransactions.push(refundSender, refundReceiver);
+
+      // Update user balance
+      const userId = senderTx.userId._id.toString();
+      const userUpdate = usersToUpdate.get(userId) || { balanceChange: 0, savingsBalanceChange: 0 };
+
+      // Credit the source account
+      if (senderTx.accountType === "checking") {
+        userUpdate.balanceChange += Math.abs(senderTx.amount);
+      } else if (senderTx.accountType === "savings") {
+        userUpdate.savingsBalanceChange += Math.abs(senderTx.amount);
+      }
+
+      // Debit the destination account
+      if (receiverTx.accountType === "checking") {
+        userUpdate.balanceChange -= Math.abs(receiverTx.amount);
+      } else if (receiverTx.accountType === "savings") {
+        userUpdate.savingsBalanceChange -= Math.abs(receiverTx.amount);
+      }
+
+      usersToUpdate.set(userId, userUpdate);
+      console.log(`DEBUG: Updated user balance for ${userId}:`, userUpdate);
+    } else {
+      // Handle non-internal transfer refunds (Zelle, External, or single transactions)
+      for (const originalTransaction of transactions) {
+        console.log(`DEBUG: Processing transaction ${originalTransaction._id}...`);
+
+        if (originalTransaction.type === "refund") {
+          console.log(`DEBUG: Transaction ${originalTransaction._id} is already a refund`);
+          await session.abortTransaction();
+          session.endSession();
+          return NextResponse.json({ error: "Cannot refund a refund transaction" }, { status: 400 });
         }
-      } else if (isCrypto) {
-        // Handle crypto transaction refunds
-        if (originalTransaction.type === "crypto_buy") {
-          // Refund a buy: return cash (credit balance), remove BTC (debit cryptoBalance)
-          userUpdate.balanceChange += -originalTransaction.amount; // Credit cash spent
-          userUpdate.cryptoBalanceChange += -(originalTransaction.cryptoAmount || 0); // Debit BTC received
-        } else if (originalTransaction.type === "crypto_sell") {
-          // Refund a sell: return BTC (credit cryptoBalance), remove cash (debit balance)
-          userUpdate.balanceChange += -originalTransaction.amount; // Debit cash received
-          userUpdate.cryptoBalanceChange += -(originalTransaction.cryptoAmount || 0); // Credit BTC sold
+
+        // Check if already refunded
+        const existingRefund = await Transaction.findOne({ relatedTransactionId: originalTransaction._id }).session(session);
+        if (existingRefund) {
+          console.log(`DEBUG: Transaction ${originalTransaction._id} already refunded`);
+          await session.abortTransaction();
+          session.endSession();
+          return NextResponse.json({ error: "Transaction already refunded" }, { status: 400 });
         }
-      } else {
-        // Handle non-transfer, non-crypto refunds
+
+        // Process refund for the transaction
+        const refund = new Transaction({
+          userId: originalTransaction.userId._id,
+          description: `Refund for ${originalTransaction.description}`,
+          amount: -originalTransaction.amount,
+          date: new Date(),
+          type: "refund",
+          category: originalTransaction.category,
+          accountType: originalTransaction.accountType,
+          status: "completed",
+          memo: `Refund for transaction ${originalTransaction._id}`,
+          relatedTransactionId: originalTransaction._id,
+          transferId: originalTransaction.transferId,
+        });
+
+        console.log(`DEBUG: Created refund transaction for ${originalTransaction._id}:`, JSON.stringify(refund, null, 2));
+        refundTransactions.push(refund);
+
+        // Update user balance
+        const userId = originalTransaction.userId._id.toString();
+        const userUpdate = usersToUpdate.get(userId) || { balanceChange: 0, savingsBalanceChange: 0 };
         if (originalTransaction.accountType === "checking") {
           userUpdate.balanceChange += -originalTransaction.amount;
         } else if (originalTransaction.accountType === "savings") {
           userUpdate.savingsBalanceChange += -originalTransaction.amount;
         }
+        usersToUpdate.set(userId, userUpdate);
+        console.log(`DEBUG: Updated user balance for ${userId}:`, userUpdate);
       }
-
-      usersToUpdate.set(userId, userUpdate);
-      console.log(`DEBUG: Updated user balance for ${userId}:`, userUpdate);
     }
 
     // Validate sufficient balance for debit operations
-    for (const [userId, { balanceChange, savingsBalanceChange, cryptoBalanceChange }] of usersToUpdate) {
+    for (const [userId, { balanceChange, savingsBalanceChange }] of usersToUpdate) {
       console.log(`DEBUG: Validating balance for user ${userId}...`);
-      if (balanceChange < 0 || savingsBalanceChange < 0 || cryptoBalanceChange < 0) {
+      if (balanceChange < 0 || savingsBalanceChange < 0) {
         const user = await User.findById(userId).session(session);
         console.log(`DEBUG: Fetched user ${userId}:`, user ? JSON.stringify(user, null, 2) : "Not found");
         if (!user) {
@@ -183,9 +240,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
         const newBalance = (user.balance || 0) + balanceChange;
         const newSavingsBalance = (user.savingsBalance || 0) + savingsBalanceChange;
-        const newCryptoBalance = (user.cryptoBalance || 0) + cryptoBalanceChange;
-        console.log(`DEBUG: New balance for ${userId}: Checking: ${newBalance}, Savings: ${newSavingsBalance}, Crypto: ${newCryptoBalance}`);
-        if (newBalance < 0 || newSavingsBalance < 0 || newCryptoBalance < 0) {
+        console.log(`DEBUG: New balance for ${userId}: Checking: ${newBalance}, Savings: ${newSavingsBalance}`);
+        if (newBalance < 0 || newSavingsBalance < 0) {
           console.log(`DEBUG: Insufficient balance for user ${userId}`);
           await session.abortTransaction();
           session.endSession();
@@ -201,14 +257,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Update user balances
     console.log("DEBUG: Updating user balances...");
-    for (const [userId, { balanceChange, savingsBalanceChange, cryptoBalanceChange }] of usersToUpdate) {
+    for (const [userId, { balanceChange, savingsBalanceChange }] of usersToUpdate) {
       const user = await User.findById(userId).session(session);
       if (user) {
         user.balance = (user.balance || 0) + balanceChange;
         user.savingsBalance = (user.savingsBalance || 0) + savingsBalanceChange;
-        user.cryptoBalance = (user.cryptoBalance || 0) + cryptoBalanceChange;
         await user.save({ session });
-        console.log(`DEBUG: Updated user ${userId} - Balance: ${user.balance}, Savings: ${user.savingsBalance}, Crypto: ${user.cryptoBalance}`);
+        console.log(`DEBUG: Updated user ${userId} - Balance: ${user.balance}, Savings: ${user.savingsBalance}`);
       }
     }
 
@@ -232,8 +287,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         account: tx.accountType,
         memo: tx.memo,
         relatedTransactionId: tx.relatedTransactionId?.toString(),
-        cryptoAmount: tx.cryptoAmount || 0,
-        cryptoPrice: tx.cryptoPrice || 0,
       })),
     };
     console.log("DEBUG: Sending response:", JSON.stringify(response, null, 2));
@@ -247,53 +300,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 }
 
-// GET and PUT methods remain unchanged
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  console.log("DEBUG: Starting GET handler...");
-  await dbConnect();
-
-  const authResponse = await verifyAdminToken(req);
-  if (authResponse) return authResponse;
-
-  try {
-    const { id } = await params;
-    console.log("DEBUG: Fetching transaction with ID:", id);
-    const transaction = await Transaction.findById(id).populate("userId", "fullName email");
-    console.log("DEBUG: Fetched transaction:", transaction ? JSON.stringify(transaction, null, 2) : "Not found");
-
-    if (!transaction) {
-      console.log("DEBUG: Transaction not found, returning 404");
-      return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
-    }
-
-    const response = {
-      transaction: {
-        id: transaction._id.toString(),
-        userId: transaction.userId._id.toString(),
-        userName: transaction.userId.fullName,
-        userEmail: transaction.userId.email,
-        type: transaction.type,
-        amount: transaction.amount,
-        description: transaction.description,
-        date: transaction.date.toISOString(),
-        status: transaction.status,
-        account: transaction.accountType,
-        memo: transaction.memo || "",
-        relatedTransactionId: transaction.relatedTransactionId?.toString(),
-        cryptoAmount: transaction.cryptoAmount || 0,
-        cryptoPrice: transaction.cryptoPrice || 0,
-        transferId: transaction.transferId || "",
-      },
-    };
-    console.log("DEBUG: Sending GET response:", JSON.stringify(response, null, 2));
-
-    return NextResponse.json(response);
-  } catch (error) {
-    console.error("DEBUG: Error fetching transaction:", error);
-    return NextResponse.json({ error: "Failed to fetch transaction" }, { status: 500 });
-  }
-}
-
+// PUT: Update transaction details
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   console.log("DEBUG: Starting PUT handler...");
   await dbConnect();

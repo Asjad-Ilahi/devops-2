@@ -1,10 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Transaction from "@/models/Transaction";
-import User from "@/models/User";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+
+// Interface for the decoded JWT payload
+interface IJwtPayload {
+  role: string;
+  [key: string]: any;
+}
+
+// Interface for the User document (populated fields)
+interface IUser {
+  _id: string;
+  fullName?: string;
+  email?: string;
+  accountNumber?: string;
+  savingsNumber?: string;
+}
+
+// Interface for the Transaction document
+interface ITransaction {
+  _id: string;
+  userId: IUser;
+  amount: number;
+  type: string;
+  date: Date | string;
+  accountType: string;
+  status: string;
+  description?: string;
+  memo?: string;
+  __v?: number;
+}
+
+// Interface for the processed transaction output
+interface IProcessedTransaction {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  type: string;
+  amount: number;
+  description: string;
+  date: string;
+  status: string;
+  account: string;
+  memo: string;
+}
+
+// Helper function to check if two dates are within a tolerance window (5 seconds)
+const areDatesClose = (date1: Date, date2: Date, windowMs: number = 5000): boolean => {
+  return Math.abs(date1.getTime() - date2.getTime()) <= windowMs;
+};
 
 export async function GET(req: NextRequest) {
   await dbConnect();
@@ -15,195 +63,125 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET) as IJwtPayload;
     if (decoded.role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Fetch transactions and populate user details
     const transactions = await Transaction.find()
-      .populate("userId", "fullName email")
-      .sort({ date: -1 });
+      .populate("userId", "fullName email accountNumber savingsNumber")
+      .limit(50)
+      .lean() as ITransaction[];
 
-    const transferGroups = new Map();
-    const singleTransactions = [];
+    const processedTransactions: IProcessedTransaction[] = [];
+    const processedIds = new Set<string>();
 
-    transactions.forEach((tx) => {
-      if (tx.transferId) {
-        const key = tx.transferId.toString();
-        if (!transferGroups.has(key)) transferGroups.set(key, []);
-        transferGroups.get(key).push(tx);
-      } else {
-        singleTransactions.push(tx);
+    for (const tx of transactions) {
+      const txId = tx._id;
+      if (processedIds.has(txId)) continue;
+
+      if (tx.type === "transfer") {
+        // Look for internal transfer pair (same user, opposite amounts, different accounts)
+        const internalPair = transactions.find(
+          (otherTx) =>
+            otherTx._id !== txId &&
+            otherTx.userId._id === tx.userId._id &&
+            otherTx.type === "transfer" &&
+            Math.abs(otherTx.amount) === Math.abs(tx.amount) &&
+            otherTx.amount === -tx.amount &&
+            areDatesClose(new Date(otherTx.date), new Date(tx.date)) &&
+            otherTx.accountType !== tx.accountType &&
+            !processedIds.has(otherTx._id)
+        );
+
+        if (internalPair) {
+          const sourceTx = tx.amount < 0 ? tx : internalPair;
+          const destTx = tx.amount < 0 ? internalPair : tx;
+          const sourceAccount = sourceTx.accountType;
+          const destAccount = destTx.accountType;
+          const sourceAccountNumber =
+            sourceAccount === "checking" ? sourceTx.userId.accountNumber : sourceTx.userId.savingsNumber;
+          const destAccountNumber =
+            destAccount === "checking" ? destTx.userId.accountNumber : destTx.userId.savingsNumber;
+          const amount = Math.abs(sourceTx.amount);
+          const description = `Transfer from ${sourceAccount} (${sourceAccountNumber ?? "N/A"}) to ${destAccount} (${destAccountNumber ?? "N/A"})`;
+
+          processedTransactions.push({
+            id: sourceTx._id,
+            userId: sourceTx.userId._id,
+            userName: sourceTx.userId.fullName || "Unknown User",
+            userEmail: sourceTx.userId.email || "N/A",
+            type: "transfer",
+            amount,
+            description,
+            date: new Date(sourceTx.date).toISOString(),
+            status: sourceTx.status,
+            account: "internal transfer",
+            memo: sourceTx.memo || "",
+          });
+          processedIds.add(sourceTx._id);
+          processedIds.add(destTx._id);
+          continue;
+        }
+
+        // Look for external transfer pair (different users, opposite amounts)
+        const externalPair = transactions.find(
+          (otherTx) =>
+            otherTx._id !== txId &&
+            otherTx.userId._id !== tx.userId._id &&
+            otherTx.type === "transfer" &&
+            Math.abs(otherTx.amount) === Math.abs(tx.amount) &&
+            otherTx.amount === -tx.amount &&
+            areDatesClose(new Date(otherTx.date), new Date(tx.date)) &&
+            !processedIds.has(otherTx._id)
+        );
+
+        if (externalPair) {
+          const senderTx = tx.amount < 0 ? tx : externalPair;
+          const receiverTx = tx.amount < 0 ? externalPair : tx;
+          const amount = Math.abs(senderTx.amount);
+          const description = `Sent from ${senderTx.userId.fullName || "Unknown User"} to ${receiverTx.userId.fullName || "Unknown User"}`;
+
+          processedTransactions.push({
+            id: senderTx._id,
+            userId: senderTx.userId._id,
+            userName: senderTx.userId.fullName || "Unknown User",
+            userEmail: senderTx.userId.email || "N/A",
+            type: "transfer",
+            amount,
+            description,
+            date: new Date(senderTx.date).toISOString(),
+            status: senderTx.status,
+            account: "external transfer",
+            memo: senderTx.memo || "",
+          });
+          processedIds.add(senderTx._id);
+          processedIds.add(receiverTx._id);
+          continue;
+        }
       }
-    });
 
-    const getGroupStatus = (txs) => {
-      if (txs.some((tx) => tx.status === "failed")) return "failed";
-      if (txs.some((tx) => tx.status === "pending")) return "pending";
-      return "completed";
-    };
-
-    const transferGroupObjects = Array.from(transferGroups.entries()).map(([transferId, txs]) => {
-      const userIds = [...new Set(txs.map((tx) => tx.userId._id.toString()))];
-      let transferType, description, fromAccount, toAccount, fromUserId, fromUserName, toUserId, toUserName;
-
-      if (userIds.length === 1) {
-        transferType = "internal";
-        const userId = userIds[0];
-        const fromTx = txs.find((tx) => tx.amount < 0);
-        const toTx = txs.find((tx) => tx.amount > 0);
-        fromAccount = fromTx?.accountType || "unknown";
-        toAccount = toTx?.accountType || "unknown";
-        fromUserName = fromTx?.userId.fullName || "Unknown";
-        description = `Internal Transfer from ${fromAccount} to ${toAccount} for ${fromUserName}`;
-      } else {
-        transferType = "user-to-user";
-        const fromTx = txs.find((tx) => tx.amount < 0);
-        const toTx = txs.find((tx) => tx.amount > 0);
-        fromUserId = fromTx?.userId._id.toString() || "unknown";
-        fromUserName = fromTx?.userId.fullName || "Unknown";
-        toUserId = toTx?.userId._id.toString() || "unknown";
-        toUserName = toTx?.userId.fullName || "Unknown";
-        description = `Transfer from ${fromUserName} to ${toUserName}`;
-      }
-
-      const amount = txs.find((tx) => tx.amount > 0)?.amount || Math.abs(txs[0].amount);
-      const date = txs[0].date.toISOString();
-      const status = getGroupStatus(txs);
-
-      return {
-        groupType: "transfer",
-        transferId,
-        transferType,
-        description,
-        amount,
-        date,
-        status,
-        transactions: txs.map((tx) => ({
-          id: tx._id.toString(),
-          userId: tx.userId._id.toString(),
-          userName: tx.userId.fullName,
-          userEmail: tx.userId.email,
-          type: tx.type,
-          amount: tx.amount,
-          description: tx.description,
-          date: tx.date.toISOString(),
-          status: tx.status,
-          account: tx.accountType,
-          memo: tx.memo,
-          relatedTransactionId: tx.relatedTransactionId?.toString(),
-        })),
-        ...(transferType === "internal"
-          ? { userId: userIds[0], fromAccount, toAccount }
-          : { fromUserId, fromUserName, toUserId, toUserName }),
-      };
-    });
-
-    const singleGroupObjects = singleTransactions.map((tx) => ({
-      groupType: "single",
-      transaction: {
-        id: tx._id.toString(),
-        userId: tx.userId._id.toString(),
-        userName: tx.userId.fullName,
-        userEmail: tx.userId.email,
+      // Add non-paired transaction as is (including non-transfer transactions)
+      processedTransactions.push({
+        id: txId,
+        userId: tx.userId._id,
+        userName: tx.userId.fullName || "Unknown User",
+        userEmail: tx.userId.email || "N/A",
         type: tx.type,
         amount: tx.amount,
-        description: tx.description,
-        date: tx.date.toISOString(),
+        description: tx.description || "",
+        date: new Date(tx.date).toISOString(),
         status: tx.status,
         account: tx.accountType,
-        memo: tx.memo,
-        relatedTransactionId: tx.relatedTransactionId?.toString(),
-      },
-    }));
+        memo: tx.memo || "",
+      });
+      processedIds.add(txId);
+    }
 
-    const allGroups = [...transferGroupObjects, ...singleGroupObjects].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-
-    return NextResponse.json({ transactionGroups: allGroups });
+    return NextResponse.json({ transactions: processedTransactions });
   } catch (error) {
     console.error("Error fetching transactions:", error);
     return NextResponse.json({ error: "Failed to fetch transactions" }, { status: 500 });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  await dbConnect();
-
-  const token = req.cookies.get("adminToken")?.value;
-  if (!token) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const { userId, type, amount, memo } = await req.json();
-
-    if (!userId || !type || !amount || !memo) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-    }
-
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount)) {
-      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    let balanceChange = parsedAmount;
-    if (type === "withdrawal" || (type === "adjustment" && parsedAmount > 0)) {
-      balanceChange = -parsedAmount;
-    }
-
-    user.balance = (user.balance || 0) + balanceChange;
-    await user.save();
-
-    const transaction = new Transaction({
-      userId,
-      type,
-      amount: parsedAmount,
-      description: memo,
-      memo,
-      date: new Date(),
-      status: "completed",
-      accountType: "checking",
-    });
-
-    await transaction.save();
-
-    const transactionData = {
-      id: transaction._id.toString(),
-      userId: transaction.userId.toString(),
-      userName: user.fullName,
-      userEmail: user.email,
-      type: transaction.type,
-      amount: transaction.amount,
-      description: transaction.description,
-      date: transaction.date.toISOString(),
-      status: transaction.status,
-      account: transaction.accountType,
-      memo: transaction.memo,
-      relatedTransactionId: transaction.relatedTransactionId?.toString(),
-    };
-
-    return NextResponse.json({
-      message: "Transaction completed successfully",
-      transaction: transactionData,
-      newBalance: user.balance,
-    }, { status: 200 });
-  } catch (error) {
-    console.error("Error processing transaction:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
-      { status: 500 }
-    );
   }
 }

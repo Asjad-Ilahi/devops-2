@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useAuth } from '@/lib/auth'
+import { apiFetch } from '@/lib/api'
 
 // Define transaction interface for type safety
 interface Transaction {
@@ -23,112 +25,148 @@ interface Transaction {
   date: string
 }
 
+// Define colors interface
+interface Colors {
+  primaryColor: string
+  secondaryColor: string
+}
+
+// Define raw transaction interface from API
+interface RawTransaction {
+  _id: string
+  type: "crypto_buy" | "crypto_sell"
+  cryptoAmount: number
+  amount: number
+  cryptoPrice: number
+  date: string
+}
+
 export default function CryptoPage() {
   const router = useRouter()
 
-  // States initialized to default values (to be set by API)
-  const [accountBalance, setAccountBalance] = useState(0)
-  const [cryptoBalance, setCryptoBalance] = useState(0)
-  const [cryptoValue, setCryptoValue] = useState(0)
-  const [btcPrice, setBtcPrice] = useState(0)
-  const [priceChange, setPriceChange] = useState(0)
-  const [isLoading, setIsLoading] = useState(false)
+  // States initialized to default values
+  const [accountBalance, setAccountBalance] = useState<number>(0)
+  const [cryptoBalance, setCryptoBalance] = useState<number>(0)
+  const [cryptoValue, setCryptoValue] = useState<number>(0)
+  const [btcPrice, setBtcPrice] = useState<number>(0)
+  const [priceChange, setPriceChange] = useState<number>(0)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
+  const [colors, setColors] = useState<Colors | null>(null)
 
   // Transaction states
-  const [buyAmount, setBuyAmount] = useState("")
-  const [buyEquivalent, setBuyEquivalent] = useState("0")
-  const [sellAmount, setSellAmount] = useState("")
-  const [sellEquivalent, setSellEquivalent] = useState("0")
+  const [buyAmount, setBuyAmount] = useState<string>("")
+  const [buyEquivalent, setBuyEquivalent] = useState<string>("0")
+  const [sellAmount, setSellAmount] = useState<string>("")
+  const [sellEquivalent, setSellEquivalent] = useState<string>("0")
 
   // Transaction history initialized as empty array
   const [transactions, setTransactions] = useState<Transaction[]>([])
 
-  // Fetch colors
+  // Use the auth hook to handle token validation and expiration
+  useAuth()
+
+  // Fetch colors (public endpoint, no auth required)
   useEffect(() => {
     const fetchColors = async () => {
       try {
         const response = await fetch('/api/colors')
-        if (response.ok) {
-          const data = await response.json()
-          setColors(data)
-
-          const primary = Color(data.primaryColor)
-          const secondary = Color(data.secondaryColor)
-
-          const generateShades = (color: typeof Color.prototype) => ({
-            50: color.lighten(0.5).hex(),
-            100: color.lighten(0.4).hex(),
-            200: color.lighten(0.3).hex(),
-            300: color.lighten(0.2).hex(),
-            400: color.lighten(0.1).hex(),
-            500: color.hex(),
-            600: color.darken(0.1).hex(),
-            700: color.darken(0.2).hex(),
-            800: color.darken(0.3).hex(),
-            900: color.darken(0.4).hex(),
-          })
-
-          const primaryShades = generateShades(primary)
-          const secondaryShades = generateShades(secondary)
-
-          Object.entries(primaryShades).forEach(([shade, color]) => {
-            document.documentElement.style.setProperty(`--primary-${shade}`, color)
-          })
-
-          Object.entries(secondaryShades).forEach(([shade, color]) => {
-            document.documentElement.style.setProperty(`--secondary-${shade}`, color)
-          })
-        } else {
-          console.error('Failed to fetch colors')
+        if (!response.ok) {
+          throw new Error('Failed to fetch colors')
         }
-      } catch (error) {
-        console.error('Error fetching colors:', error)
+        const data: Colors = await response.json()
+        setColors(data)
+
+        const primary = Color(data.primaryColor)
+        const secondary = Color(data.secondaryColor)
+
+        const generateShades = (color: typeof Color.prototype) => ({
+          50: color.lighten(0.5).hex(),
+          100: color.lighten(0.4).hex(),
+          200: color.lighten(0.3).hex(),
+          300: color.lighten(0.2).hex(),
+          400: color.lighten(0.1).hex(),
+          500: color.hex(),
+          600: color.darken(0.1).hex(),
+          700: color.darken(0.2).hex(),
+          800: color.darken(0.3).hex(),
+          900: color.darken(0.4).hex(),
+        })
+
+        const primaryShades = generateShades(primary)
+        const secondaryShades = generateShades(secondary)
+
+        Object.entries(primaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--primary-${shade}`, color)
+        })
+
+        Object.entries(secondaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--secondary-${shade}`, color)
+        })
+      } catch (error: unknown) {
+        console.error('Error fetching colors:', error instanceof Error ? error.message : 'Unknown error')
       }
     }
     fetchColors()
   }, [])
 
+  // Function to map raw transactions to the Transaction interface with validation
+  const mapRawTransactions = (rawTransactions: RawTransaction[]): Transaction[] => {
+    return rawTransactions
+      .filter((tx) => 
+        tx._id && 
+        (tx.type === "crypto_buy" || tx.type === "crypto_sell") &&
+        typeof tx.cryptoAmount === 'number' &&
+        typeof tx.amount === 'number' &&
+        typeof tx.cryptoPrice === 'number' &&
+        tx.date
+      )
+      .map((tx) => ({
+        id: tx._id,
+        type: tx.type === "crypto_buy" ? "buy" : "sell",
+        amount: Math.abs(tx.cryptoAmount) || 0,
+        value: Math.abs(tx.amount) || 0,
+        price: tx.cryptoPrice || 0,
+        date: new Date(tx.date).toLocaleString() || new Date().toLocaleString(),
+      }))
+  }
+
   // Effect to fetch initial data and set up price updates
   useEffect(() => {
-    const token = localStorage.getItem("token")
-    if (!token) {
-      router.push("/login")
-      return
-    }
-
     const fetchData = async () => {
+      setIsLoading(true)
       try {
         // Fetch user data
-        const userResponse = await fetch("/api/user", {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const userResponse = await apiFetch("/api/user")
         if (!userResponse.ok) throw new Error("Failed to fetch user data")
         const userData = await userResponse.json()
         setAccountBalance(userData.balance || 0)
         setCryptoBalance(userData.cryptoBalance || 0)
 
-        // Fetch BTC price
+        // Fetch BTC price (public endpoint, no auth required)
         const priceResponse = await fetch("/api/price")
         if (!priceResponse.ok) throw new Error("Failed to fetch BTC price")
         const priceData = await priceResponse.json()
-        const newBtcPrice = priceData.bitcoin.usd
-        const newPriceChange = priceData.bitcoin.usd_24h_change
+        const newBtcPrice: number = priceData.bitcoin?.usd || 0
+        const newPriceChange: number = priceData.bitcoin?.usd_24h_change || 0
         setBtcPrice(newBtcPrice)
         setPriceChange(newPriceChange)
         setCryptoValue((userData.cryptoBalance || 0) * newBtcPrice)
 
-        // Fetch transactions (assuming endpoint exists)
-        const txResponse = await fetch("/api/crypto-transactions", {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        // Fetch transactions
+        const txResponse = await apiFetch("/api/transactions")
         if (!txResponse.ok) throw new Error("Failed to fetch transactions")
         const txData = await txResponse.json()
-        setTransactions(txData.transactions || [])
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load data")
+        setTransactions(mapRawTransactions(txData.transactions || []))
+      } catch (error: unknown) {
+        if (error instanceof Error && error.message !== 'Unauthorized') {
+          setError(error.message)
+        } else {
+          setError("Failed to load data")
+        }
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -140,18 +178,18 @@ export default function CryptoPage() {
         const response = await fetch("/api/price")
         if (!response.ok) throw new Error("Price update failed")
         const data = await response.json()
-        const newBtcPrice = data.bitcoin.usd
-        const newPriceChange = data.bitcoin.usd_24h_change
+        const newBtcPrice: number = data.bitcoin?.usd || 0
+        const newPriceChange: number = data.bitcoin?.usd_24h_change || 0
         setBtcPrice(newBtcPrice)
         setPriceChange(newPriceChange)
         setCryptoValue(cryptoBalance * newBtcPrice)
-      } catch (err) {
-        console.error("Price update error:", err)
+      } catch (error: unknown) {
+        console.error("Price update error:", error instanceof Error ? error.message : 'Unknown error')
       }
     }, 600000) // 10 minutes = 600,000 ms
 
     return () => clearInterval(priceInterval)
-  }, [router, cryptoBalance])
+  }, [cryptoBalance])
 
   // Calculate equivalents when inputs change
   useEffect(() => {
@@ -191,13 +229,8 @@ export default function CryptoPage() {
     setIsLoading(true)
 
     try {
-      const token = localStorage.getItem("token")
-      const response = await fetch("/api/crypto-transfer", {
+      const response = await apiFetch("/api/crypto-transfer", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           action: "buy",
           amount: parseFloat(buyEquivalent),
@@ -205,24 +238,29 @@ export default function CryptoPage() {
         }),
       })
 
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || "Failed to buy BTC")
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to buy BTC")
+      }
 
-      setAccountBalance(data.newCheckingBalance)
-      setCryptoBalance(data.newCryptoBalance)
-      setCryptoValue(data.newCryptoBalance * btcPrice)
+      const data = await response.json()
+      setAccountBalance(data.newCheckingBalance || 0)
+      setCryptoBalance(data.newCryptoBalance || 0)
+      setCryptoValue((data.newCryptoBalance || 0) * btcPrice)
       setSuccess(data.message)
       setBuyAmount("")
 
       // Refetch transactions
-      const txResponse = await fetch("/api/crypto-transactions", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const txResponse = await apiFetch("/api/transactions")
       if (!txResponse.ok) throw new Error("Failed to fetch transactions")
       const txData = await txResponse.json()
-      setTransactions(txData.transactions || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to complete the purchase")
+      setTransactions(mapRawTransactions(txData.transactions || []))
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message !== 'Unauthorized') {
+        setError(error.message)
+      } else {
+        setError("Failed to complete the purchase")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -247,13 +285,8 @@ export default function CryptoPage() {
     setIsLoading(true)
 
     try {
-      const token = localStorage.getItem("token")
-      const response = await fetch("/api/crypto-transfer", {
+      const response = await apiFetch("/api/crypto-transfer", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           action: "sell",
           amount: sellValue,
@@ -261,24 +294,29 @@ export default function CryptoPage() {
         }),
       })
 
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || "Failed to sell BTC")
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to sell BTC")
+      }
 
-      setAccountBalance(data.newCheckingBalance)
-      setCryptoBalance(data.newCryptoBalance)
-      setCryptoValue(data.newCryptoBalance * btcPrice)
+      const data = await response.json()
+      setAccountBalance(data.newCheckingBalance || 0)
+      setCryptoBalance(data.newCryptoBalance || 0)
+      setCryptoValue((data.newCryptoBalance || 0) * btcPrice)
       setSuccess(data.message)
       setSellAmount("")
 
       // Refetch transactions
-      const txResponse = await fetch("/api/crypto-transactions", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const txResponse = await apiFetch("/api/transactions")
       if (!txResponse.ok) throw new Error("Failed to fetch transactions")
       const txData = await txResponse.json()
-      setTransactions(txData.transactions || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to complete the sale")
+      setTransactions(mapRawTransactions(txData.transactions || []))
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message !== 'Unauthorized') {
+        setError(error.message)
+      } else {
+        setError("Failed to complete the sale")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -549,10 +587,10 @@ export default function CryptoPage() {
                           </span>
                         </td>
                         <td className="p-4">
-                          <span className="font-mono text-primary-900">{tx.amount.toFixed(8)}</span> BTC
+                          <span className="font-mono text-primary-900">{(tx.amount || 0).toFixed(8)}</span> BTC
                         </td>
-                        <td className="p-4 font-medium text-primary-900">${tx.value.toFixed(2)}</td>
-                        <td className="p-4 text-primary-700">${tx.price.toFixed(2)}</td>
+                        <td className="p-4 font-medium text-primary-900">${(tx.value || 0).toFixed(2)}</td>
+                        <td className="p-4 text-primary-700">${(tx.price || 0).toFixed(2)}</td>
                         <td className="p-4 text-primary-700">{tx.date}</td>
                       </tr>
                     ))}

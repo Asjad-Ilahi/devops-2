@@ -3,6 +3,7 @@ import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
 import Transaction from "@/models/Transaction";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -43,7 +44,10 @@ export async function POST(req: NextRequest) {
     if (to === "checking") user.balance += amount;
     else user.savingsBalance += amount;
 
-    // Create transaction records
+    // Generate a transferId to link the sender and receiver transactions
+    const transferId = new mongoose.Types.ObjectId();
+
+    // Create transaction records with the same transferId
     await Transaction.create([
       {
         userId: user._id,
@@ -53,6 +57,7 @@ export async function POST(req: NextRequest) {
         category: "Transfer",
         accountType: from,
         status: "completed",
+        transferId, // Add transferId to sender transaction
       },
       {
         userId: user._id,
@@ -62,6 +67,7 @@ export async function POST(req: NextRequest) {
         category: "Transfer",
         accountType: to,
         status: "completed",
+        transferId, // Add transferId to receiver transaction
       },
     ]);
 

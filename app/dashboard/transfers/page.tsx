@@ -66,7 +66,7 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
           const primary = Color(data.primaryColor)
           const secondary = Color(data.secondaryColor)
 
-          const generateShades = (color: Color<string>) => ({
+          const generateShades = (color: typeof Color.prototype) => ({
             50: color.lighten(0.5).hex(),
             100: color.lighten(0.4).hex(),
             200: color.lighten(0.3).hex(),
@@ -726,7 +726,7 @@ function TransferContent() {
           const primary = Color(data.primaryColor)
           const secondary = Color(data.secondaryColor)
 
-          const generateShades = (color: Color<string>) => ({
+          const generateShades = (color: typeof Color.prototype) => ({
             50: color.lighten(0.5).hex(),
             100: color.lighten(0.4).hex(),
             200: color.lighten(0.3).hex(),

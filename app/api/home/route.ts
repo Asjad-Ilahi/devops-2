@@ -20,13 +20,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Destructure the properties
-    const { facebookUrl, twitterUrl, instagramUrl, linkedinUrl } = settings;
+    const { facebookUrl, twitterUrl, instagramUrl } = settings;
     
     return NextResponse.json({
       facebookUrl,
       twitterUrl,
       instagramUrl,
-      linkedinUrl
     });
   } catch (error) {
     console.error('Settings fetch error:', error);

@@ -19,6 +19,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useAuth, logout } from '@/lib/auth'
+import { apiFetch } from '@/lib/api'
 
 // Transaction interface
 interface Transaction {
@@ -61,6 +63,8 @@ interface Contact {
 }
 
 export default function DashboardPage() {
+  useAuth() // Proactively check token expiration
+
   const router = useRouter()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [userData, setUserData] = useState<UserData | null>(null)
@@ -118,17 +122,9 @@ export default function DashboardPage() {
   // Fetch user data and transactions on mount
   useEffect(() => {
     const fetchData = async () => {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        router.push("/login")
-        return
-      }
-
       try {
         // Fetch user data
-        const userResponse = await fetch("/api/user", {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const userResponse = await apiFetch("/api/user")
         if (!userResponse.ok) {
           throw new Error("Failed to fetch user data")
         }
@@ -142,9 +138,7 @@ export default function DashboardPage() {
         })
 
         // Fetch transactions
-        const transactionsResponse = await fetch("/api/transactions", {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const transactionsResponse = await apiFetch("/api/transactions")
         if (!transactionsResponse.ok) {
           const errorData = await transactionsResponse.json()
           setError(errorData.error || "Failed to fetch transactions")
@@ -162,14 +156,17 @@ export default function DashboardPage() {
         const storedContacts = localStorage.getItem("recentZelleContacts")
         const contacts = storedContacts ? JSON.parse(storedContacts) : []
         setRecentContacts(contacts)
-      } catch (error) {
-        console.error("Error fetching data:", error)
-        setError("An error occurred while loading your dashboard")
+      } catch (error: any) {
+        if (error.message !== 'Unauthorized') {
+          console.error("Error fetching data:", error)
+          setError("An error occurred while loading your dashboard")
+        }
+        // Note: If error is 'Unauthorized', apiFetch handles logout
       }
     }
 
     fetchData()
-  }, [router])
+  }, [])
 
   // Update crypto value when userData or btcPrice changes
   useEffect(() => {
@@ -187,12 +184,7 @@ export default function DashboardPage() {
     }, 30000)
 
     return () => clearInterval(interval)
-  }, [])
-
-  const handleLogout = () => {
-    localStorage.removeItem("token")
-    router.push("/login")
-  }
+  }, [btcPrice])
 
   return (
     <div className="flex min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
@@ -259,7 +251,7 @@ export default function DashboardPage() {
                       Profile
                     </Link>
                   </Button>
-                  <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" onClick={handleLogout}>
+                  <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" onClick={logout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
                   </Button>
@@ -322,7 +314,7 @@ export default function DashboardPage() {
                   Profile
                 </Link>
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" onClick={handleLogout}>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" onClick={logout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout
               </Button>
@@ -354,15 +346,19 @@ export default function DashboardPage() {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/profile">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  <span>Accounts</span>
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/accounts">
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    <span>Accounts</span>
+                  </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout}>
+                <DropdownMenuItem onClick={logout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Logout</span>
                 </DropdownMenuItem>

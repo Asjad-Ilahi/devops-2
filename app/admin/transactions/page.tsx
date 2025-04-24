@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation"
 import Color from "color"
 import {
   ArrowDown,
-  ArrowLeft,
   ArrowUp,
   Calendar,
   CreditCard,
@@ -16,6 +15,7 @@ import {
   Send,
   RefreshCcw,
   Loader2,
+  ArrowLeft,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,30 +37,30 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { DateRange } from "react-day-picker"
 
-// Interface for Colors
 interface Colors {
   primaryColor: string
   secondaryColor: string
 }
 
-// Define User interface
 interface User {
   id: string
   name: string
   email: string
 }
 
-// Define Transaction interface
 interface Transaction {
   id: string
   userId: string
-  type: "deposit" | "withdrawal" | "transfer" | "payment" | "fee" | "interest" | "adjustment" | "refund" | "crypto_buy" | "crypto_sell"
-  amount: number
+  userName: string
+  userEmail: string
+  type: string
+  amount: number // Amount is now always required
   description: string
   date: string
-  status: "completed" | "pending" | "failed"
+  status: string
   account: string
-  relatedTransactionId?: string
+  memo?: string
+  transferId?: string
 }
 
 interface TransactionGroup {
@@ -77,29 +77,22 @@ interface TransactionGroup {
 
 export default function AdminTransactionsPage() {
   const router = useRouter()
-
-  // Filters state
   const [searchTerm, setSearchTerm] = useState("")
-  const [dateRange, setDateRange] = useState<{
-    from: Date | undefined
-    to: Date | undefined
-  }>({
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
     from: undefined,
     to: undefined,
   })
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [amountFilter, setAmountFilter] = useState<string>("all")
-
-  // Transactions and Users state
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [groupedTransactions, setGroupedTransactions] = useState<TransactionGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [colors, setColors] = useState<Colors | null>(null)
 
-  // Fetch colors and set CSS custom properties
   useEffect(() => {
     const fetchColors = async () => {
       try {
@@ -107,10 +100,8 @@ export default function AdminTransactionsPage() {
         if (!response.ok) throw new Error("Failed to fetch colors")
         const data: Colors = await response.json()
         setColors(data)
-
         const primary = Color(data.primaryColor)
         const secondary = Color(data.secondaryColor)
-
         const generateShades = (color: typeof Color.prototype) => ({
           50: color.lighten(0.5).hex(),
           100: color.lighten(0.4).hex(),
@@ -123,14 +114,11 @@ export default function AdminTransactionsPage() {
           800: color.darken(0.3).hex(),
           900: color.darken(0.4).hex(),
         })
-
         const primaryShades = generateShades(primary)
         const secondaryShades = generateShades(secondary)
-
         Object.entries(primaryShades).forEach(([shade, color]) => {
           document.documentElement.style.setProperty(`--primary-${shade}`, color)
         })
-
         Object.entries(secondaryShades).forEach(([shade, color]) => {
           document.documentElement.style.setProperty(`--secondary-${shade}`, color)
         })
@@ -141,7 +129,6 @@ export default function AdminTransactionsPage() {
     fetchColors()
   }, [])
 
-  // Fetch transactions and users from API
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -171,8 +158,11 @@ export default function AdminTransactionsPage() {
 
         const transactionsData = await transactionsRes.json()
         const usersData = await usersRes.json()
-
-        setTransactions(transactionsData.transactions)
+        // Filter out transactions with invalid amounts
+        const validTransactions = transactionsData.transactions.filter(
+          (tx: Transaction) => typeof tx.amount === "number" && !isNaN(tx.amount)
+        )
+        setTransactions(validTransactions)
         setUsers(usersData.users)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data")
@@ -181,67 +171,113 @@ export default function AdminTransactionsPage() {
         setLoading(false)
       }
     }
-
     fetchData()
   }, [router])
 
-  // Group transactions
   useEffect(() => {
     const userMap = new Map(users.map((user) => [user.id, user]))
-    const grouped: TransactionGroup[] = []
-    const processedIds = new Set<string>()
+    const transferGroups = new Map<string, Transaction[]>()
+    const remainingTransactions: Transaction[] = []
 
     transactions.forEach((tx) => {
-      if (processedIds.has(tx.id)) return
+      if (tx.transferId) {
+        const key = tx.transferId
+        if (!transferGroups.has(key)) transferGroups.set(key, [])
+        transferGroups.get(key)!.push(tx)
+      } else {
+        remainingTransactions.push(tx)
+      }
+    })
 
-      if (tx.type === "transfer" && tx.relatedTransactionId) {
-        const relatedTx = transactions.find(
-          (t) => t.id === tx.relatedTransactionId && t.type === "transfer"
-        )
-        if (relatedTx && !processedIds.has(relatedTx.id)) {
-          const isInternal = tx.userId === relatedTx.userId
-          const senderTx = tx.amount < 0 ? tx : relatedTx
-          const receiverTx = tx.amount > 0 ? tx : relatedTx
-          const senderUser = userMap.get(senderTx.userId)?.name || "Unknown"
-          const receiverUser = userMap.get(receiverTx.userId)?.name || "Unknown"
-          const amount = Math.abs(senderTx.amount)
+    const grouped: TransactionGroup[] = []
+    transferGroups.forEach((txs, transferId) => {
+      const userIds = [...new Set(txs.map((tx) => tx.userId))]
+      const date = txs[0].date
+      const status = txs.every((tx) => tx.status === "completed") ? "completed" : "pending"
+      const accounts = [...new Set(txs.map((tx) => tx.account))]
+      const transactionIds = txs.map((tx) => tx.id)
 
-          let description = ""
-          if (isInternal) {
-            description = `${senderUser} transferred $${amount.toFixed(2)} from ${senderTx.account} to ${receiverTx.account}`
-          } else {
-            description = `${senderUser} sent $${amount.toFixed(2)} to ${receiverUser}`
-          }
-
+      if (txs.length === 2) {
+        const senderTx = txs.find((tx) => tx.amount < 0)
+        const receiverTx = txs.find((tx) => tx.amount > 0)
+        if (senderTx && receiverTx) {
+          const sender = userMap.get(senderTx.userId)
+          const receiver = userMap.get(receiverTx.userId)
           grouped.push({
-            id: `${senderTx.id}-${receiverTx.id}`,
-            userIds: [senderTx.userId, receiverTx.userId],
-            description,
-            date: senderTx.date,
-            amount,
-            status: senderTx.status === "completed" && receiverTx.status === "completed" ? "completed" : "pending",
-            accounts: [senderTx.account, receiverTx.account],
-            transactionIds: [senderTx.id, receiverTx.id],
+            id: transferId,
+            userIds,
+            description: `Zelle transfer from ${sender?.name || "Unknown"} to ${receiver?.name || "Unknown"}`,
+            date,
+            amount: Math.abs(senderTx.amount),
+            status,
+            accounts,
+            transactionIds,
             type: "transfer",
           })
-          processedIds.add(senderTx.id)
-          processedIds.add(relatedTx.id)
-        } else {
-          // Fallback for unpaired transfer
+        }
+      } else {
+        txs.forEach((tx) => {
           grouped.push({
             id: tx.id,
             userIds: [tx.userId],
             description: tx.description,
             date: tx.date,
-            amount: Math.abs(tx.amount),
+            amount: tx.amount,
             status: tx.status,
             accounts: [tx.account],
             transactionIds: [tx.id],
             type: tx.type,
           })
-          processedIds.add(tx.id)
+        })
+      }
+    })
+
+    const txByDate = new Map<string, Transaction[]>()
+    remainingTransactions.forEach((tx) => {
+      const key = tx.date
+      if (!txByDate.has(key)) txByDate.set(key, [])
+      txByDate.get(key)!.push(tx)
+    })
+
+    txByDate.forEach((txs, date) => {
+      const unpaired: Transaction[] = [...txs]
+      while (unpaired.length >= 2) {
+        let paired = false
+        for (let i = 0; i < unpaired.length - 1; i++) {
+          for (let j = i + 1; j < unpaired.length; j++) {
+            const tx1 = unpaired[i]
+            const tx2 = unpaired[j]
+            if (
+              tx1.amount === -tx2.amount &&
+              (tx1.type === "deposit" || tx1.type === "transfer") &&
+              (tx2.type === "deposit" || tx2.type === "transfer")
+            ) {
+              const senderTx = tx1.amount < 0 ? tx1 : tx2
+              const receiverTx = tx1.amount < 0 ? tx2 : tx1
+              const sender = userMap.get(senderTx.userId)
+              const receiver = userMap.get(receiverTx.userId)
+              grouped.push({
+                id: `${senderTx.id}-${receiverTx.id}`,
+                userIds: [senderTx.userId, receiverTx.userId],
+                description: `Zelle transfer from ${sender?.name || "Unknown"} to ${receiver?.name || "Unknown"}`,
+                date,
+                amount: Math.abs(senderTx.amount),
+                status: senderTx.status === "completed" && receiverTx.status === "completed" ? "completed" : "pending",
+                accounts: [senderTx.account, receiverTx.account],
+                transactionIds: [senderTx.id, receiverTx.id],
+                type: "transfer",
+              })
+              unpaired.splice(j, 1)
+              unpaired.splice(i, 1)
+              paired = true
+              break
+            }
+          }
+          if (paired) break
         }
-      } else {
+        if (!paired) break
+      }
+      unpaired.forEach((tx) => {
         grouped.push({
           id: tx.id,
           userIds: [tx.userId],
@@ -253,53 +289,44 @@ export default function AdminTransactionsPage() {
           transactionIds: [tx.id],
           type: tx.type,
         })
-        processedIds.add(tx.id)
-      }
+      })
     })
 
-    // Apply filters
     let filtered = [...grouped]
-
     if (searchTerm) {
-      filtered = filtered.filter((group) =>
-        group.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        group.userIds.some((userId) => {
-          const user = userMap.get(userId)
-          return (
-            user?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user?.email.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-        }) ||
-        group.id.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(
+        (group) =>
+          group.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          group.userIds.some((userId) => {
+            const user = userMap.get(userId)
+            return (
+              user?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              user?.email.toLowerCase().includes(searchTerm.toLowerCase())
+            )
+          }) ||
+          group.id.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
-
     if (dateRange.from) {
       filtered = filtered.filter((group) => new Date(group.date) >= dateRange.from!)
     }
-
     if (dateRange.to) {
       filtered = filtered.filter((group) => new Date(group.date) <= dateRange.to!)
     }
-
     if (typeFilter !== "all") {
       filtered = filtered.filter((group) => group.type === typeFilter)
     }
-
     if (statusFilter !== "all") {
       filtered = filtered.filter((group) => group.status === statusFilter)
     }
-
     if (amountFilter === "positive") {
       filtered = filtered.filter((group) => group.amount > 0)
     } else if (amountFilter === "negative") {
       filtered = filtered.filter((group) => group.amount < 0)
     }
-
     setGroupedTransactions(filtered)
   }, [searchTerm, dateRange, typeFilter, statusFilter, amountFilter, transactions, users])
 
-  // Reset filters
   const resetFilters = () => {
     setSearchTerm("")
     setDateRange({ from: undefined, to: undefined })
@@ -308,7 +335,6 @@ export default function AdminTransactionsPage() {
     setAmountFilter("all")
   }
 
-  // Get transaction icon based on type
   const getTransactionIcon = (type: string) => {
     switch (type) {
       case "deposit":
@@ -324,45 +350,24 @@ export default function AdminTransactionsPage() {
         return <FileText className="h-5 w-5 text-gray-600" />
       case "refund":
         return <RefreshCcw className="h-5 w-5 text-yellow-600" />
-      case "crypto_buy":
-        return <CreditCard className="h-5 w-5 text-secondary-600" />
-      case "crypto_sell":
-        return <CreditCard className="h-5 w-5 text-primary-600" />
       default:
-        return <CreditCard className="h-5 w-5" />
+        return <CreditCard className="h-5 w-5 text-gray-600" />
     }
   }
 
-  // Handle transaction status change (client-side placeholder)
-  const handleStatusChange = async (transactionIds: string[], newStatus: "completed" | "pending" | "failed") => {
-    try {
-      // Update status for all transaction IDs in the group
-      const promises = transactionIds.map((txId) =>
-        fetch(`/api/admin/transactions/${txId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ status: newStatus }),
-        })
+  const handleStatusChange = (transactionId: string, newStatus: "completed" | "pending" | "failed") => {
+    setTransactions((prev) =>
+      prev.map((transaction) =>
+        transaction.id === transactionId ? { ...transaction, status: newStatus } : transaction
       )
-      const responses = await Promise.all(promises)
-      for (const response of responses) {
-        if (!response.ok) {
-          throw new Error("Failed to update transaction status")
-        }
-      }
-      setGroupedTransactions((prev) =>
-        prev.map((group) =>
-          group.transactionIds.some((id) => transactionIds.includes(id)) ? { ...group, status: newStatus } : group
-        )
+    )
+    setGroupedTransactions((prev) =>
+      prev.map((group) =>
+        group.transactionIds.includes(transactionId) ? { ...group, status: newStatus } : group
       )
-    } catch (error) {
-      console.error("Error updating status:", error)
-      setError("Failed to update transaction status")
-    }
+    )
   }
 
-  // Handle date range selection
   const handleDateRangeSelect = (range: DateRange | undefined) => {
     setDateRange({
       from: range?.from,
@@ -370,7 +375,151 @@ export default function AdminTransactionsPage() {
     })
   }
 
-  // Display loading state
+  const handleRefundGroup = async (groupId: string) => {
+    try {
+      setSuccess(null)
+      setError(null)
+
+      // Fetch transactions in the group
+      const response = await fetch(`/api/admin/transactions?transferId=${groupId}`, {
+        method: "GET",
+        credentials: "include",
+      })
+      if (!response.ok) throw new Error("Failed to fetch group transactions")
+      const { transactions } = await response.json()
+      if (transactions.length !== 2) throw new Error("Invalid group: must contain exactly 2 transactions")
+
+      const senderTx = transactions.find((tx: Transaction) => tx.amount < 0)
+      const receiverTx = transactions.find((tx: Transaction) => tx.amount > 0)
+      if (!senderTx || !receiverTx) throw new Error("Invalid group: missing sender or receiver transaction")
+
+      // Check for existing refunds
+      const [senderRefundRes, receiverRefundRes] = await Promise.all([
+        fetch(`/api/admin/transactions?relatedTransactionId=${senderTx.id}`, {
+          method: "GET",
+          credentials: "include",
+        }),
+        fetch(`/api/admin/transactions?relatedTransactionId=${receiverTx.id}`, {
+          method: "GET",
+          credentials: "include",
+        }),
+      ])
+      const senderRefunds = await senderRefundRes.json()
+      const receiverRefunds = await receiverRefundRes.json()
+
+      if (senderRefunds.transactions.length > 0 && receiverRefunds.transactions.length > 0) {
+        throw new Error("Both sender and receiver transactions have already been refunded")
+      }
+
+      const refundTransactions: Transaction[] = []
+      const balanceUpdates: { userId: string; balanceChange: number }[] = []
+
+      // Refund sender if not already refunded
+      if (senderRefunds.transactions.length === 0) {
+        refundTransactions.push({
+          id: "",
+          userId: senderTx.userId,
+          userName: senderTx.userName,
+          userEmail: senderTx.userEmail,
+          description: `Refund for ${senderTx.description}`,
+          amount: Math.abs(senderTx.amount),
+          date: new Date().toISOString(),
+          type: "refund",
+          status: "completed",
+          account: senderTx.account,
+          memo: senderTx.memo,
+          transferId: senderTx.transferId,
+        })
+        balanceUpdates.push({
+          userId: senderTx.userId,
+          balanceChange: Math.abs(senderTx.amount),
+        })
+      }
+
+      // Refund receiver if not already refunded
+      if (receiverRefunds.transactions.length === 0) {
+        refundTransactions.push({
+          id: "",
+          userId: receiverTx.userId,
+          userName: receiverTx.userName,
+          userEmail: receiverTx.userEmail,
+          description: `Refund deduction for ${receiverTx.description}`,
+          amount: -Math.abs(receiverTx.amount),
+          date: new Date().toISOString(),
+          type: "refund",
+          status: "completed",
+          account: receiverTx.account,
+          memo: receiverTx.memo,
+          transferId: receiverTx.transferId,
+        })
+        balanceUpdates.push({
+          userId: receiverTx.userId,
+          balanceChange: -Math.abs(receiverTx.amount),
+        })
+      }
+
+      if (refundTransactions.length === 0) {
+        throw new Error("No transactions require refunding")
+      }
+
+      // Process refunds
+      const refundPromises = refundTransactions.map((refund) =>
+        fetch("/api/admin/transactions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ ...refund, relatedTransactionId: refund.amount > 0 ? senderTx.id : receiverTx.id }),
+        })
+      )
+      const refundResponses = await Promise.all(refundPromises)
+      const createdRefunds: Transaction[] = []
+      for (const res of refundResponses) {
+        if (!res.ok) {
+          const errorData = await res.json()
+          throw new Error(errorData.error || "Failed to create refund transaction")
+        }
+        const { transaction } = await res.json()
+        createdRefunds.push(transaction)
+      }
+
+      // Update balances
+      const balanceUpdatePromises = balanceUpdates.map((update) =>
+        fetch(`/api/admin/users/${update.userId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ balanceChange: update.balanceChange }),
+        })
+      )
+      const balanceUpdateResponses = await Promise.all(balanceUpdatePromises)
+      for (const res of balanceUpdateResponses) {
+        if (!res.ok) {
+          // Roll back refunds if balance update fails
+          await Promise.all(
+            createdRefunds.map((refund) =>
+              fetch(`/api/admin/transactions/${refund.id}`, {
+                method: "DELETE",
+                credentials: "include",
+              })
+            )
+          )
+          throw new Error("Failed to update user balance")
+        }
+      }
+
+      // Update local state
+      setTransactions((prev) => [...createdRefunds, ...prev])
+      setSuccess(
+        createdRefunds.length === 2
+          ? "Both sender and receiver transactions refunded successfully"
+          : `Refunded ${createdRefunds.length === 1 && createdRefunds[0].amount > 0 ? "sender" : "receiver"} transaction successfully`
+      )
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "An error occurred during group refund")
+      console.error("Refund group error:", error)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -382,11 +531,7 @@ export default function AdminTransactionsPage() {
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
       <div className="p-6 max-w-7xl mx-auto">
-        <Button
-          variant="ghost"
-          asChild
-          className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
-        >
+        <Button variant="ghost" asChild className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100">
           <Link href="/admin/dashboard">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
@@ -395,16 +540,17 @@ export default function AdminTransactionsPage() {
         <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
           Transaction Management
         </h1>
-
-        {/* Error Display */}
         {error && (
           <Alert variant="destructive" className="mb-6 bg-red-50 border-red-200">
             <AlertDescription className="text-red-700">{error}</AlertDescription>
           </Alert>
         )}
-
-        {/* Filters */}
-        <Card className="mb-6 backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
+        {success && (
+          <Alert className="mb-6 bg-green-50 border-green-200">
+            <AlertDescription className="text-green-700">{success}</AlertDescription>
+          </Alert>
+        )}
+        <Card className="mb-6 backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
@@ -415,7 +561,7 @@ export default function AdminTransactionsPage() {
                 variant="ghost"
                 size="sm"
                 onClick={resetFilters}
-                className="text-primary-600 hover:text-primary-800 hover:bg-primary-50"
+                className="text-primary-700 hover:text-primary-900 hover:bg-primary-100"
               >
                 Reset Filters
               </Button>
@@ -435,7 +581,6 @@ export default function AdminTransactionsPage() {
                   />
                 </div>
               </div>
-
               <div>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -466,7 +611,6 @@ export default function AdminTransactionsPage() {
                   </PopoverContent>
                 </Popover>
               </div>
-
               <div>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
                   <SelectTrigger>
@@ -480,14 +624,10 @@ export default function AdminTransactionsPage() {
                     <SelectItem value="payment">Payments</SelectItem>
                     <SelectItem value="fee">Fees</SelectItem>
                     <SelectItem value="interest">Interest</SelectItem>
-                    <SelectItem value="adjustment">Adjustments</SelectItem>
-                    <SelectItem value="crypto_buy">Crypto Buy</SelectItem>
-                    <SelectItem value="crypto_sell">Crypto Sell</SelectItem>
-                    <SelectItem value="refund">Refund</SelectItem>
+                    <SelectItem value="refund">Refunds</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
               <div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger>
@@ -502,32 +642,30 @@ export default function AdminTransactionsPage() {
                 </Select>
               </div>
             </div>
-
             <div className="mt-4 flex items-center">
               <span className="text-sm font-medium mr-2">Amount:</span>
               <Tabs value={amountFilter} onValueChange={setAmountFilter} className="w-auto">
                 <TabsList className="bg-primary-100/70 p-1 rounded-lg">
                   <TabsTrigger
                     value="all"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md"
                   >
                     All
                   </TabsTrigger>
                   <TabsTrigger
                     value="positive"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md"
                   >
                     Income
                   </TabsTrigger>
                   <TabsTrigger
                     value="negative"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md"
                   >
                     Expenses
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
-
               <div className="ml-auto">
                 <Button
                   variant="outline"
@@ -541,9 +679,7 @@ export default function AdminTransactionsPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Transactions Table */}
-        <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
+        <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
           <CardHeader>
             <CardTitle className="text-primary-900">Transaction History</CardTitle>
             <CardDescription className="text-primary-600">
@@ -567,10 +703,27 @@ export default function AdminTransactionsPage() {
                 </thead>
                 <tbody className="divide-y divide-primary-100">
                   {groupedTransactions.map((group) => {
-                    const userNames = group.userIds.map((id) => users.find((u) => u.id === id)?.name || "Unknown User")
+                    const userNames = group.userIds.map(
+                      (id) => users.find((u) => u.id === id)?.name || "Unknown User"
+                    )
+                    const isGroup = group.transactionIds.length > 1
+                    const senderTxId = group.transactionIds.find((txId) => {
+                      const tx = transactions.find((t) => t.id === txId)
+                      return tx?.amount < 0
+                    })
+                    const receiverTxId = group.transactionIds.find((txId) => {
+                      const tx = transactions.find((t) => t.id === txId)
+                      return tx?.amount > 0
+                    })
+                    const detailLink = isGroup
+                      ? `/admin/transactions/${senderTxId}?receiverId=${receiverTxId}`
+                      : `/admin/transactions/${group.transactionIds[0]}`
+
                     return (
                       <tr key={group.id} className="hover:bg-primary-50/50 transition-colors">
-                        <td className="p-4 font-mono text-xs">{group.id}</td>
+                        <td className="p-4 font-mono text-xs">
+                          {isGroup ? `Group: ${group.id}` : group.id}
+                        </td>
                         <td className="p-4">
                           <div>
                             <div className="font-medium text-primary-900">{userNames.join(" to ")}</div>
@@ -591,14 +744,20 @@ export default function AdminTransactionsPage() {
                             </div>
                             <div>
                               <div className="font-medium">{group.description}</div>
-                              <div className="text-sm text-muted-foreground capitalize">{group.type.replace("_", " ")}</div>
+                              <div className="text-sm text-muted-foreground capitalize">
+                                {group.type.replace("_", " ")}
+                              </div>
                             </div>
                           </div>
                         </td>
                         <td className="p-4">{new Date(group.date).toLocaleString()}</td>
-                        <td className="p-4">{group.accounts.join(" to ")}</td>
-                        <td className="p-4 text-right font-medium text-green-600">
-                          ${group.amount.toFixed(2)}
+                        <td className="p-4">{group.accounts.join(", ")}</td>
+                        <td
+                          className={`p-4 text-right font-medium ${
+                            group.amount > 0 ? "text-green-600" : "text-red-600"
+                          }`}
+                        >
+                          {group.amount > 0 ? "+" : ""}${Math.abs(group.amount).toFixed(2)}
                         </td>
                         <td className="p-4 text-center">
                           <Badge
@@ -617,7 +776,7 @@ export default function AdminTransactionsPage() {
                                 : "bg-red-100 text-red-800 border-red-200 hover:bg-red-200"
                             }
                           >
-                            {group.status}
+                            {group.status.charAt(0).toUpperCase() + group.status.slice(1)}
                           </Badge>
                         </td>
                         <td className="p-4 text-center">
@@ -634,11 +793,15 @@ export default function AdminTransactionsPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Transaction Actions</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              {group.transactionIds.map((txId) => (
-                                <DropdownMenuItem key={txId} asChild>
-                                  <Link href={`/admin/transactions/${txId}`}>View Details (ID: {txId})</Link>
+                              {isGroup ? (
+                                <DropdownMenuItem asChild>
+                                  <Link href={detailLink}>View Transactions</Link>
                                 </DropdownMenuItem>
-                              ))}
+                              ) : (
+                                <DropdownMenuItem asChild>
+                                  <Link href={detailLink}>View Details (ID: {group.transactionIds[0]})</Link>
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem asChild>
                                 <Link href={`/admin/users/${group.userIds[0]}`}>View User</Link>
                               </DropdownMenuItem>
@@ -647,19 +810,33 @@ export default function AdminTransactionsPage() {
                                   <Link href={`/admin/users/${group.userIds[1]}`}>View Recipient</Link>
                                 </DropdownMenuItem>
                               )}
+                              {isGroup && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => handleRefundGroup(group.id)}>
+                                    Refund Group
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                               <DropdownMenuSeparator />
                               {group.status === "pending" && (
                                 <>
-                                  <DropdownMenuItem onClick={() => handleStatusChange(group.transactionIds, "completed")}>
+                                  <DropdownMenuItem
+                                    onClick={() => handleStatusChange(group.transactionIds[0], "completed")}
+                                  >
                                     Mark as Completed
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleStatusChange(group.transactionIds, "failed")}>
+                                  <DropdownMenuItem
+                                    onClick={() => handleStatusChange(group.transactionIds[0], "failed")}
+                                  >
                                     Mark as Failed
                                   </DropdownMenuItem>
                                 </>
                               )}
                               {group.status === "failed" && (
-                                <DropdownMenuItem onClick={() => handleStatusChange(group.transactionIds, "completed")}>
+                                <DropdownMenuItem
+                                  onClick={() => handleStatusChange(group.transactionIds[0], "completed")}
+                                >
                                   Mark as Completed
                                 </DropdownMenuItem>
                               )}

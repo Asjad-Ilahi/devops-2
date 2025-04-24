@@ -36,6 +36,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import Color from 'color'
+import { useAuth } from '@/lib/auth'
+import { apiFetch } from '@/lib/api'
 
 interface ProfileData {
   firstName: string
@@ -49,6 +51,8 @@ interface ProfileData {
 }
 
 export default function ProfilePage() {
+  useAuth() // Proactively check token validity and handle expiration
+
   const [profileForm, setProfileForm] = useState<ProfileData>({
     firstName: "",
     lastName: "",
@@ -76,6 +80,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
 
+  // Fetch colors (public endpoint, no auth required)
   useEffect(() => {
     const fetchColors = async () => {
       try {
@@ -120,29 +125,15 @@ export default function ProfilePage() {
     fetchColors()
   }, [])
 
+  // Fetch profile data
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = localStorage.getItem("token")
-      if (!token) {
-        setError("Please log in to view profile")
-        return
-      }
-
       try {
-        const response = await fetch("/api/user", {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-
+        const response = await apiFetch("/api/user")
         if (!response.ok) {
-          const contentType = response.headers.get("content-type")
-          if (contentType && contentType.includes("application/json")) {
-            const data = await response.json()
-            throw new Error(data.error || "Failed to fetch profile")
-          } else {
-            throw new Error(`Unexpected response: ${await response.text()}`)
-          }
+          const data = await response.json()
+          throw new Error(data.error || "Failed to fetch profile")
         }
-
         const data = await response.json()
         setProfileForm({
           firstName: data.fullName?.split(" ")[0] || "",
@@ -156,8 +147,10 @@ export default function ProfilePage() {
         })
         setLastLogin(data.lastLogin ? new Date(data.lastLogin).toLocaleString() : "Never")
       } catch (error) {
-        console.error("Error fetching profile:", error)
-        setError(error instanceof Error ? error.message : "Failed to load profile data")
+        if (error instanceof Error && error.message !== 'Unauthorized') {
+          console.error("Error fetching profile:", error)
+          setError(error.message)
+        }
       }
     }
     fetchProfile()
@@ -174,15 +167,8 @@ export default function ProfilePage() {
     setError(null)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) throw new Error("Authentication token not found")
-
-      const response = await fetch("/api/user", {
+      const response = await apiFetch("/api/user", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           fullName: `${profileForm.firstName} ${profileForm.lastName}`,
           email: profileForm.email,
@@ -202,7 +188,11 @@ export default function ProfilePage() {
       setSuccess("Profile updated successfully")
       setTimeout(() => setSuccess(null), 3000)
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to update profile. Please try again.")
+      if (error instanceof Error && error.message !== 'Unauthorized') {
+        setError(error.message)
+      } else if (!(error instanceof Error)) {
+        setError("An unknown error occurred while updating the profile")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -223,15 +213,8 @@ export default function ProfilePage() {
     setSuccess(null)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) throw new Error("Authentication token not found")
-
-      const response = await fetch("/api/user-password-change", {
+      const response = await apiFetch("/api/user-password-change", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           email: profileForm.email,
           step: "requestCode",
@@ -249,8 +232,12 @@ export default function ProfilePage() {
       setVerificationCode("")
       setSuccess("Verification code sent to your email.")
     } catch (error) {
-      console.error("Error initiating password change:", error)
-      setError(error instanceof Error ? error.message : "Failed to initiate password change. Please try again.")
+      if (error instanceof Error && error.message !== 'Unauthorized') {
+        console.error("Error initiating password change:", error)
+        setError(error.message)
+      } else if (!(error instanceof Error)) {
+        setError("An unknown error occurred while initiating password change")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -261,15 +248,8 @@ export default function ProfilePage() {
     setError(null)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) throw new Error("Authentication token not found")
-
-      const response = await fetch("/api/user-password-change", {
+      const response = await apiFetch("/api/user-password-change", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           email: profileForm.email,
           step: "verifyCode",
@@ -294,7 +274,11 @@ export default function ProfilePage() {
       setVerificationCode("")
       setTimeout(() => setSuccess(null), 3000)
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to change password. Please try again.")
+      if (error instanceof Error && error.message !== 'Unauthorized') {
+        setError(error.message)
+      } else if (!(error instanceof Error)) {
+        setError("An unknown error occurred while changing the password")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -306,15 +290,8 @@ export default function ProfilePage() {
     setError(null)
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) throw new Error("Authentication token not found")
-
-      const response = await fetch("/api/user-password-change", {
+      const response = await apiFetch("/api/user-password-change", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           email: profileForm.email,
           step: "requestCode",
@@ -331,8 +308,12 @@ export default function ProfilePage() {
       setVerificationCode("")
       setSuccess(`Verification code sent to your ${value}.`)
     } catch (error) {
-      console.error("Error initiating 2FA method change:", error)
-      setError(error instanceof Error ? error.message : "Failed to initiate 2FA method change.")
+      if (error instanceof Error && error.message !== 'Unauthorized') {
+        console.error("Error initiating 2FA method change:", error)
+        setError(error.message)
+      } else if (!(error instanceof Error)) {
+        setError("An unknown error occurred while initiating 2FA method change")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -350,18 +331,11 @@ export default function ProfilePage() {
     }
 
     try {
-      const token = localStorage.getItem("token")
-      if (!token) throw new Error("Authentication token not found")
-
       if (verificationType === "password") {
         await handlePasswordChange()
       } else if (verificationType === "method" && newPreferredMethod) {
-        const response = await fetch("/api/user/update-2fa-method", {
+        const response = await apiFetch("/api/user/update-2fa-method", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
           body: JSON.stringify({
             method: newPreferredMethod,
             verificationCode,
@@ -382,7 +356,11 @@ export default function ProfilePage() {
         setTimeout(() => setSuccess(null), 3000)
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Invalid verification code. Please try again.")
+      if (error instanceof Error && error.message !== 'Unauthorized') {
+        setError(error.message)
+      } else if (!(error instanceof Error)) {
+        setError("An unknown error occurred during 2FA verification")
+      }
     } finally {
       setIsLoading(false)
     }

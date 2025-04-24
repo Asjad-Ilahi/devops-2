@@ -29,6 +29,8 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { DateRange } from "react-day-picker"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useAuth } from '@/lib/auth'
+import { apiFetch } from '@/lib/api'
 
 // Transaction interface updated to match Code-02's backend model
 interface Transaction {
@@ -45,6 +47,8 @@ interface Transaction {
 }
 
 export default function TransactionsPage() {
+  useAuth() // Proactively check token validity and handle expiration
+
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -70,7 +74,7 @@ export default function TransactionsPage() {
   // Color states
   const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
 
-  // Fetch colors
+  // Fetch colors (public endpoint, no auth required)
   useEffect(() => {
     const fetchColors = async () => {
       try {
@@ -121,29 +125,12 @@ export default function TransactionsPage() {
       setIsLoading(true)
       setError(null)
 
-      const token = localStorage.getItem("token")
-      if (!token) {
-        router.push("/login")
-        return
-      }
-
       try {
-        const response = await fetch("/api/transactions", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
+        const response = await apiFetch("/api/transactions")
         if (!response.ok) {
-          if (response.status === 401) {
-            localStorage.removeItem("token")
-            router.push("/login")
-            return
-          }
-          const errorData = await response.json()
-          throw new Error(errorData.error || "Failed to fetch transactions")
+          const data = await response.json()
+          throw new Error(data.error || "Failed to fetch transactions")
         }
-
         const data = await response.json()
         const transactionsWithId = data.transactions.map((tx: any) => ({
           ...tx,
@@ -164,16 +151,20 @@ export default function TransactionsPage() {
           }
           setIsInitialLoad(false)
         }
-      } catch (err) {
-        console.error("Error fetching transactions:", err)
-        setError(err instanceof Error ? err.message : "Failed to load transactions")
+      } catch (error) {
+        if (error instanceof Error && error.message !== 'Unauthorized') {
+          console.error("Error fetching transactions:", error)
+          setError(error.message)
+        } else if (!(error instanceof Error)) {
+          setError("An unknown error occurred while fetching transactions")
+        }
       } finally {
         setIsLoading(false)
       }
     }
 
     loadTransactions()
-  }, [searchParams, isInitialLoad, router])
+  }, [searchParams, isInitialLoad])
 
   // Apply filters to transactions
   useEffect(() => {
