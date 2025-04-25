@@ -346,7 +346,7 @@ export default function TransactionsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-primary-400" />
@@ -410,7 +410,7 @@ export default function TransactionsPage() {
               </div>
             </div>
 
-            <div className="mt-4 flex items-center">
+            <div className="mt-4 flex flex-wrap items-center">
               <span className="text-sm font-medium mr-2 text-primary-800">Amount:</span>
               <Tabs value={amountFilter} onValueChange={setAmountFilter} className="w-auto">
                 <TabsList className="bg-primary-100/70 p-1 rounded-lg">

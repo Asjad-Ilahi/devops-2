@@ -1,7 +1,8 @@
+// app/api/register/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import PendingUser from "@/models/pendingUser";
-import { sendVerificationEmail } from "@/lib/email";
+import { sendVerificationEmail } from "@/lib/email-server";
 import crypto from "crypto";
 
 export async function POST(req: NextRequest) {

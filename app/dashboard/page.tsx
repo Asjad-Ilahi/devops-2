@@ -199,7 +199,7 @@ export default function DashboardPage() {
             <Menu className="h-5 w-5 text-primary-600" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="p-0">
+        <SheetContent side="left" className="p-0 w-64">
           <div className="flex h-full flex-col bg-gradient-to-br from-primary-800 to-secondary-900 text-white">
             <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
               <div className="flex items-center gap-2">
@@ -324,9 +324,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Main Content */}
-      <div className="md:pl-64 flex-1">
+      <div className="md:pl-64 flex-1 flex flex-col">
         <header className="bg-white border-b border-primary-100 h-16 sticky top-0 z-30 flex items-center shadow-sm">
-          <div className="flex-1 px-6">
+          <div className="flex-1 px-6 pl-12 md:pl-6">
             <h1 className="text-xl font-bold md:hidden bg-clip-text text-transparent bg-gradient-to-r from-primary-700 to-secondary-700">
               Dashboard
             </h1>
@@ -366,7 +366,7 @@ export default function DashboardPage() {
             </DropdownMenu>
           </div>
         </header>
-        <main className="p-6">
+        <main className="p-4 sm:p-6 flex-1">
           <h1 className="text-2xl font-bold mb-6 hidden md:block bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-600">
             Dashboard
           </h1>
@@ -378,7 +378,7 @@ export default function DashboardPage() {
           )}
 
           {/* Account Cards */}
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-8">
             <div className="relative group h-full">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-300"></div>
               <Card className="relative bg-white border-0 shadow-lg h-full flex flex-col">
@@ -529,14 +529,14 @@ export default function DashboardPage() {
                           )}
                         </div>
                         <div>
-                          <div className="font-medium">{transaction.description}</div>
-                          <div className="text-sm text-primary-500">
+                          <div className="font-medium text-sm sm:text-base">{transaction.description}</div>
+                          <div className="text-xs text-primary-500">
                             {new Date(transaction.date).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
                       <div
-                        className={`font-bold ${transaction.amount > 0 ? "text-emerald-600" : "text-red-600"}`}
+                        className={`font-bold text-sm sm:text-base ${transaction.amount > 0 ? "text-emerald-600" : "text-red-600"}`}
                       >
                         {transaction.amount > 0 ? "+" : ""}
                         {transaction.amount.toFixed(2)}
