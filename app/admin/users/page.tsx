@@ -63,7 +63,7 @@ export default function UsersPage() {
   // Bulk actions state
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
   const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false)
-  const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   // Colors state
   const [colors, setColors] = useState<Colors | null>(null)
@@ -235,23 +235,64 @@ export default function UsersPage() {
     }
   }
 
-  // Handle bulk suspend (simulated, as in original code)
-  const handleBulkSuspend = () => {
-    setUsers((prev) =>
-      prev.map((user) =>
-        selectedUsers.includes(user.id) && user.status === "active"
-          ? { ...user, status: "suspended" }
-          : user,
-      ),
-    )
-    setSelectedUsers([])
-    setIsSuspendDialogOpen(false)
+  // Handle bulk delete with API call
+  const handleBulkDelete = async () => {
+    try {
+      const response = await fetch("/api/admin/users/bulk-delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ userIds: selectedUsers }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to delete users")
+      }
+
+      setUsers((prev) => prev.filter((user) => !selectedUsers.includes(user.id)))
+      setFilteredUsers((prev) => prev.filter((user) => !selectedUsers.includes(user.id)))
+      setSelectedUsers([])
+      setIsDeleteDialogOpen(false)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete users"
+      setError(errorMessage)
+      console.error("Error deleting users:", error)
+    }
+  }
+
+  // Handle single user deletion
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      const response = await fetch("/api/admin/users/bulk-delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ userIds: [userId] }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to delete user")
+      }
+
+      setUsers((prev) => prev.filter((user) => user.id !== userId))
+      setFilteredUsers((prev) => prev.filter((user) => user.id !== userId))
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete user"
+      setError(errorMessage)
+      console.error("Error deleting user:", error)
+    }
   }
 
   // Handle user status change with API call
   const handleStatusChange = async (
     userId: string,
-    newStatus: "active" | "suspended" | "pending",
+    newStatus: "active" | "pending",
   ) => {
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
@@ -413,17 +454,11 @@ export default function UsersPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setIsSuspendDialogOpen(true)}
-                    disabled={
-                      !selectedUsers.some((id) => {
-                        const user = users.find((user) => user.id === id)
-                        return user?.status === "active"
-                      })
-                    }
+                    onClick={() => setIsDeleteDialogOpen(true)}
                     className="border-primary-200 text-primary-700 hover:bg-primary-50"
                   >
                     <X className="mr-2 h-4 w-4" />
-                    Suspend
+                    Delete
                   </Button>
                   <Button
                     variant="ghost"
@@ -528,16 +563,9 @@ export default function UsersPage() {
                                 Approve User
                               </DropdownMenuItem>
                             )}
-                            {user.status === "active" && (
-                              <DropdownMenuItem onClick={() => handleStatusChange(user.id, "suspended")}>
-                                Suspend User
-                              </DropdownMenuItem>
-                            )}
-                            {user.status === "suspended" && (
-                              <DropdownMenuItem onClick={() => handleStatusChange(user.id, "active")}>
-                                Reactivate User
-                              </DropdownMenuItem>
-                            )}
+                            <DropdownMenuItem onClick={() => handleDeleteUser(user.id)}>
+                              Delete User
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem asChild>
                               <Link href={`/admin/users/${user.id}/transactions`}>View Transactions</Link>
@@ -598,40 +626,34 @@ export default function UsersPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Suspend Dialog */}
-        <Dialog open={isSuspendDialogOpen} onOpenChange={setIsSuspendDialogOpen}>
+        {/* Delete Dialog */}
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <DialogContent className="bg-white/95 backdrop-blur-sm border border-primary-100">
             <DialogHeader>
-              <DialogTitle className="text-primary-900">Suspend Users</DialogTitle>
+              <DialogTitle className="text-primary-900">Delete Users</DialogTitle>
               <DialogDescription className="text-primary-600">
-                Are you sure you want to suspend the selected users? This will change their status to "Suspended".
+                Are you sure you want to delete the selected users? This action is permanent and cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">
               <div className="text-sm">
-                {
-                  selectedUsers.filter((id) => {
-                    const user = users.find((user) => user.id === id)
-                    return user?.status === "active"
-                  }).length
-                }{" "}
-                user(s) will be suspended.
+                {selectedUsers.length} user(s) will be deleted.
               </div>
             </div>
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setIsSuspendDialogOpen(false)}
+                onClick={() => setIsDeleteDialogOpen(false)}
                 className="border-primary-200 text-primary-700 hover:bg-primary-50"
               >
                 Cancel
               </Button>
               <Button
                 variant="destructive"
-                onClick={handleBulkSuspend}
+                onClick={handleBulkDelete}
                 className="bg-red-600 hover:bg-red-700 text-white"
               >
-                Suspend Users
+                Delete Users
               </Button>
             </DialogFooter>
           </DialogContent>

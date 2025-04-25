@@ -1,4 +1,3 @@
-// app/api/login/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
@@ -25,8 +24,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid username or password" }, { status: 401 });
       }
 
-      if (!user.isApproved) {
-        return NextResponse.json({ error: "Account not yet approved" }, { status: 403 });
+      // Log isApproved status for debugging
+      console.log(`User ${username} isApproved: ${user.isApproved}`);
+
+      // Check if user is approved; treat missing isApproved as true for backward compatibility
+      if (user.isApproved === false) {
+        return NextResponse.json({ error: "Your account is awaiting admin approval. Please try again later." }, { status: 403 });
       }
 
       const verificationCode = crypto.randomBytes(3).toString("hex").toUpperCase();
@@ -34,14 +37,10 @@ export async function POST(req: NextRequest) {
       user.twoFactorCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
       await user.save();
 
-      if (user.verificationMethod === "email") {
-        await sendVerificationEmail(user.email, verificationCode);
-      }
+      await sendVerificationEmail(user.email, verificationCode);
 
       return NextResponse.json({
         message: "Verification code sent",
-        verificationMethod: user.verificationMethod,
-        phone: user.verificationMethod === "phone" ? user.phone : undefined,
       });
     } catch (error) {
       console.error("Login error:", error);

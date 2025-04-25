@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { CreditCard, Home, LogOut, Menu, Plus, Settings, Users, Loader, User } from "lucide-react"
+import { CreditCard, Home, LogOut, Menu, Plus, Settings, Users, Loader, User, AlertCircle } from "lucide-react"
 import Color from "color"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 // Interface for User
 interface User {
@@ -105,7 +106,9 @@ export default function AdminDashboardPage() {
   })
   const [isPendingApprovalsOpen, setIsPendingApprovalsOpen] = useState<boolean>(false)
   const [transactionError, setTransactionError] = useState<string | null>(null)
+  const [approvalError, setApprovalError] = useState<string | null>(null)
   const [colors, setColors] = useState<Colors | null>(null)
+  const [loadingActions, setLoadingActions] = useState<{ [key: string]: boolean }>({})
 
   // Fetch colors
   useEffect(() => {
@@ -186,7 +189,16 @@ export default function AdminDashboardPage() {
               throw new Error(errorData.error || "Failed to fetch pending users")
             }
             const pendingData = await pendingRes.json()
-            const pendingUsersArray: PendingUser[] = pendingData.pendingUsers || []
+            const pendingUsersArray: PendingUser[] = (pendingData.pendingUsers || []).filter(
+              (user: PendingUser) => user._id && typeof user._id === "string"
+            )
+
+            if (pendingUsersArray.length !== pendingData.pendingUsers.length) {
+              console.warn(
+                "Some pending users were filtered out due to invalid _id:",
+                pendingData.pendingUsers
+              )
+            }
 
             // Update state
             setUsers(usersArray)
@@ -275,6 +287,16 @@ export default function AdminDashboardPage() {
 
   // Handle approving a pending user
   const handleApproveUser = async (pendingUserId: string) => {
+    if (!pendingUserId || typeof pendingUserId !== "string") {
+      console.error("Invalid pendingUserId:", pendingUserId)
+      setApprovalError("Invalid user ID. Please try again.")
+      return
+    }
+
+    console.debug("Approving user with ID:", pendingUserId)
+    setLoadingActions((prev) => ({ ...prev, [pendingUserId]: true }))
+    setApprovalError(null)
+
     try {
       const response = await fetch("/api/admin/approve-user", {
         method: "POST",
@@ -285,7 +307,9 @@ export default function AdminDashboardPage() {
 
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.error || "Failed to approve user")
+        const errorMessage = data.error || "Failed to approve user"
+        console.error("Approval API error:", errorMessage, { pendingUserId })
+        throw new Error(errorMessage)
       }
 
       const approvedUserData = await response.json()
@@ -310,9 +334,75 @@ export default function AdminDashboardPage() {
           totalUsers: prev.totalUsers + 1,
           totalBalance: prev.totalBalance + newUser.balance,
         }))
+      } else {
+        console.warn("Approved user not found in pendingUsers:", pendingUserId)
+        // Refresh pending users to sync state
+        const pendingRes = await fetch("/api/admin/pending-users", { credentials: "include" })
+        if (pendingRes.ok) {
+          const pendingData = await pendingRes.json()
+          setPendingUsers(pendingData.pendingUsers || [])
+          setStats((prev) => ({
+            ...prev,
+            pendingApprovals: (pendingData.pendingUsers || []).length,
+          }))
+        }
       }
     } catch (error) {
       console.error("Error approving user:", error)
+      const errorMessage =
+        error instanceof Error && error.message === "User not found"
+          ? "User not found. They may have been already approved or removed."
+          : error instanceof Error
+          ? error.message
+          : "Failed to approve user"
+      setApprovalError(errorMessage)
+
+      // Refresh pending users to ensure UI is in sync
+      try {
+        const pendingRes = await fetch("/api/admin/pending-users", { credentials: "include" })
+        if (pendingRes.ok) {
+          const pendingData = await pendingRes.json()
+          setPendingUsers(pendingData.pendingUsers || [])
+          setStats((prev) => ({
+            ...prev,
+            pendingApprovals: (pendingData.pendingUsers || []).length,
+          }))
+        }
+      } catch (refreshError) {
+        console.error("Error refreshing pending users:", refreshError)
+      }
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [pendingUserId]: false }))
+    }
+  }
+
+  // Handle rejecting a pending user
+  const handleRejectUser = async (pendingUserId: string) => {
+    setLoadingActions((prev) => ({ ...prev, [pendingUserId]: true }))
+    setApprovalError(null)
+    try {
+      const response = await fetch("/api/admin/reject-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ pendingUserId }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to reject user")
+      }
+
+      setPendingUsers((prev) => prev.filter((user) => user._id !== pendingUserId))
+      setStats((prev) => ({
+        ...prev,
+        pendingApprovals: prev.pendingApprovals - 1,
+      }))
+    } catch (error) {
+      console.error("Error rejecting user:", error)
+      setApprovalError(error instanceof Error ? error.message : "Failed to reject user")
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [pendingUserId]: false }))
     }
   }
 
@@ -719,7 +809,7 @@ export default function AdminDashboardPage() {
           <DialogHeader>
             <DialogTitle className="text-primary-900">Add New Transaction</DialogTitle>
             <DialogDescription className="text-primary-600">
-              Create a new transaction for a user&apos;s account.
+              Create a new transaction for a user's account.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4 px-2 sm:px-0">
@@ -815,10 +905,16 @@ export default function AdminDashboardPage() {
           <DialogHeader>
             <DialogTitle className="text-primary-900">Pending Approvals</DialogTitle>
             <DialogDescription className="text-primary-600">
-              Review and approve new user registrations.
+              Review and approve or reject new user registrations.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
+            {approvalError && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{approvalError}</AlertDescription>
+              </Alert>
+            )}
             {pendingUsers.length > 0 ? (
               <div className="space-y-4">
                 {pendingUsers.map((user) => (
@@ -860,15 +956,23 @@ export default function AdminDashboardPage() {
                         variant="outline"
                         className="border-red-200 text-red-700 hover:bg-red-50"
                         size="sm"
-                        disabled
+                        onClick={() => handleRejectUser(user._id)}
+                        disabled={loadingActions[user._id]}
                       >
+                        {loadingActions[user._id] ? (
+                          <Loader className="h-4 w-4 animate-spin mr-2" />
+                        ) : null}
                         Reject
                       </Button>
                       <Button
                         size="sm"
                         className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
                         onClick={() => handleApproveUser(user._id)}
+                        disabled={loadingActions[user._id]}
                       >
+                        {loadingActions[user._id] ? (
+                          <Loader className="h-4 w-4 animate-spin mr-2" />
+                        ) : null}
                         Approve
                       </Button>
                     </div>
@@ -884,7 +988,10 @@ export default function AdminDashboardPage() {
           <DialogFooter>
             <Button
               className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
-              onClick={() => setIsPendingApprovalsOpen(false)}
+              onClick={() => {
+                setIsPendingApprovalsOpen(false)
+                setApprovalError(null)
+              }}
             >
               Close
             </Button>

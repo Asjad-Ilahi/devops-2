@@ -1,8 +1,7 @@
-
 "use client";
 
 import type React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check, Eye, EyeOff, Loader2 } from "lucide-react";
@@ -18,20 +17,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Color from "color";
-import { RecaptchaVerifier } from "firebase/auth";
-import { auth } from "@/firebase";
-import { sendVerificationSMS } from "@/lib/email-client";
-
-// Test Firebase connection at initialization
-console.log("Firebase connection test - Auth instance:", auth ? "Initialized" : "Not initialized");
 
 export default function RegisterPage() {
   const router = useRouter();
-  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
-  const confirmationResultRef = useRef<any>(null);
-  const [isRecaptchaReady, setIsRecaptchaReady] = useState(false);
-
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -42,7 +30,6 @@ export default function RegisterPage() {
     state: "",
     zipCode: "",
     emailVerificationCode: "",
-    smsVerificationCode: "",
     username: "",
     password: "",
     confirmPassword: "",
@@ -96,40 +83,6 @@ export default function RegisterPage() {
     };
     fetchColors();
   }, []);
-
-  useEffect(() => {
-    if (recaptchaContainerRef.current && !recaptchaVerifierRef.current) {
-      try {
-        recaptchaVerifierRef.current = new RecaptchaVerifier(
-          auth,
-          recaptchaContainerRef.current,
-          {
-            size: "invisible",
-            callback: () => {
-              console.log("reCAPTCHA verified successfully");
-            },
-            "expired-callback": () => {
-              console.log("reCAPTCHA expired");
-              setErrors({ form: "reCAPTCHA expired. Please refresh the page." });
-              setIsRecaptchaReady(false);
-            },
-          }
-        );
-        console.log("reCAPTCHA verifier initialized");
-        setIsRecaptchaReady(true);
-      } catch (error) {
-        console.error("Error initializing reCAPTCHA:", error);
-        setErrors({ form: "Failed to initialize reCAPTCHA. Please refresh the page." });
-      }
-    }
-    // Cleanup reCAPTCHA on component unmount
-    return () => {
-      if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear();
-        recaptchaVerifierRef.current = null;
-      }
-    };
-  }, [recaptchaContainerRef.current]);
 
   const usStates = [
     { value: "AL", label: "Alabama" },
@@ -231,9 +184,6 @@ export default function RegisterPage() {
     if (!formData.emailVerificationCode.trim()) {
       newErrors.emailVerificationCode = "Email verification code is required";
     }
-    if (!formData.smsVerificationCode.trim()) {
-      newErrors.smsVerificationCode = "SMS verification code is required";
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -262,13 +212,21 @@ export default function RegisterPage() {
       console.log("Validation failed:", errors);
       return;
     }
-    if (!isRecaptchaReady || !recaptchaVerifierRef.current) {
-      console.error("reCAPTCHA not ready or verifier not initialized");
-      setErrors({ form: "reCAPTCHA not ready. Please wait a moment and try again." });
-      return;
-    }
     setIsLoading(true);
     try {
+      // Check for duplicate email
+      const duplicateCheckResponse = await fetch("/api/admin/check-duplicate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email, username: "" }),
+      });
+      const duplicateData = await duplicateCheckResponse.json();
+      if (!duplicateCheckResponse.ok) {
+        setErrors({ email: "This email is already registered. Please use a different email." });
+        setIsLoading(false);
+        return;
+      }
+
       console.log("Sending request to /api/register");
       const response = await fetch("/api/register", {
         method: "POST",
@@ -288,40 +246,10 @@ export default function RegisterPage() {
       const data = await response.json();
       console.log("API response:", data);
       if (!response.ok) {
-        setErrors({ form: data.error || "Failed to send verification codes" });
+        setErrors({ form: data.error || "Failed to send verification code" });
         setIsLoading(false);
         return;
       }
-
-      console.log("Attempting to send SMS verification with phone:", formData.phone);
-      try {
-        const formattedPhoneNumber = `+92${formData.phone.replace(/\D/g, "")}`;
-        console.log("Formatted phone number for SMS:", formattedPhoneNumber);
-        const confirmation = await sendVerificationSMS(formattedPhoneNumber, recaptchaVerifierRef.current);
-        console.log("SMS verification sent successfully:", confirmation);
-        confirmationResultRef.current = confirmation;
-        alert("SMS verification code sent");
-      } catch (smsError: any) {
-        console.error("Detailed SMS verification error:", {
-          message: smsError.message,
-          code: smsError.code,
-          stack: smsError.stack,
-        });
-        let errorMessage = smsError.message;
-        if (smsError.code === "auth/billing-not-enabled") {
-          errorMessage = "Phone authentication requires a billing account. Please enable billing in your Firebase project.";
-        } else if (smsError.code === "auth/invalid-phone-number") {
-          errorMessage = "Invalid phone number format. Please enter a valid 10-digit phone number.";
-        } else if (smsError.code === "auth/too-many-requests") {
-          errorMessage = "Too many attempts. Please try again later.";
-        }
-        setErrors({
-          form: `Failed to send SMS verification: ${errorMessage} (Code: ${smsError.code || "unknown"})`,
-        });
-        setIsLoading(false);
-        return;
-      }
-
       console.log("Setting pendingUserId and advancing to step 2");
       setPendingUserId(data.pendingUserId);
       setStep(2);
@@ -352,18 +280,6 @@ export default function RegisterPage() {
         setIsLoading(false);
         return;
       }
-
-      console.log("Verifying SMS code");
-      try {
-        await confirmationResultRef.current.confirm(formData.smsVerificationCode);
-        console.log("SMS verification successful");
-      } catch (error: any) {
-        console.error("SMS verification error:", error);
-        setErrors({ smsVerificationCode: "Invalid SMS verification code" });
-        setIsLoading(false);
-        return;
-      }
-
       console.log("Advancing to step 3");
       setStep(3);
     } catch (error: any) {
@@ -378,6 +294,19 @@ export default function RegisterPage() {
     if (!validateThirdStep()) return;
     setIsLoading(true);
     try {
+      // Check for duplicate username
+      const duplicateCheckResponse = await fetch("/api/admin/check-duplicate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "", username: formData.username }),
+      });
+      const duplicateData = await duplicateCheckResponse.json();
+      if (!duplicateCheckResponse.ok) {
+        setErrors({ username: "This username is already taken. Please choose a different username." });
+        setIsLoading(false);
+        return;
+      }
+
       console.log("Completing registration");
       const response = await fetch("/api/complete-registration", {
         method: "POST",
@@ -420,14 +349,22 @@ export default function RegisterPage() {
   };
 
   const handleResendCode = async () => {
-    if (!isRecaptchaReady || !recaptchaVerifierRef.current) {
-      console.error("reCAPTCHA not ready or verifier not initialized for resend");
-      setErrors({ form: "reCAPTCHA not ready. Please wait a moment and try again." });
-      return;
-    }
     setIsLoading(true);
     try {
-      console.log("Resending verification codes");
+      // Check for duplicate email again before resending
+      const duplicateCheckResponse = await fetch("/api/admin/check-duplicate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email, username: "" }),
+      });
+      const duplicateData = await duplicateCheckResponse.json();
+      if (!duplicateCheckResponse.ok) {
+        setErrors({ email: "This email is already registered. Please use a different email." });
+        setIsLoading(false);
+        return;
+      }
+
+      console.log("Resending verification code");
       const response = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -445,38 +382,15 @@ export default function RegisterPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        setErrors({ form: data.error || "Failed to resend verification codes" });
+        setErrors({ form: data.error || "Failed to resend verification code" });
         setIsLoading(false);
         return;
       }
-
-      console.log("Resending SMS verification");
-      try {
-        const formattedPhoneNumber = `+92${formData.phone.replace(/\D/g, "")}`;
-        const confirmation = await sendVerificationSMS(formattedPhoneNumber, recaptchaVerifierRef.current);
-        confirmationResultRef.current = confirmation;
-        alert("Verification codes resent successfully");
-      } catch (smsError: any) {
-        console.error("Resend SMS error:", smsError);
-        let errorMessage = smsError.message;
-        if (smsError.code === "auth/billing-not-enabled") {
-          errorMessage = "Phone authentication requires a billing account. Please enable billing in your Firebase project.";
-        } else if (smsError.code === "auth/invalid-phone-number") {
-          errorMessage = "Invalid phone number format. Please enter a valid 10-digit phone number.";
-        } else if (smsError.code === "auth/too-many-requests") {
-          errorMessage = "Too many attempts. Please try again later.";
-        }
-        setErrors({
-          form: `Failed to resend SMS verification: ${errorMessage} (Code: ${smsError.code || "unknown"})`,
-        });
-        setIsLoading(false);
-        return;
-      }
-
+      alert("Verification code resent successfully");
       setPendingUserId(data.pendingUserId);
     } catch (error: any) {
-      console.error("Resend codes error:", error);
-      setErrors({ form: `Failed to resend codes: ${error.message}` });
+      console.error("Resend code error:", error);
+      setErrors({ form: `Failed to resend code: ${error.message}` });
     } finally {
       setIsLoading(false);
     }
@@ -538,7 +452,6 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 px-4 py-12 relative overflow-hidden">
-      <div ref={recaptchaContainerRef} style={{ display: "none" }}></div>
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
         <div className="absolute top-10 left-10 w-72 h-72 bg-primary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
         <div className="absolute top-0 right-10 w-72 h-72 bg-secondary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
@@ -738,12 +651,12 @@ export default function RegisterPage() {
                   type="button"
                   className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
                   onClick={handleNextStep}
-                  disabled={isLoading || !isRecaptchaReady}
+                  disabled={isLoading}
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Sending Codes...
+                      Sending Code...
                     </>
                   ) : (
                     "Continue"
@@ -756,7 +669,7 @@ export default function RegisterPage() {
                 <div>
                   <Alert className="bg-primary-50 border-primary-200 text-primary-700">
                     <AlertDescription>
-                      Verification codes have been sent to your email and phone.
+                      A verification code has been sent to your email.
                     </AlertDescription>
                   </Alert>
                 </div>
@@ -778,32 +691,14 @@ export default function RegisterPage() {
                     <p className="mt-1 text-sm text-red-500">{errors.emailVerificationCode}</p>
                   )}
                 </div>
-                <div>
-                  <Label htmlFor="smsVerificationCode" className="text-primary-800 font-medium">
-                    SMS Verification Code
-                  </Label>
-                  <Input
-                    id="smsVerificationCode"
-                    name="smsVerificationCode"
-                    type="text"
-                    required
-                    value={formData.smsVerificationCode}
-                    onChange={handleChange}
-                    placeholder="Enter SMS verification code"
-                    className={`${errors.smsVerificationCode ? "border-red-500" : "border-primary-200"} mt-1 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all`}
-                  />
-                  {errors.smsVerificationCode && (
-                    <p className="mt-1 text-sm text-red-500">{errors.smsVerificationCode}</p>
-                  )}
-                </div>
                 <div className="text-center">
                   <button
                     type="button"
                     className="text-sm text-secondary-600 hover:text-secondary-500 transition-colors"
                     onClick={handleResendCode}
-                    disabled={isLoading || !isRecaptchaReady}
+                    disabled={isLoading}
                   >
-                    {isLoading ? "Sending..." : "Didn't receive codes? Resend"}
+                    {isLoading ? "Sending..." : "Didn't receive code? Resend"}
                   </button>
                 </div>
                 <div className="flex gap-4">

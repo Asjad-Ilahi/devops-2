@@ -35,11 +35,15 @@ interface Colors {
 interface Transaction {
   id: string;
   userId: string;
-  type: "deposit" | "withdrawal" | "transfer" | "adjustment";
+  type: "deposit" | "withdrawal" | "transfer" | "payment" | "fee" | "interest" | "crypto_buy" | "crypto_sell" | "refund";
   amount: number;
   description: string;
   date: string;
   status: "completed" | "pending" | "failed";
+  category: string;
+  accountType: "checking" | "savings" | "crypto";
+  cryptoAmount?: number;
+  cryptoPrice?: number;
 }
 
 interface User {
@@ -96,6 +100,13 @@ export default function UserManagementPage() {
     type: "deposit" as Transaction["type"],
     amount: "",
     description: "",
+  });
+
+  // Crypto transaction dialog
+  const [isCryptoDialogOpen, setIsCryptoDialogOpen] = useState(false);
+  const [cryptoForm, setCryptoForm] = useState({
+    cryptoAmount: "",
+    cryptoPrice: "",
   });
 
   // Colors state
@@ -199,13 +210,17 @@ export default function UserManagementPage() {
         const { transactions: transactionsData } = await transactionsResponse.json();
         setTransactions(
           transactionsData.map((txn: any) => ({
-            id: txn.id,
+            id: txn._id,
             userId: txn.userId,
             type: txn.type,
             amount: txn.amount,
             description: txn.description || "N/A",
             date: new Date(txn.date).toISOString().replace("T", " ").substring(0, 19),
             status: txn.status,
+            category: txn.category || "N/A",
+            accountType: txn.accountType,
+            cryptoAmount: txn.cryptoAmount,
+            cryptoPrice: txn.cryptoPrice,
           }))
         );
       } catch (err: unknown) {
@@ -220,7 +235,7 @@ export default function UserManagementPage() {
     if (userId) {
       fetchUserData();
     }
-  }, [userId, router]);
+  }, [userId]);
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -230,6 +245,10 @@ export default function UserManagementPage() {
   const handleProfileUpdate = async () => {
     setError(null);
     setSuccess(null);
+    if (!profileForm.name || !profileForm.email || !profileForm.username || !profileForm.phoneNumber) {
+      setError("All fields are required");
+      return;
+    }
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: "PUT",
@@ -249,10 +268,10 @@ export default function UserManagementPage() {
       const { user: updatedUser } = await response.json();
       setUser((prev) => ({
         ...prev!,
-        name: updatedUser.name || updatedUser.fullName,
+        name: updatedUser.fullName,
         email: updatedUser.email,
         username: updatedUser.username,
-        phoneNumber: updatedUser.phoneNumber || updatedUser.phone,
+        phoneNumber: updatedUser.phone,
       }));
       setSuccess("Profile updated successfully");
       setIsEditingProfile(false);
@@ -325,6 +344,10 @@ export default function UserManagementPage() {
       setError("Please enter a valid amount");
       return;
     }
+    if (["crypto_buy", "crypto_sell"].includes(newTransaction.type)) {
+      setIsCryptoDialogOpen(true);
+      return;
+    }
     try {
       const response = await fetch(`/api/admin/users/${userId}/transactions`, {
         method: "POST",
@@ -334,7 +357,7 @@ export default function UserManagementPage() {
           type: newTransaction.type,
           amount,
           description: newTransaction.description,
-          category: "manual",
+          category: "Manual",
           accountType: "checking",
         }),
       });
@@ -344,13 +367,15 @@ export default function UserManagementPage() {
       }
       const newTxn = await response.json();
       const transaction: Transaction = {
-        id: newTxn.id,
+        id: newTxn._id,
         userId: userId,
         type: newTxn.type,
         amount: newTxn.amount,
         description: newTxn.description,
         date: new Date(newTxn.date).toISOString().replace("T", " ").substring(0, 19),
         status: newTxn.status,
+        category: newTxn.category,
+        accountType: newTxn.accountType,
       };
       setTransactions((prev) => [transaction, ...prev]);
       setUser((prev) => ({
@@ -360,6 +385,76 @@ export default function UserManagementPage() {
       setSuccess("Transaction added successfully");
       setIsAddTransactionOpen(false);
       setNewTransaction({ type: "deposit", amount: "", description: "" });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to add transaction";
+      setError(errorMessage);
+    }
+  };
+
+  const handleCryptoTransaction = async () => {
+    setError(null);
+    const amount = Number.parseFloat(newTransaction.amount);
+    const cryptoAmount = Number.parseFloat(cryptoForm.cryptoAmount);
+    const cryptoPrice = Number.parseFloat(cryptoForm.cryptoPrice);
+    if (!newTransaction.amount || !newTransaction.description) {
+      setError("Please fill in all transaction fields");
+      return;
+    }
+    if (isNaN(amount) || amount === 0) {
+      setError("Please enter a valid amount");
+      return;
+    }
+    if (!cryptoForm.cryptoAmount || isNaN(cryptoAmount) || cryptoAmount <= 0) {
+      setError("Please enter a valid crypto amount");
+      return;
+    }
+    if (!cryptoForm.cryptoPrice || isNaN(cryptoPrice) || cryptoPrice <= 0) {
+      setError("Please enter a valid crypto price");
+      return;
+    }
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/transactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          type: newTransaction.type,
+          amount,
+          description: newTransaction.description,
+          category: "Crypto",
+          accountType: "crypto",
+          cryptoAmount,
+          cryptoPrice,
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to add transaction");
+      }
+      const newTxn = await response.json();
+      const transaction: Transaction = {
+        id: newTxn._id,
+        userId: userId,
+        type: newTxn.type,
+        amount: newTxn.amount,
+        description: newTxn.description,
+        date: new Date(newTxn.date).toISOString().replace("T", " ").substring(0, 19),
+        status: newTxn.status,
+        category: newTxn.category,
+        accountType: newTxn.accountType,
+        cryptoAmount: newTxn.cryptoAmount,
+        cryptoPrice: newTxn.cryptoPrice,
+      };
+      setTransactions((prev) => [transaction, ...prev]);
+      setUser((prev) => ({
+        ...prev!,
+        cryptoBalance: prev!.cryptoBalance + cryptoAmount,
+      }));
+      setSuccess("Transaction added successfully");
+      setIsAddTransactionOpen(false);
+      setIsCryptoDialogOpen(false);
+      setNewTransaction({ type: "deposit", amount: "", description: "" });
+      setCryptoForm({ cryptoAmount: "", cryptoPrice: "" });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to add transaction";
       setError(errorMessage);
@@ -495,7 +590,7 @@ export default function UserManagementPage() {
               </div>
               <div className="flex justify-between items-center pb-2 border-b border-primary-100">
                 <span className="text-primary-600">Crypto Balance:</span>
-                <span className="font-bold text-primary-900">{user.cryptoBalance.toFixed(2)} BTC</span>
+                <span className="font-bold text-primary-900">{user.cryptoBalance.toFixed(8)} BTC</span>
               </div>
               <div className="flex justify-between items-center pb-2 border-b border-primary-100">
                 <span className="text-primary-600">Created:</span>
@@ -728,7 +823,12 @@ export default function UserManagementPage() {
                             <SelectItem value="deposit">Deposit</SelectItem>
                             <SelectItem value="withdrawal">Withdrawal</SelectItem>
                             <SelectItem value="transfer">Transfer</SelectItem>
-                            <SelectItem value="adjustment">Adjustment</SelectItem>
+                            <SelectItem value="payment">Payment</SelectItem>
+                            <SelectItem value="fee">Fee</SelectItem>
+                            <SelectItem value="interest">Interest</SelectItem>
+                            <SelectItem value="crypto_buy">Crypto Buy</SelectItem>
+                            <SelectItem value="crypto_sell">Crypto Sell</SelectItem>
+                            <SelectItem value="refund">Refund</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -887,6 +987,74 @@ export default function UserManagementPage() {
               className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
             >
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCryptoDialogOpen} onOpenChange={setIsCryptoDialogOpen}>
+        <DialogContent className="bg-white/95 backdrop-blur-sm border border-primary-100">
+          <DialogHeader>
+            <DialogTitle className="text-primary-900">Crypto Transaction Details</DialogTitle>
+            <DialogDescription className="text-primary-600">
+              Provide additional details for the {newTransaction.type} transaction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {error && (
+              <Alert variant="destructive" className="bg-red-50 border border-red-200">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-700">{error}</AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="cryptoAmount" className="text-primary-800">
+                Crypto Amount (BTC)
+              </Label>
+              <Input
+                id="cryptoAmount"
+                type="number"
+                step="0.00000001"
+                className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                placeholder="0.00000000"
+                value={cryptoForm.cryptoAmount}
+                onChange={(e) => setCryptoForm({ ...cryptoForm, cryptoAmount: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cryptoPrice" className="text-primary-800">
+                Crypto Price (USD per BTC)
+              </Label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-600">$</div>
+                <Input
+                  id="cryptoPrice"
+                  type="number"
+                  step="0.01"
+                  className="pl-7 border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                  placeholder="0.00"
+                  value={cryptoForm.cryptoPrice}
+                  onChange={(e) => setCryptoForm({ ...cryptoForm, cryptoPrice: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCryptoDialogOpen(false);
+                setCryptoForm({ cryptoAmount: "", cryptoPrice: "" });
+              }}
+              className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCryptoTransaction}
+              className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
+            >
+              Submit Transaction
             </Button>
           </DialogFooter>
         </DialogContent>

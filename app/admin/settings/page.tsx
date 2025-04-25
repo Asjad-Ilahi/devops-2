@@ -27,13 +27,13 @@ export default function AdminSettingsPage() {
     siteName: "Zelle Banking",
     supportEmail: "support@zellebank.example.com",
     supportPhone: "1-800-555-1234",
-    instagramUrl: "",
-    twitterUrl: "",
-    facebookUrl: "",
+    instagramUrl: "https://instagram.com",
+    twitterUrl: "https://twitter.com",
+    facebookUrl: "https://facebook.com",
     privacyPolicy: "",
     termsOfService: "",
-    primaryColor: "#6D1ED4",
-    secondaryColor: "#000000",
+    primaryColor: "#5f6cd3",
+    secondaryColor: "#9c65d2",
     logoUrl: "/zelle-logo.svg",
     zelleLogoUrl: "/zelle-logo.svg",
     checkingIcon: "square",
@@ -83,13 +83,13 @@ export default function AdminSettingsPage() {
           siteName: data.siteName || "Zelle Banking",
           supportEmail: data.supportEmail || "support@zellebank.example.com",
           supportPhone: data.supportPhone || "1-800-555-1234",
-          instagramUrl: data.instagramUrl || "",
-          twitterUrl: data.twitterUrl || "",
-          facebookUrl: data.facebookUrl || "",
+          instagramUrl: data.instagramUrl || "https://instagram.com",
+          twitterUrl: data.twitterUrl || "https://twitter.com",
+          facebookUrl: data.facebookUrl || "https://facebook.com",
           privacyPolicy: data.privacyPolicy || "",
           termsOfService: data.termsOfService || "",
-          primaryColor: data.primaryColor || "#6D1ED4",
-          secondaryColor: data.secondaryColor || "#000000",
+          primaryColor: data.primaryColor || "#5f6cd3",
+          secondaryColor: data.secondaryColor || "#9c65d2",
           logoUrl: data.logoUrl || "/zelle-logo.svg",
           zelleLogoUrl: data.zelleLogoUrl || "/zelle-logo.svg",
           checkingIcon: data.checkingIcon || "square",
@@ -102,8 +102,8 @@ export default function AdminSettingsPage() {
           const colorsData = await colorsResponse.json();
           setColors(colorsData);
 
-          const primary = Color(colorsData.primaryColor);
-          const secondary = Color(colorsData.secondaryColor);
+          const primary = Color(colorsData.primaryColor || "#5f6cd3");
+          const secondary = Color(colorsData.secondaryColor || "#9c65d2");
 
           const generateShades = (color: typeof Color.prototype) => ({
             50: color.lighten(0.5).hex(),
@@ -475,9 +475,7 @@ export default function AdminSettingsPage() {
                       <Button
                         variant="outline"
                         onClick={() => document.getElementById("logoUpload")?.click()}
-                        className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary- •
-
-50 hover:text-primary-800 hover:border-primary-300"
+                        className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
                       >
                         <Upload className="mr-2 h-4 w-4" />
                         Upload Logo

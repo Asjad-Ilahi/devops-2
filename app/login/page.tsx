@@ -1,23 +1,18 @@
-// app/login.tsx
 "use client";
 
 import type React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Color from "color";
-import { RecaptchaVerifier, auth } from "@/firebase";
-import { sendVerificationSMS } from "@/lib/email";
 
 export default function LoginPage() {
   const router = useRouter();
-  const recaptchaVerifierRef = useRef<any>(null);
-  const confirmationResultRef = useRef<any>(null);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +22,6 @@ export default function LoginPage() {
   const [isTwoFactorLoading, setIsTwoFactorLoading] = useState(false);
   const [showTwoFactor, setShowTwoFactor] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
-  const [verificationMethod, setVerificationMethod] = useState<"email" | "phone">("email");
   const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null);
 
   useEffect(() => {
@@ -69,19 +63,6 @@ export default function LoginPage() {
     fetchColors();
   }, []);
 
-  useEffect(() => {
-    if (showTwoFactor && verificationMethod === "phone" && !recaptchaVerifierRef.current) {
-      recaptchaVerifierRef.current = new RecaptchaVerifier(
-        "recaptcha-container",
-        {
-          size: "invisible",
-          callback: () => {},
-        },
-        auth
-      );
-    }
-  }, [showTwoFactor, verificationMethod]);
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -95,21 +76,21 @@ export default function LoginPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error);
+        if (response.status === 403) {
+          setError(
+            `${data.error} If you believe this is an error, please contact support.`
+          );
+        } else {
+          setError(data.error || "An error occurred during login.");
+        }
         setIsLoginLoading(false);
         return;
-      }
-
-      setVerificationMethod(data.verificationMethod || "email");
-      if (data.verificationMethod === "phone") {
-        const confirmationResult = await sendVerificationSMS(data.phone, recaptchaVerifierRef.current);
-        confirmationResultRef.current = confirmationResult;
       }
 
       setShowTwoFactor(true);
       setIsLoginLoading(false);
     } catch (error) {
-      setError("An error occurred. Please try again later.");
+      setError("An unexpected error occurred. Please try again later.");
       setIsLoginLoading(false);
     }
   };
@@ -120,10 +101,6 @@ export default function LoginPage() {
     setIsTwoFactorLoading(true);
 
     try {
-      if (verificationMethod === "phone") {
-        await confirmationResultRef.current.confirm(twoFactorCode);
-      }
-
       const response = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -131,7 +108,7 @@ export default function LoginPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error);
+        setError(data.error || "Invalid verification code.");
         setIsTwoFactorLoading(false);
         return;
       }
@@ -139,7 +116,7 @@ export default function LoginPage() {
       localStorage.setItem("token", data.token);
       router.push(data.redirect);
     } catch (error) {
-      setError("Invalid verification code or an error occurred.");
+      setError("Invalid verification code or an unexpected error occurred.");
       setIsTwoFactorLoading(false);
     }
   };
@@ -168,7 +145,19 @@ export default function LoginPage() {
         </div>
         {error && (
           <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {error.includes("contact support") ? (
+                <>
+                  {error.split(" If")[0]}.{" "}
+                  <Link href="/contact" className="font-medium text-red-600 hover:text-red-500">
+                    Contact Support
+                  </Link>
+                </>
+              ) : (
+                error
+              )}
+            </AlertDescription>
           </Alert>
         )}
         <div className="relative">
@@ -265,7 +254,7 @@ export default function LoginPage() {
                     Verification Code
                   </Label>
                   <p className="text-sm text-primary-600 mb-2">
-                    We've sent a code to your {verificationMethod === "email" ? "email" : "phone"}. Please enter it below.
+                    We've sent a code to your email. Please enter it below.
                   </p>
                   <Input
                     id="twoFactorCode"
@@ -279,7 +268,6 @@ export default function LoginPage() {
                     maxLength={6}
                   />
                 </div>
-                <div id="recaptcha-container"></div>
                 <Button
                   type="submit"
                   className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium shadow-md hover:shadow-lg transition-all"
