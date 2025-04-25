@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -18,6 +19,7 @@ import {
   Send,
   User,
   X,
+  AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -743,9 +745,17 @@ export default function TransactionDetailPage() {
                 )}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2">
+              {senderTransaction.category === "admin" && (
+                <Alert className="bg-yellow-50 border-yellow-200">
+                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                  <AlertDescription className="text-yellow-700">
+                    Admin transactions are non-refundable.
+                  </AlertDescription>
+                </Alert>
+              )}
               {!editMode.sender && (
-                <>
+                <div className="flex gap-2">
                   <Button
                     variant="outline"
                     onClick={() => setEditMode((prev) => ({ ...prev, sender: true }))}
@@ -757,13 +767,13 @@ export default function TransactionDetailPage() {
                   <Button
                     variant="secondary"
                     onClick={() => setConfirmRefund(true)}
-                    disabled={saving}
+                    disabled={saving || senderTransaction.category === "admin"}
                     className="bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200 hover:text-yellow-800 disabled:bg-gray-100 disabled:text-gray-500 disabled:border-gray-200"
                   >
                     <RefreshCcw className="mr-2 h-4 w-4" />
                     {isGroupTransaction || isInternalTransfer ? "Refund Both Transactions" : "Refund Transaction"}
                   </Button>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -1029,7 +1039,7 @@ export default function TransactionDetailPage() {
                 {editMode.receiver ? (
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="receiver-description" className="text-primary-800 font-medium">Description</Label>
+                      <Label htmlFor="receiver-description" className="text-primary-800 font-medium"> Description</Label>
                       <Input
                         id="receiver-description"
                         value={editFormReceiver.description}

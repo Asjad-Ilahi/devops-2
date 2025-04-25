@@ -54,7 +54,7 @@ interface Transaction {
   userName: string
   userEmail: string
   type: string
-  amount: number // Amount is now always required
+  amount: number
   description: string
   date: string
   status: string
@@ -158,12 +158,21 @@ export default function AdminTransactionsPage() {
 
         const transactionsData = await transactionsRes.json()
         const usersData = await usersRes.json()
+        
+        // Log raw transactions for debugging
+        console.log("Raw transactions:", transactionsData.transactions)
+        console.log("Raw users:", usersData.users)
+        
         // Filter out transactions with invalid amounts
         const validTransactions = transactionsData.transactions.filter(
-          (tx: Transaction) => typeof tx.amount === "number" && !isNaN(tx.amount)
+          (tx: Transaction) => typeof tx.amount === "number" && !isNaN(tx.amount) && tx.userId
         )
         setTransactions(validTransactions)
         setUsers(usersData.users)
+        
+        if (validTransactions.length === 0) {
+          setError("No valid transactions found")
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data")
         console.error("Error fetching data:", err)
@@ -350,6 +359,9 @@ export default function AdminTransactionsPage() {
         return <FileText className="h-5 w-5 text-gray-600" />
       case "refund":
         return <RefreshCcw className="h-5 w-5 text-yellow-600" />
+      case "crypto_buy":
+      case "crypto_sell":
+        return <CreditCard className="h-5 w-5 text-purple-600" />
       default:
         return <CreditCard className="h-5 w-5 text-gray-600" />
     }
@@ -624,6 +636,8 @@ export default function AdminTransactionsPage() {
                     <SelectItem value="payment">Payments</SelectItem>
                     <SelectItem value="fee">Fees</SelectItem>
                     <SelectItem value="interest">Interest</SelectItem>
+                    <SelectItem value="crypto_buy">Crypto Buy</SelectItem>
+                    <SelectItem value="crypto_sell">Crypto Sell</SelectItem>
                     <SelectItem value="refund">Refunds</SelectItem>
                   </SelectContent>
                 </Select>

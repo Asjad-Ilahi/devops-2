@@ -1,11 +1,9 @@
-// app/api/transfer/internal/request/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { sendVerificationEmail, sendVerificationSMS } from "@/lib/email";
-import { RecaptchaVerifier, auth } from "@/firebase";
+import { sendVerificationEmail } from "@/lib/email";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -43,18 +41,9 @@ export async function POST(req: NextRequest) {
     user.pendingTransfer = { from, to, amount, memo, verificationCode, createdAt: new Date() };
     await user.save();
 
-    if (user.verificationMethod === "email") {
-      await sendVerificationEmail(user.email, verificationCode);
-    } else {
-      const recaptchaVerifier = new RecaptchaVerifier(
-        "recaptcha-container-server",
-        { size: "invisible" },
-        auth
-      );
-      await sendVerificationSMS(user.phone, recaptchaVerifier);
-    }
+    await sendVerificationEmail(user.email, verificationCode);
 
-    return NextResponse.json({ message: "Verification code sent" }, { status: 200 });
+    return NextResponse.json({ message: "Verification code sent to your email" }, { status: 200 });
   } catch (error) {
     console.error("Internal transfer request error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

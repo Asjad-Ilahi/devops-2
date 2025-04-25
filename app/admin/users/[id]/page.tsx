@@ -357,7 +357,7 @@ export default function UserManagementPage() {
           type: newTransaction.type,
           amount,
           description: newTransaction.description,
-          category: "Manual",
+          category: "admin",
           accountType: "checking",
         }),
       });
@@ -421,7 +421,7 @@ export default function UserManagementPage() {
           type: newTransaction.type,
           amount,
           description: newTransaction.description,
-          category: "Crypto",
+          category: "admin",
           accountType: "crypto",
           cryptoAmount,
           cryptoPrice,
@@ -500,7 +500,7 @@ export default function UserManagementPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 bg-gradient-to-br from-primary-50 to-secondary-50 min-h-screen">
+    <div className="w-full px-6 bg-gradient-to-br from-primary-50 to-secondary-50 min-h-screen">
       <div className="mb-6">
         <Button
           variant="ghost"
@@ -628,16 +628,7 @@ export default function UserManagementPage() {
                 <Shield className="mr-2 h-4 w-4" />
                 Manage 2FA
               </Button>
-              <Button
-                variant="outline"
-                className="justify-start bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
-                asChild
-              >
-                <Link href={`/admin/users/${userId}/transactions`}>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  View All Transactions
-                </Link>
-              </Button>
+
             </div>
           </CardContent>
         </Card>
@@ -824,11 +815,7 @@ export default function UserManagementPage() {
                             <SelectItem value="withdrawal">Withdrawal</SelectItem>
                             <SelectItem value="transfer">Transfer</SelectItem>
                             <SelectItem value="payment">Payment</SelectItem>
-                            <SelectItem value="fee">Fee</SelectItem>
-                            <SelectItem value="interest">Interest</SelectItem>
-                            <SelectItem value="crypto_buy">Crypto Buy</SelectItem>
-                            <SelectItem value="crypto_sell">Crypto Sell</SelectItem>
-                            <SelectItem value="refund">Refund</SelectItem>
+                            <SelectItem value="crypto_buy">Add Crypto</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -849,7 +836,7 @@ export default function UserManagementPage() {
                           />
                         </div>
                         <p className="text-sm text-primary-600">
-                          Use negative values for withdrawals and adjustments that reduce balance.
+                          Use negative values for withdrawals only that reduce balance.
                         </p>
                       </div>
                       <div className="space-y-2">
