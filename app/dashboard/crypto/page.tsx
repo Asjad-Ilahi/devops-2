@@ -1,0 +1,613 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { AlertCircle, ArrowDown, ArrowLeft, ArrowUp, Bitcoin, DollarSign, Loader2, ArrowDownUp } from "lucide-react"
+import Color from 'color'
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useAuth } from '@/lib/auth'
+import { apiFetch } from '@/lib/api'
+
+// Define transaction interface for type safety
+interface Transaction {
+  id: string
+  type: "buy" | "sell"
+  amount: number
+  value: number
+  price: number
+  date: string
+}
+
+// Define colors interface
+interface Colors {
+  primaryColor: string
+  secondaryColor: string
+}
+
+// Define raw transaction interface from API
+interface RawTransaction {
+  _id: string
+  type: "crypto_buy" | "crypto_sell"
+  cryptoAmount: number
+  amount: number
+  cryptoPrice: number
+  date: string
+}
+
+export default function CryptoPage() {
+  const router = useRouter()
+
+  // States initialized to default values
+  const [accountBalance, setAccountBalance] = useState<number>(0)
+  const [cryptoBalance, setCryptoBalance] = useState<number>(0)
+  const [cryptoValue, setCryptoValue] = useState<number>(0)
+  const [btcPrice, setBtcPrice] = useState<number>(0)
+  const [priceChange, setPriceChange] = useState<number>(0)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [colors, setColors] = useState<Colors | null>(null)
+
+  // Transaction states
+  const [buyAmount, setBuyAmount] = useState<string>("")
+  const [buyEquivalent, setBuyEquivalent] = useState<string>("0")
+  const [sellAmount, setSellAmount] = useState<string>("")
+  const [sellEquivalent, setSellEquivalent] = useState<string>("0")
+
+  // Transaction history initialized as empty array
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+
+  // Use the auth hook to handle token validation and expiration
+  useAuth()
+
+  // Fetch colors (public endpoint, no auth required)
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch('/api/colors')
+        if (!response.ok) {
+          throw new Error('Failed to fetch colors')
+        }
+        const data: Colors = await response.json()
+        setColors(data)
+
+        const primary = Color(data.primaryColor)
+        const secondary = Color(data.secondaryColor)
+
+        const generateShades = (color: typeof Color.prototype) => ({
+          50: color.lighten(0.5).hex(),
+          100: color.lighten(0.4).hex(),
+          200: color.lighten(0.3).hex(),
+          300: color.lighten(0.2).hex(),
+          400: color.lighten(0.1).hex(),
+          500: color.hex(),
+          600: color.darken(0.1).hex(),
+          700: color.darken(0.2).hex(),
+          800: color.darken(0.3).hex(),
+          900: color.darken(0.4).hex(),
+        })
+
+        const primaryShades = generateShades(primary)
+        const secondaryShades = generateShades(secondary)
+
+        Object.entries(primaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--primary-${shade}`, color)
+        })
+
+        Object.entries(secondaryShades).forEach(([shade, color]) => {
+          document.documentElement.style.setProperty(`--secondary-${shade}`, color)
+        })
+      } catch (error: unknown) {
+        console.error('Error fetching colors:', error instanceof Error ? error.message : 'Unknown error')
+      }
+    }
+    fetchColors()
+  }, [])
+
+  // Function to map raw transactions to the Transaction interface with validation
+  const mapRawTransactions = (rawTransactions: RawTransaction[]): Transaction[] => {
+    return rawTransactions
+      .filter((tx) => 
+        tx._id && 
+        (tx.type === "crypto_buy" || tx.type === "crypto_sell") &&
+        typeof tx.cryptoAmount === 'number' &&
+        typeof tx.amount === 'number' &&
+        typeof tx.cryptoPrice === 'number' &&
+        tx.date
+      )
+      .map((tx) => ({
+        id: tx._id,
+        type: tx.type === "crypto_buy" ? "buy" : "sell",
+        amount: Math.abs(tx.cryptoAmount) || 0,
+        value: Math.abs(tx.amount) || 0,
+        price: tx.cryptoPrice || 0,
+        date: new Date(tx.date).toLocaleString() || new Date().toLocaleString(),
+      }))
+  }
+
+  // Effect to fetch initial data and set up price updates
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true)
+      try {
+        // Fetch user data
+        const userResponse = await apiFetch("/api/user")
+        if (!userResponse.ok) throw new Error("Failed to fetch user data")
+        const userData = await userResponse.json()
+        setAccountBalance(userData.balance || 0)
+        setCryptoBalance(userData.cryptoBalance || 0)
+
+        // Fetch BTC price (public endpoint, no auth required)
+        const priceResponse = await fetch("/api/price")
+        if (!priceResponse.ok) throw new Error("Failed to fetch BTC price")
+        const priceData = await priceResponse.json()
+        const newBtcPrice: number = priceData.bitcoin?.usd || 0
+        const newPriceChange: number = priceData.bitcoin?.usd_24h_change || 0
+        setBtcPrice(newBtcPrice)
+        setPriceChange(newPriceChange)
+        setCryptoValue((userData.cryptoBalance || 0) * newBtcPrice)
+
+        // Fetch transactions
+        const txResponse = await apiFetch("/api/transactions")
+        if (!txResponse.ok) throw new Error("Failed to fetch transactions")
+        const txData = await txResponse.json()
+        setTransactions(mapRawTransactions(txData.transactions || []))
+      } catch (error: unknown) {
+        if (error instanceof Error && error.message !== 'Unauthorized') {
+          setError(error.message)
+        } else {
+          setError("Failed to load data")
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+
+    // Update BTC price every 10 minutes
+    const priceInterval = setInterval(async () => {
+      try {
+        const response = await fetch("/api/price")
+        if (!response.ok) throw new Error("Price update failed")
+        const data = await response.json()
+        const newBtcPrice: number = data.bitcoin?.usd || 0
+        const newPriceChange: number = data.bitcoin?.usd_24h_change || 0
+        setBtcPrice(newBtcPrice)
+        setPriceChange(newPriceChange)
+        setCryptoValue(cryptoBalance * newBtcPrice)
+      } catch (error: unknown) {
+        console.error("Price update error:", error instanceof Error ? error.message : 'Unknown error')
+      }
+    }, 600000) // 10 minutes = 600,000 ms
+
+    return () => clearInterval(priceInterval)
+  }, [cryptoBalance])
+
+  // Calculate equivalents when inputs change
+  useEffect(() => {
+    if (buyAmount && btcPrice) {
+      const btcEquivalent = Number.parseFloat(buyAmount) / btcPrice
+      setBuyEquivalent(btcEquivalent.toFixed(8))
+    } else {
+      setBuyEquivalent("0")
+    }
+  }, [buyAmount, btcPrice])
+
+  useEffect(() => {
+    if (sellAmount && btcPrice) {
+      const usdEquivalent = Number.parseFloat(sellAmount) * btcPrice
+      setSellEquivalent(usdEquivalent.toFixed(2))
+    } else {
+      setSellEquivalent("0")
+    }
+  }, [sellAmount, btcPrice])
+
+  // Handle buy BTC with real API call
+  const handleBuyBTC = async () => {
+    setError(null)
+    setSuccess(null)
+
+    if (!buyAmount || Number.parseFloat(buyAmount) <= 0) {
+      setError("Please enter a valid amount to buy")
+      return
+    }
+
+    const buyValue = Number.parseFloat(buyAmount)
+    if (buyValue > accountBalance) {
+      setError("Insufficient funds in your account")
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const response = await apiFetch("/api/crypto-transfer", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "buy",
+          amount: parseFloat(buyEquivalent),
+          btcPrice,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to buy BTC")
+      }
+
+      const data = await response.json()
+      setAccountBalance(data.newCheckingBalance || 0)
+      setCryptoBalance(data.newCryptoBalance || 0)
+      setCryptoValue((data.newCryptoBalance || 0) * btcPrice)
+      setSuccess(data.message)
+      setBuyAmount("")
+
+      // Refetch transactions
+      const txResponse = await apiFetch("/api/transactions")
+      if (!txResponse.ok) throw new Error("Failed to fetch transactions")
+      const txData = await txResponse.json()
+      setTransactions(mapRawTransactions(txData.transactions || []))
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message !== 'Unauthorized') {
+        setError(error.message)
+      } else {
+        setError("Failed to complete the purchase")
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Handle sell BTC with real API call
+  const handleSellBTC = async () => {
+    setError(null)
+    setSuccess(null)
+
+    if (!sellAmount || Number.parseFloat(sellAmount) <= 0) {
+      setError("Please enter a valid amount to sell")
+      return
+    }
+
+    const sellValue = Number.parseFloat(sellAmount)
+    if (sellValue > cryptoBalance) {
+      setError("Insufficient BTC in your wallet")
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const response = await apiFetch("/api/crypto-transfer", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "sell",
+          amount: sellValue,
+          btcPrice,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to sell BTC")
+      }
+
+      const data = await response.json()
+      setAccountBalance(data.newCheckingBalance || 0)
+      setCryptoBalance(data.newCryptoBalance || 0)
+      setCryptoValue((data.newCryptoBalance || 0) * btcPrice)
+      setSuccess(data.message)
+      setSellAmount("")
+
+      // Refetch transactions
+      const txResponse = await apiFetch("/api/transactions")
+      if (!txResponse.ok) throw new Error("Failed to fetch transactions")
+      const txData = await txResponse.json()
+      setTransactions(mapRawTransactions(txData.transactions || []))
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message !== 'Unauthorized') {
+        setError(error.message)
+      } else {
+        setError("Failed to complete the sale")
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
+      <div className="p-6 max-w-5xl mx-auto">
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            asChild
+            className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
+          >
+            <Link href="/dashboard">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Dashboard
+            </Link>
+          </Button>
+          <h1 className="text-3xl font-extrabold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
+            Bitcoin Wallet
+          </h1>
+        </div>
+
+        {/* Overview Cards */}
+        <div className="grid gap-6 md:grid-cols-3 mb-8">
+          <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-amber-500/10 opacity-50 group-hover:opacity-70 transition-opacity"></div>
+            <CardHeader className="pb-2 relative z-10">
+              <CardTitle className="text-sm font-medium text-primary-800">Bitcoin Balance</CardTitle>
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <div className="flex items-baseline">
+                <div className="text-2xl font-bold text-primary-900">{cryptoBalance.toFixed(6)} BTC</div>
+                <Bitcoin className="ml-2 h-5 w-5 text-amber-500" />
+              </div>
+              <p className="text-sm text-primary-700">≈ ${cryptoValue.toFixed(2)}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-blue-500/10 opacity-50 group-hover:opacity-70 transition-opacity"></div>
+            <CardHeader className="pb-2 relative z-10">
+              <CardTitle className="text-sm font-medium text-primary-800">Current BTC Price</CardTitle>
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <div className="flex items-baseline">
+                <div className="text-2xl font-bold text-primary-900">${btcPrice.toFixed(2)}</div>
+                <div className={`ml-2 flex items-center ${priceChange >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                  {priceChange >= 0 ? (
+                    <ArrowUp className="h-4 w-4 mr-1 animate-pulse" />
+                  ) : (
+                    <ArrowDown className="h-4 w-4 mr-1 animate-pulse" />
+                  )}
+                  <span className="text-xs font-bold">{Math.abs(priceChange).toFixed(2)}%</span>
+                </div>
+              </div>
+              <p className="text-sm text-primary-700">24h change</p>
+            </CardContent>
+          </Card>
+
+          <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-green-500/10 opacity-50 group-hover:opacity-70 transition-opacity"></div>
+            <CardHeader className="pb-2 relative z-10">
+              <CardTitle className="text-sm font-medium text-primary-800">Account Balance</CardTitle>
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <div className="text-2xl font-bold text-primary-900">${accountBalance.toFixed(2)}</div>
+              <DollarSign className="ml-2 h-5 w-5 text-emerald-500" />
+              <p className="text-sm text-primary-700">Available for purchases</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Success or Error Messages */}
+        {success && (
+          <Alert className="mb-6 bg-green-50 border border-green-200 text-green-800">
+            <AlertDescription className="text-green-800 font-medium">{success}</AlertDescription>
+          </Alert>
+        )}
+
+        {error && (
+          <Alert variant="destructive" className="mb-6 bg-red-50 border border-red-200">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-700">{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Buy/Sell Tabs */}
+        <div className="mb-8">
+          <Tabs defaultValue="buy">
+            <TabsList className="grid w-full grid-cols-2 bg-primary-100/70 p-1 rounded-lg">
+              <TabsTrigger
+                value="buy"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
+              >
+                Buy Bitcoin
+              </TabsTrigger>
+              <TabsTrigger
+                value="sell"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
+              >
+                Sell Bitcoin
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent
+              value="buy"
+              className="p-6 backdrop-blur-sm bg-white/70 border border-primary-100 rounded-lg shadow-lg mt-4"
+            >
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="buyAmount" className="text-primary-800 font-medium">
+                    Amount (USD)
+                  </Label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-700 font-bold">$</div>
+                    <Input
+                      id="buyAmount"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      className="pl-7 border-primary-200 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      placeholder="0.00"
+                      value={buyAmount}
+                      onChange={(e) => setBuyAmount(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center py-3">
+                  <div className="p-2 bg-primary-100 rounded-full animate-bounce">
+                    <ArrowDownUp className="h-5 w-5 text-primary-600" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-primary-800 font-medium">You'll Receive (BTC)</Label>
+                  <div className="bg-primary-50/70 p-4 rounded-lg flex items-center border border-primary-100">
+                    <Bitcoin className="h-5 w-5 mr-3 text-amber-500" />
+                    <div>
+                      <span className="font-mono text-primary-900 font-bold">{buyEquivalent}</span> BTC
+                    </div>
+                  </div>
+                  <p className="text-xs text-primary-600 font-medium">1 BTC = ${btcPrice.toFixed(2)}</p>
+                </div>
+
+                <Button
+                  className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
+                  onClick={handleBuyBTC}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Buy Bitcoin"
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent
+              value="sell"
+              className="p-6 backdrop-blur-sm bg-white/70 border border-primary-100 rounded-lg shadow-lg mt-4"
+            >
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="sellAmount" className="text-primary-800 font-medium">
+                    Amount (BTC)
+                  </Label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                      <Bitcoin className="h-4 w-4 text-amber-500" />
+                    </div>
+                    <Input
+                      id="sellAmount"
+                      type="number"
+                      min="0.00000001"
+                      step="0.00000001"
+                      className="pl-8 border-primary-200 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      placeholder="0.00000000"
+                      value={sellAmount}
+                      onChange={(e) => setSellAmount(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-primary-700">Available: {cryptoBalance.toFixed(8)} BTC</span>
+                    <button
+                      type="button"
+                      className="text-secondary-600 hover:text-secondary-700 font-medium"
+                      onClick={() => setSellAmount(cryptoBalance.toString())}
+                    >
+                      Max
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center py-3">
+                  <div className="p-2 bg-primary-100 rounded-full animate-bounce">
+                    <ArrowDownUp className="h-5 w-5 text-primary-600" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-primary-800 font-medium">You'll Receive (USD)</Label>
+                  <div className="bg-primary-50/70 p-4 rounded-lg flex items-center border border-primary-100">
+                    <DollarSign className="h-5 w-5 mr-3 text-emerald-500" />
+                    <div>
+                      <span className="font-mono text-primary-900 font-bold">${sellEquivalent}</span> USD
+                    </div>
+                  </div>
+                  <p className="text-xs text-primary-600 font-medium">1 BTC = ${btcPrice.toFixed(2)}</p>
+                </div>
+
+                <Button
+                  className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
+                  onClick={handleSellBTC}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Sell Bitcoin"
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Transaction History */}
+        <div>
+          <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
+            Transaction History
+          </h2>
+          <Card className="backdrop-blur-sm bg-white/70 border border-primary-100 shadow-lg">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-primary-50/50">
+                      <th className="text-left p-4 text-primary-800">Type</th>
+                      <th className="text-left p-4 text-primary-800">Amount</th>
+                      <th className="text-left p-4 text-primary-800">Value (USD)</th>
+                      <th className="text-left p-4 text-primary-800">Price</th>
+                      <th className="text-left p-4 text-primary-800">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-primary-100">
+                    {transactions.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-primary-50/50 transition-colors">
+                        <td className="p-4">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${tx.type === "buy" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                          >
+                            {tx.type === "buy" ? (
+                              <ArrowUp className="mr-1 h-3 w-3" />
+                            ) : (
+                              <ArrowDown className="mr-1 h-3 w-3" />
+                            )}
+                            {tx.type === "buy" ? "Buy" : "Sell"}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <span className="font-mono text-primary-900">{(tx.amount || 0).toFixed(8)}</span> BTC
+                        </td>
+                        <td className="p-4 font-medium text-primary-900">${(tx.value || 0).toFixed(2)}</td>
+                        <td className="p-4 text-primary-700">${(tx.price || 0).toFixed(2)}</td>
+                        <td className="p-4 text-primary-700">{tx.date}</td>
+                      </tr>
+                    ))}
+                    {transactions.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-4 text-center text-primary-500">
+                          No transactions found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}
