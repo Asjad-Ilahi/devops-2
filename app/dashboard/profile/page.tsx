@@ -64,6 +64,7 @@ export default function ProfilePage() {
     zipCode: "",
   })
   const [lastLogin, setLastLogin] = useState<string | null>(null)
+  const [createdAt, setCreatedAt] = useState<string | null>(null)
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -146,6 +147,7 @@ export default function ProfilePage() {
           zipCode: data.zipCode || "",
         })
         setLastLogin(data.lastLogin ? new Date(data.lastLogin).toLocaleString() : "Never")
+        setCreatedAt(data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : "Unknown")
       } catch (error) {
         if (error instanceof Error && error.message !== 'Unauthorized') {
           console.error("Error fetching profile:", error)
@@ -494,7 +496,7 @@ export default function ProfilePage() {
               </div>
               <div className="space-y-1">
                 <h4 className="text-sm font-medium text-primary-800">Account Details</h4>
-                <p className="text-sm text-primary-600">Member since January 15, 2025</p>
+                <p className="text-sm text-primary-600">Member since {createdAt || "Loading..."}</p>
                 <p className="text-sm text-primary-600">Last login: {lastLogin || "Loading..."}</p>
               </div>
             </CardContent>
@@ -753,9 +755,9 @@ export default function ProfilePage() {
                       <p>Password requirements:</p>
                       <ul className="list-disc list-inside pl-4 space-y-1 mt-1">
                         <li>At least 8 characters long</li>
-                        <li>Must include at least one uppercase letter</li>
-                        <li>Must include at least one number</li>
-                        <li>Must include at least one special character</li>
+                        <li>At least one uppercase letter</li>
+                        <li>At least one number</li>
+                        <li>At least one special character</li>
                       </ul>
                     </div>
                   </CardContent>
@@ -803,7 +805,6 @@ export default function ProfilePage() {
                             </SelectTrigger>
                             <SelectContent className="bg-white/90 border-primary-100">
                               <SelectItem value="email">Email</SelectItem>
-                              <SelectItem value="sms">SMS</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

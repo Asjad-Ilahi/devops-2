@@ -1,60 +1,80 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { ArrowLeft, Eye, EyeOff, History, Bitcoin, Plus, ArrowUp, ArrowDown } from "lucide-react"
-import Color from 'color'
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { useAuth } from '@/lib/auth'
-import { apiFetch } from '@/lib/api'
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  History,
+  Bitcoin,
+  Plus,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
+import Color from "color";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/lib/auth";
+import { apiFetch } from "@/lib/api";
 
 interface Account {
-  name: string
-  number: string
-  fullNumber: string
-  balance: number
-  type: string
-  status: string
-  openedDate: string
+  name: string;
+  number: string;
+  fullNumber: string;
+  balance: number;
+  type: string;
+  status: string;
+  openedDate: string;
 }
 
 interface Transaction {
-  id: string
-  description: string
-  amount: number
-  date: string
-  type: string
-  accountType: string
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  type: string;
+  accountType: string;
 }
 
 export default function AccountsPage() {
-  useAuth() // Proactively check token validity and handle expiration
+  useAuth(); // Proactively check token validity and handle expiration
 
-  const [showAccountNumber, setShowAccountNumber] = useState(false)
-  const [showWalletNumber, setShowWalletNumber] = useState(false)
-  const [activeTab, setActiveTab] = useState("checking")
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [btcPrice, setBtcPrice] = useState(44256.32)
-  const [priceChange, setPriceChange] = useState(2.34)
-  const [error, setError] = useState<string | null>(null)
-  const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
+  const [showAccountNumber, setShowAccountNumber] = useState(false);
+  const [showWalletNumber, setShowWalletNumber] = useState(false);
+  const [activeTab, setActiveTab] = useState("checking");
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [btcPrice, setBtcPrice] = useState(44256.32);
+  const [priceChange, setPriceChange] = useState(2.34);
+  const [error, setError] = useState<string | null>(null);
+  const [colors, setColors] = useState<{
+    primaryColor: string;
+    secondaryColor: string;
+  } | null>(null);
 
   // Fetch colors (public endpoint, no auth required)
   useEffect(() => {
     const fetchColors = async () => {
       try {
-        const response = await fetch('/api/colors')
+        const response = await fetch("/api/colors");
         if (!response.ok) {
-          throw new Error('Failed to fetch colors')
+          throw new Error("Failed to fetch colors");
         }
-        const data = await response.json()
-        setColors(data)
+        const data = await response.json();
+        setColors(data);
 
-        const primary = Color(data.primaryColor)
-        const secondary = Color(data.secondaryColor)
+        const primary = Color(data.primaryColor);
+        const secondary = Color(data.secondaryColor);
 
         const generateShades = (color: typeof Color.prototype) => ({
           50: color.lighten(0.5).hex(),
@@ -67,68 +87,33 @@ export default function AccountsPage() {
           700: color.darken(0.2).hex(),
           800: color.darken(0.3).hex(),
           900: color.darken(0.4).hex(),
-        })
+        });
 
-        const primaryShades = generateShades(primary)
-        const secondaryShades = generateShades(secondary)
+        const primaryShades = generateShades(primary);
+        const secondaryShades = generateShades(secondary);
 
         Object.entries(primaryShades).forEach(([shade, color]) => {
-          document.documentElement.style.setProperty(`--primary-${shade}`, color)
-        })
+          document.documentElement.style.setProperty(
+            `--primary-${shade}`,
+            color
+          );
+        });
 
         Object.entries(secondaryShades).forEach(([shade, color]) => {
-          document.documentElement.style.setProperty(`--secondary-${shade}`, color)
-        })
+          document.documentElement.style.setProperty(
+            `--secondary-${shade}`,
+            color
+          );
+        });
       } catch (error: unknown) {
-        console.error('Error fetching colors:', error instanceof Error ? error.message : 'Unknown error')
+        console.error(
+          "Error fetching colors:",
+          error instanceof Error ? error.message : "Unknown error"
+        );
       }
-    }
-    fetchColors()
-  }, [])
-
-  // Static transaction data
-  const transactions: Transaction[] = [
-    {
-      id: "txn-001",
-      description: "Deposit from Bank",
-      amount: 1200.0,
-      date: "2025-03-12",
-      type: "deposit",
-      accountType: "checking",
-    },
-    {
-      id: "txn-002",
-      description: "Coffee Shop",
-      amount: -4.75,
-      date: "2025-03-11",
-      type: "withdrawal",
-      accountType: "checking",
-    },
-    {
-      id: "txn-003",
-      description: "Transfer to John",
-      amount: -50.0,
-      date: "2025-03-10",
-      type: "transfer",
-      accountType: "checking",
-    },
-    {
-      id: "txn-004",
-      description: "Monthly Interest",
-      amount: 2.14,
-      date: "2025-03-01",
-      type: "deposit",
-      accountType: "savings",
-    },
-    {
-      id: "txn-005",
-      description: "Bitcoin Purchase",
-      amount: -0.025,
-      date: "2025-03-01",
-      type: "crypto_buy",
-      accountType: "crypto",
-    },
-  ]
+    };
+    fetchColors();
+  }, []);
 
   // Fetch accounts from API
   useEffect(() => {
@@ -136,18 +121,22 @@ export default function AccountsPage() {
       try {
         const response = await apiFetch("/api/accounts", {
           method: "GET",
-        })
+        });
 
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+          const errorData = await response.json();
+          throw new Error(
+            errorData.error || `HTTP error! status: ${response.status}`
+          );
         }
 
-        const data = await response.json()
+        const data = await response.json();
         const newAccounts: Account[] = [
           {
             name: "Checking Account",
-            number: data.checkingNumber?.slice(-4).padStart(12, "x") || "xxxx-xxxx-xxxx",
+            number:
+              data.checkingNumber?.slice(-4).padStart(12, "x") ||
+              "xxxx-xxxx-xxxx",
             fullNumber: data.checkingNumber || "Not Available",
             balance: data.checkingBalance || 0,
             type: "checking",
@@ -156,7 +145,9 @@ export default function AccountsPage() {
           },
           {
             name: "Savings Account",
-            number: data.savingsNumber?.slice(-4).padStart(12, "x") || "xxxx-xxxx-xxxx",
+            number:
+              data.savingsNumber?.slice(-4).padStart(12, "x") ||
+              "xxxx-xxxx-xxxx",
             fullNumber: data.savingsNumber || "Not Available",
             balance: data.savingsBalance || 0,
             type: "savings",
@@ -165,20 +156,22 @@ export default function AccountsPage() {
           },
           {
             name: "Bitcoin Wallet",
-            number: data.cryptoNumber?.slice(-4).padStart(12, "x") || "xxxx-xxxx-xxxx",
+            number:
+              data.cryptoNumber?.slice(-4).padStart(12, "x") ||
+              "xxxx-xxxx-xxxx",
             fullNumber: data.cryptoNumber || "Not Available",
             balance: data.cryptoBalance || 0,
             type: "crypto",
             status: "active",
             openedDate: data.openedDate || "N/A",
           },
-        ]
-        setAccounts(newAccounts)
-        setError(null)
+        ];
+        setAccounts(newAccounts);
+        setError(null);
       } catch (error: unknown) {
-        if (error instanceof Error && error.message !== 'Unauthorized') {
-          console.error("Fetch error:", error.message)
-          setError(error.message)
+        if (error instanceof Error && error.message !== "Unauthorized") {
+          console.error("Fetch error:", error.message);
+          setError(error.message);
           setAccounts([
             {
               name: "Checking Account",
@@ -207,26 +200,59 @@ export default function AccountsPage() {
               status: "active",
               openedDate: "N/A",
             },
-          ])
+          ]);
         }
       }
-    }
+    };
 
-    fetchAccounts()
-  }, [])
+    fetchAccounts();
+  }, []);
+
+  // Fetch transactions for the active account type
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        const response = await apiFetch(
+          `/api/accounts/transactions?accountType=${activeTab}`,
+          {
+            method: "GET",
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.error || `HTTP error! status: ${response.status}`
+          );
+        }
+
+        const data = await response.json();
+        setTransactions(data.transactions);
+        setError(null);
+      } catch (error: unknown) {
+        if (error instanceof Error && error.message !== "Unauthorized") {
+          console.error("Fetch transactions error:", error.message);
+          setError(error.message);
+          setTransactions([]);
+        }
+      }
+    };
+
+    fetchTransactions();
+  }, [activeTab]);
 
   // Simulate BTC price updates
   useEffect(() => {
     const interval = setInterval(() => {
       setBtcPrice((prevPrice) => {
-        const priceDelta = Math.random() * 400 - 200
-        return Math.max(prevPrice + priceDelta, 30000)
-      })
-      setPriceChange(Math.random() * 6 - 3)
-    }, 15000)
+        const priceDelta = Math.random() * 400 - 200;
+        return Math.max(prevPrice + priceDelta, 30000);
+      });
+      setPriceChange(Math.random() * 6 - 3);
+    }, 15000);
 
-    return () => clearInterval(interval)
-  }, [])
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
@@ -276,7 +302,8 @@ export default function AccountsPage() {
           </TabsList>
 
           {accounts.map((account) => {
-            const cryptoValue = account.type === "crypto" ? account.balance * btcPrice : 0
+            const cryptoValue =
+              account.type === "crypto" ? account.balance * btcPrice : 0;
             return (
               <TabsContent key={account.type} value={account.type}>
                 <div className="grid gap-6 md:grid-cols-2">
@@ -286,15 +313,19 @@ export default function AccountsPage() {
                         account.type === "checking"
                           ? "bg-gradient-to-br from-primary-500/10 to-blue-500/10"
                           : account.type === "savings"
-                            ? "bg-gradient-to-br from-emerald-500/10 to-green-500/10"
-                            : "bg-gradient-to-br from-amber-500/10 to-orange-500/10"
+                          ? "bg-gradient-to-br from-emerald-500/10 to-green-500/10"
+                          : "bg-gradient-to-br from-amber-500/10 to-orange-500/10"
                       }`}
                     ></div>
                     <CardHeader className="relative z-10">
                       <div className="flex justify-between items-center">
                         <div>
-                          <CardTitle className="text-xl font-bold text-primary-900">{account.name}</CardTitle>
-                          <CardDescription className="text-primary-700">Account Details</CardDescription>
+                          <CardTitle className="text-xl font-bold text-primary-900">
+                            {account.name}
+                          </CardTitle>
+                          <CardDescription className="text-primary-700">
+                            Account Details
+                          </CardDescription>
                         </div>
                         <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-none">
                           {account.status}
@@ -305,7 +336,9 @@ export default function AccountsPage() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="text-primary-600 font-medium">
-                            {account.type === "crypto" ? "Bitcoin Balance" : "Current Balance"}
+                            {account.type === "crypto"
+                              ? "Bitcoin Balance"
+                              : "Current Balance"}
                           </span>
                           <div className="flex items-center">
                             <span className="font-bold text-lg text-primary-900">
@@ -313,22 +346,34 @@ export default function AccountsPage() {
                                 ? `${account.balance.toFixed(6)} BTC`
                                 : `$${account.balance.toFixed(2)}`}
                             </span>
-                            {account.type === "crypto" && <Bitcoin className="ml-2 h-5 w-5 text-amber-500" />}
+                            {account.type === "crypto" && (
+                              <Bitcoin className="ml-2 h-5 w-5 text-amber-500" />
+                            )}
                           </div>
                         </div>
                         {account.type === "crypto" && (
                           <>
                             <div className="flex justify-between text-sm">
-                              <span className="text-primary-600 font-medium">USD Value</span>
-                              <span className="font-medium text-primary-900">${cryptoValue.toFixed(2)}</span>
+                              <span className="text-primary-600 font-medium">
+                                USD Value
+                              </span>
+                              <span className="font-medium text-primary-900">
+                                ${cryptoValue.toFixed(2)}
+                              </span>
                             </div>
                             <div className="flex justify-between text-sm">
-                              <span className="text-primary-600 font-medium">Current BTC Price</span>
+                              <span className="text-primary-600 font-medium">
+                                Current BTC Price
+                              </span>
                               <div className="flex items-center">
-                                <span className="font-medium text-primary-900">${btcPrice.toFixed(2)}</span>
+                                <span className="font-medium text-primary-900">
+                                  ${btcPrice.toFixed(2)}
+                                </span>
                                 <div
                                   className={`ml-2 flex items-center ${
-                                    priceChange >= 0 ? "text-emerald-500" : "text-red-500"
+                                    priceChange >= 0
+                                      ? "text-emerald-500"
+                                      : "text-red-500"
                                   }`}
                                 >
                                   {priceChange >= 0 ? (
@@ -336,7 +381,9 @@ export default function AccountsPage() {
                                   ) : (
                                     <ArrowDown className="h-3 w-3 mr-1" />
                                   )}
-                                  <span className="text-xs font-bold">{Math.abs(priceChange).toFixed(2)}%</span>
+                                  <span className="text-xs font-bold">
+                                    {Math.abs(priceChange).toFixed(2)}%
+                                  </span>
                                 </div>
                               </div>
                             </div>
@@ -347,15 +394,17 @@ export default function AccountsPage() {
                       <div className="pt-4 border-t border-primary-100 space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-primary-600 font-medium">
-                            {account.type === "crypto" ? "Wallet Number" : "Account Number"}
+                            {account.type === "crypto"
+                              ? "Wallet Number"
+                              : "Account Number"}
                           </span>
                           <div className="flex items-center">
                             <span className="font-mono mr-2 text-primary-900">
                               {account.type === "crypto" && showWalletNumber
                                 ? account.fullNumber
                                 : showAccountNumber
-                                  ? account.fullNumber
-                                  : account.number}
+                                ? account.fullNumber
+                                : account.number}
                             </span>
                             <Button
                               variant="ghost"
@@ -367,7 +416,11 @@ export default function AccountsPage() {
                                   : setShowAccountNumber(!showAccountNumber)
                               }
                             >
-                              {(account.type === "crypto" ? showWalletNumber : showAccountNumber) ? (
+                              {(
+                                account.type === "crypto"
+                                  ? showWalletNumber
+                                  : showAccountNumber
+                              ) ? (
                                 <EyeOff className="h-4 w-4" />
                               ) : (
                                 <Eye className="h-4 w-4" />
@@ -376,12 +429,20 @@ export default function AccountsPage() {
                           </div>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-primary-600 font-medium">Account Type</span>
-                          <span className="capitalize text-primary-900">{account.type}</span>
+                          <span className="text-primary-600 font-medium">
+                            Account Type
+                          </span>
+                          <span className="capitalize text-primary-900">
+                            {account.type}
+                          </span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-primary-600 font-medium">Opened On</span>
-                          <span className="text-primary-900">{account.openedDate}</span>
+                          <span className="text-primary-600 font-medium">
+                            Opened On
+                          </span>
+                          <span className="text-primary-900">
+                            {account.openedDate}
+                          </span>
                         </div>
                       </div>
                     </CardContent>
@@ -390,13 +451,21 @@ export default function AccountsPage() {
                         asChild
                         className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white shadow-md hover:shadow-lg transition-all"
                       >
-                        <Link href={account.type === "crypto" ? "/dashboard/crypto" : "/dashboard/transfers"}>
+                        <Link
+                          href={
+                            account.type === "crypto"
+                              ? "/dashboard/crypto"
+                              : "/dashboard/transfers"
+                          }
+                        >
                           {account.type === "crypto" ? (
                             <Bitcoin className="mr-2 h-4 w-4" />
                           ) : (
                             <Plus className="mr-2 h-4 w-4" />
                           )}
-                          {account.type === "crypto" ? "Manage Crypto" : "New Transaction"}
+                          {account.type === "crypto"
+                            ? "Manage Crypto"
+                            : "New Transaction"}
                         </Link>
                       </Button>
                     </CardFooter>
@@ -408,7 +477,9 @@ export default function AccountsPage() {
                         <CardTitle className="text-xl font-bold text-primary-900">
                           Recent {account.name} Transactions
                         </CardTitle>
-                        <CardDescription className="text-primary-700">Last 5 transactions on this account</CardDescription>
+                        <CardDescription className="text-primary-700">
+                          Last 5 transactions on this account
+                        </CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
@@ -421,10 +492,20 @@ export default function AccountsPage() {
                                 className="flex justify-between items-center p-3 rounded-lg hover:bg-primary-50/50 transition-colors"
                               >
                                 <div>
-                                  <div className="font-medium text-primary-900">{tx.description}</div>
-                                  <div className="text-sm text-primary-600">{new Date(tx.date).toLocaleDateString()}</div>
+                                  <div className="font-medium text-primary-900">
+                                    {tx.description}
+                                  </div>
+                                  <div className="text-sm text-primary-600">
+                                    {new Date(tx.date).toLocaleDateString()}
+                                  </div>
                                 </div>
-                                <div className={`font-bold ${tx.amount > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                <div
+                                  className={`font-bold ${
+                                    tx.amount > 0
+                                      ? "text-emerald-600"
+                                      : "text-red-600"
+                                  }`}
+                                >
                                   {tx.amount > 0 ? "+" : ""}
                                   {account.type === "crypto"
                                     ? `${tx.amount.toFixed(6)} BTC`
@@ -432,8 +513,12 @@ export default function AccountsPage() {
                                 </div>
                               </div>
                             ))}
-                          {transactions.filter((tx) => tx.accountType === account.type).length === 0 && (
-                            <div className="text-center text-primary-600">No transactions found.</div>
+                          {transactions.filter(
+                            (tx) => tx.accountType === account.type
+                          ).length === 0 && (
+                            <div className="text-center text-primary-600">
+                              No transactions found.
+                            </div>
                           )}
                         </div>
                       </CardContent>
@@ -453,10 +538,10 @@ export default function AccountsPage() {
                   </div>
                 </div>
               </TabsContent>
-            )
+            );
           })}
         </Tabs>
       </div>
     </div>
-  )
+  );
 }

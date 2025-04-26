@@ -4,7 +4,7 @@ import type React from "react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Check, Eye, EyeOff, Loader2 } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,8 +42,8 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [step, setStep] = useState(1);
-  const [success, setSuccess] = useState(false);
   const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null);
+  const [settings, setSettings] = useState<any>(null);
 
   useEffect(() => {
     const fetchColors = async () => {
@@ -82,6 +82,21 @@ export default function RegisterPage() {
       }
     };
     fetchColors();
+
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch("/api/home");
+        if (response.ok) {
+          const data = await response.json();
+          setSettings(data);
+        } else {
+          console.error("Failed to fetch settings");
+        }
+      } catch (error) {
+        console.error("Error fetching settings:", error);
+      }
+    };
+    fetchSettings();
   }, []);
 
   const usStates = [
@@ -324,10 +339,7 @@ export default function RegisterPage() {
         return;
       }
       console.log("Registration successful");
-      setSuccess(true);
-      setTimeout(() => {
-        router.push("/login");
-      }, 3000);
+      router.push("/registration-success");
     } catch (error: any) {
       console.error("Registration error:", error);
       setErrors({ form: `An unexpected error occurred: ${error.message}` });
@@ -421,35 +433,6 @@ export default function RegisterPage() {
     if (errors.zipCode) setErrors({ ...errors, zipCode: "" });
   };
 
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 px-4 py-12 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-          <div className="absolute top-10 left-10 w-72 h-72 bg-green-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-          <div className="absolute top-0 right-10 w-72 h-72 bg-primary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-          <div className="absolute bottom-10 left-20 w-72 h-72 bg-secondary-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
-        </div>
-        <div className="w-full max-w-md text-center space-y-6 backdrop-blur-sm bg-white/70 p-8 rounded-xl shadow-xl border border-green-100 z-10">
-          <div className="mx-auto w-20 h-20 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
-            <Check className="h-10 w-10 text-white" />
-          </div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-            Registration Successful
-          </h2>
-          <p className="text-primary-700">
-            Your account has been created. You will be redirected to the login page shortly.
-          </p>
-          <Button
-            asChild
-            className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
-          >
-            <Link href="/login">Return to Login</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 px-4 py-12 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
@@ -459,7 +442,19 @@ export default function RegisterPage() {
       </div>
       <div className="w-full max-w-md space-y-8 z-10">
         <div className="text-center">
-          <img src="/zelle-logo.svg" alt="Zelle" className="h-16 w-auto mx-auto drop-shadow-md" />
+        {settings?.logoUrl ? (
+  <img
+    src={settings.logoUrl}
+    alt="Site Logo"
+    className="h-16 w-auto mx-auto drop-shadow-md"
+  />
+) : (
+  <img
+    src="/zelle-logo.svg"
+    alt="Zelle"
+    className="h-16 w-auto mx-auto drop-shadow-md"
+  />
+)}
           <h2 className="mt-6 text-4xl font-extrabold tracking-tight bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
             Create your account
           </h2>
@@ -812,7 +807,6 @@ export default function RegisterPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="email">Email</SelectItem>
-                      <SelectItem value="phone">Phone (SMS)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -846,11 +840,11 @@ export default function RegisterPage() {
             <div className="text-center">
               <p className="text-sm text-primary-700">
                 By creating an account, you agree to our{" "}
-                <Link href="#" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
+                <Link href="/terms-of-services" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
                   Terms of Service
                 </Link>{" "}
                 and{" "}
-                <Link href="#" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
+                <Link href="privacy-policy" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
                   Privacy Policy
                 </Link>
               </p>

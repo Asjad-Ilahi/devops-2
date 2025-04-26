@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Color from 'color';
+import imageCompression from 'browser-image-compression';
 
 export default function AdminSettingsPage() {
   const router = useRouter();
@@ -150,14 +151,26 @@ export default function AdminSettingsPage() {
     setSettings({ ...settings, [name]: value });
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>, field: "logoUrl" | "zelleLogoUrl") => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: "logoUrl" | "zelleLogoUrl") => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSettings({ ...settings, [field]: reader.result as string });
-      };
-      reader.readAsDataURL(file);
+      try {
+        // Compress the image before uploading
+        const options = {
+          maxSizeMB: 0.2, // Limit to 200KB
+          maxWidthOrHeight: 800, // Resize to max 800px width or height
+          useWebWorker: true,
+        };
+        const compressedFile = await imageCompression(file, options);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setSettings({ ...settings, [field]: reader.result as string });
+        };
+        reader.readAsDataURL(compressedFile);
+      } catch (error) {
+        console.error('Image compression error:', error);
+        setError("Failed to compress image. Please try again.");
+      }
     }
   };
 
@@ -482,7 +495,12 @@ export default function AdminSettingsPage() {
                       </Button>
                     </div>
                     {settings.logoUrl && (
-                      <img src={settings.logoUrl} alt="Logo preview" className="h-10 w-auto rounded" />
+                      <img
+                        src={settings.logoUrl}
+                        alt="Logo preview"
+                        className="h-10 w-auto rounded"
+                        loading="lazy"
+                      />
                     )}
                   </div>
                 </div>
@@ -507,7 +525,12 @@ export default function AdminSettingsPage() {
                       </Button>
                     </div>
                     {settings.zelleLogoUrl && (
-                      <img src={settings.zelleLogoUrl} alt="Zelle Logo preview" className="h-10 w-auto rounded" />
+                      <img
+                        src={settings.zelleLogoUrl}
+                        alt="Zelle Logo preview"
+                        className="h-10 w-auto rounded"
+                        loading="lazy"
+                      />
                     )}
                   </div>
                 </div>
@@ -568,6 +591,7 @@ export default function AdminSettingsPage() {
                             src={settings.logoUrl || "/placeholder.svg"}
                             alt="Logo"
                             className="h-8 w-auto"
+                            loading="lazy"
                           />
                           <span className="font-bold">{settings.siteName}</span>
                         </div>

@@ -12,21 +12,29 @@ async function connectDB() {
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-    // Fetch settings with lean() and safely cast to ISettings
-    const settings = (await Settings.findOne().lean()) as unknown as ISettings;
+    // Fetch settings with lean() and select only needed fields
+    const settings = (await Settings.findOne()
+      .select('logoUrl facebookUrl twitterUrl instagramUrl zelleLogoUrl')
+      .lean()) as unknown as ISettings;
     
     if (!settings) {
       return NextResponse.json({ error: 'Settings not found' }, { status: 404 });
     }
 
     // Destructure the properties
-    const { facebookUrl, twitterUrl, instagramUrl } = settings;
+    const { logoUrl, facebookUrl, twitterUrl, instagramUrl, zelleLogoUrl } = settings;
     
-    return NextResponse.json({
+    const response = NextResponse.json({
+      logoUrl,
       facebookUrl,
       twitterUrl,
       instagramUrl,
+      zelleLogoUrl,
     });
+    
+    // Add caching headers
+    response.headers.set('Cache-Control', 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=43200');
+    return response;
   } catch (error) {
     console.error('Settings fetch error:', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

@@ -108,9 +108,10 @@ export default function AdminDashboardPage() {
   const [transactionError, setTransactionError] = useState<string | null>(null)
   const [approvalError, setApprovalError] = useState<string | null>(null)
   const [colors, setColors] = useState<Colors | null>(null)
+  const [settings, setSettings] = useState<any>(null)
   const [loadingActions, setLoadingActions] = useState<{ [key: string]: boolean }>({})
 
-  // Fetch colors
+  // Fetch colors and settings
   useEffect(() => {
     const fetchColors = async () => {
       try {
@@ -149,7 +150,23 @@ export default function AdminDashboardPage() {
         console.error("Error fetching colors:", error)
       }
     }
+
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch("/api/home")
+        if (response.ok) {
+          const data = await response.json()
+          setSettings(data)
+        } else {
+          setSettings(null)
+        }
+      } catch (error) {
+        setSettings(null)
+      }
+    }
+
     fetchColors()
+    fetchSettings()
   }, [])
 
   // Authentication check and data fetching
@@ -439,7 +456,11 @@ export default function AdminDashboardPage() {
       <div className="hidden md:flex border-r bg-gradient-to-br from-primary-800 to-secondary-900 text-white w-64 flex-col fixed inset-y-0">
         <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
           <div className="flex items-center gap-2">
-            <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+            {settings?.logoUrl ? (
+              <img src={settings.logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
+            ) : (
+              <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+            )}
             <Badge variant="secondary">Admin</Badge>
           </div>
         </div>
@@ -508,7 +529,11 @@ export default function AdminDashboardPage() {
               <div className="flex h-full flex-col bg-gradient-to-br from-primary-800 to-secondary-900 text-white">
                 <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
                   <div className="flex items-center gap-2">
-                    <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+                    {settings?.logoUrl ? (
+                      <img src={settings.logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
+                    ) : (
+                      <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+                    )}
                     <Badge variant="secondary">Admin</Badge>
                   </div>
                 </div>

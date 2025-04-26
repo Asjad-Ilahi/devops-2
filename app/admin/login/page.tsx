@@ -36,8 +36,9 @@ export default function AdminLoginPage() {
   const [twoFactorCode, setTwoFactorCode] = useState<string>("")
   const [isMounted, setIsMounted] = useState<boolean>(false)
   const [colors, setColors] = useState<Colors | null>(null)
+  const [settings, setSettings] = useState<any>(null)
 
-  // Fetch colors and set CSS custom properties
+  // Fetch colors and settings
   useEffect(() => {
     const fetchColors = async () => {
       try {
@@ -76,7 +77,23 @@ export default function AdminLoginPage() {
         console.error("Error fetching colors:", error)
       }
     }
+
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch("/api/home")
+        if (response.ok) {
+          const data = await response.json()
+          setSettings(data)
+        } else {
+          setSettings(null)
+        }
+      } catch (error) {
+        setSettings(null)
+      }
+    }
+
     fetchColors()
+    fetchSettings()
   }, [])
 
   // Check authentication token and handle hydration
@@ -193,7 +210,11 @@ export default function AdminLoginPage() {
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              <img src="/zelle-logo.svg" alt="Zelle" className="h-10 w-auto" />
+              {settings?.logoUrl ? (
+                <img src={settings.logoUrl} alt="Site Logo" className="h-10 w-auto" />
+              ) : (
+                <img src="/zelle-logo.svg" alt="Zelle" className="h-10 w-auto" />
+              )}
               <span className="ml-2 text-gray-800 font-bold text-xl">Admin Portal</span>
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-primary-900">Administrator Login</h1>

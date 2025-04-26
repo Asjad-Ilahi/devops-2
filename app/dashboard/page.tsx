@@ -73,8 +73,9 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [recentContacts, setRecentContacts] = useState<Contact[]>([])
   const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
+  const [settings, setSettings] = useState<any>(null)
 
-  // Fetch colors
+  // Fetch colors and settings
   useEffect(() => {
     const fetchColors = async () => {
       try {
@@ -116,7 +117,23 @@ export default function DashboardPage() {
         console.error('Error fetching colors:', error)
       }
     }
+
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch("/api/home")
+        if (response.ok) {
+          const data = await response.json()
+          setSettings(data)
+        } else {
+          setSettings(null)
+        }
+      } catch (error) {
+        setSettings(null)
+      }
+    }
+
     fetchColors()
+    fetchSettings()
   }, [])
 
   // Fetch user data and transactions on mount
@@ -203,7 +220,11 @@ export default function DashboardPage() {
           <div className="flex h-full flex-col bg-gradient-to-br from-primary-800 to-secondary-900 text-white">
             <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
               <div className="flex items-center gap-2">
-                <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+                {settings?.logoUrl ? (
+                  <img src={settings.logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
+                ) : (
+                  <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+                )}
               </div>
             </div>
             <nav className="flex-1 overflow-auto py-2">
@@ -266,7 +287,11 @@ export default function DashboardPage() {
       <div className="hidden md:flex border-r bg-gradient-to-br from-primary-800 to-secondary-900 text-white w-64 flex-col fixed inset-y-0">
         <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
           <div className="flex items-center gap-2">
-            <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+            {settings?.logoUrl ? (
+              <img src={settings.logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
+            ) : (
+              <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+            )}
           </div>
         </div>
         <nav className="flex-1 overflow-auto py-4">

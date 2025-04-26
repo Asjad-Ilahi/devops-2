@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
 
       user.twoFactorCode = null;
       user.twoFactorCodeExpires = null;
+      user.lastLogin = new Date(); // Store current timestamp for last login
       await user.save();
 
       const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "1h" });

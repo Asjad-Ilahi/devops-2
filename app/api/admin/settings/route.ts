@@ -25,7 +25,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Settings not found' }, { status: 404 });
     }
     
-    return NextResponse.json(settings);
+    const response = NextResponse.json(settings);
+    response.headers.set('Cache-Control', 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=43200');
+    return response;
   } catch (error) {
     console.error('Settings fetch error:', error);
     return NextResponse.json({ error: 'Invalid token or server error' }, { status: 500 });
@@ -64,8 +66,8 @@ export async function PUT(request: NextRequest) {
         facebookUrl: data.facebookUrl || '',
         privacyPolicy: data.privacyPolicy,
         termsOfService: data.termsOfService,
-        primaryColor: data.primaryColor || '',
-        secondaryColor: data.secondaryColor || '',
+        primaryColor: data.primaryColor || '#5f6cd3',
+        secondaryColor: data.secondaryColor || '#9c65d2',
         logoUrl: data.logoUrl || '',
         zelleLogoUrl: data.zelleLogoUrl || '',
         checkingIcon: data.checkingIcon || '',
@@ -74,7 +76,9 @@ export async function PUT(request: NextRequest) {
       { upsert: true, new: true }
     );
 
-    return NextResponse.json({ message: 'Settings updated successfully', settings });
+    const response = NextResponse.json({ message: 'Settings updated successfully', settings });
+    response.headers.set('Cache-Control', 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=43200');
+    return response;
   } catch (error) {
     console.error('Settings update error:', error);
     return NextResponse.json({ error: 'Invalid token or server error' }, { status: 500 });

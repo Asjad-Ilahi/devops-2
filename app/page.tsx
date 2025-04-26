@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import Color from 'color';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import Color from "color";
 import {
   ArrowRight,
   CheckCircle,
@@ -20,50 +20,50 @@ import {
   Users,
   Award,
   LucideIcon,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 // Define interfaces for component props
 interface FeatureItemProps {
-  icon: LucideIcon
-  title: string
-  description: string
+  icon: LucideIcon;
+  title: string;
+  description: string;
 }
 
 interface FaqItemProps {
-  question: string
-  answer: string
+  question: string;
+  answer: string;
 }
 
 interface FeatureCardProps {
-  icon: LucideIcon
-  title: string
-  description: string
-  checkItems: string[]
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  checkItems: string[];
 }
 
 interface TrustBadgeProps {
-  icon: LucideIcon
-  text: string
+  icon: LucideIcon;
+  text: string;
 }
 
 interface AnimatedBackgroundProps {
-  className?: string
-  children: React.ReactNode
+  className?: string;
+  children: React.ReactNode;
 }
 
 interface DecorativeCircleProps {
-  size?: "sm" | "md" | "lg" | "xl"
-  position?: string
-  color?: "primary" | "secondary" | "accent"
-  className?: string
+  size?: "sm" | "md" | "lg" | "xl";
+  position?: string;
+  color?: "primary" | "secondary" | "accent";
+  className?: string;
 }
 
 interface AnimatedCounterProps {
-  end: number
-  duration?: number
-  prefix?: string
-  suffix?: string
+  end: number;
+  duration?: number;
+  prefix?: string;
+  suffix?: string;
 }
 
 // Enhanced animations and effects (unchanged)
@@ -108,7 +108,7 @@ const enhancedStyles = `
   .animate-rotate-slow {
     animation: rotate-slow 15s linear infinite;
   }
-`
+`;
 
 function FeatureItem({ icon: Icon, title, description }: FeatureItemProps) {
   return (
@@ -123,11 +123,11 @@ function FeatureItem({ icon: Icon, title, description }: FeatureItemProps) {
         <p className="text-gray-600">{description}</p>
       </div>
     </div>
-  )
+  );
 }
 
 function FaqItem({ question, answer }: FaqItemProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div className="group">
@@ -135,14 +135,30 @@ function FaqItem({ question, answer }: FaqItemProps) {
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center justify-between p-5 rounded-xl text-left transition-all duration-200 ${
           isOpen
-            ? "bg-primary text-white shadow-lg"
+            ? "bg-primary shadow-lg"
             : "bg-white hover:bg-primary-50 text-gray-900 border border-gray-200"
         } cursor-pointer`}
         aria-expanded={isOpen}
       >
-        <span className="font-medium text-lg">{question}</span>
-        <span className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}>
-          {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+        <span
+          className={`font-medium text-lg ${
+            isOpen
+              ? "bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-600"
+              : "text-gray-900"
+          }`}
+        >
+          {question}
+        </span>
+        <span
+          className={`transition-transform duration-200 ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        >
+          {isOpen ? (
+            <ChevronUp className="h-5 w-5 text-white" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-gray-900" />
+          )}
         </span>
       </button>
       <div
@@ -151,16 +167,23 @@ function FaqItem({ question, answer }: FaqItemProps) {
         }`}
       >
         <div
-          className={`p-5 bg-white border-x border-b rounded-b-xl ${isOpen ? "animate-accordion-down" : "animate-accordion-up"}`}
+          className={`p-5 bg-white border-x border-b rounded-b-xl ${
+            isOpen ? "animate-accordion-down" : "animate-accordion-up"
+          }`}
         >
           <p className="text-gray-600">{answer}</p>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-function FeatureCard({ icon: Icon, title, description, checkItems }: FeatureCardProps) {
+function FeatureCard({
+  icon: Icon,
+  title,
+  description,
+  checkItems,
+}: FeatureCardProps) {
   return (
     <div className="flex flex-col h-full p-6 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-xl hover:border-primary-200 transition-all duration-300 hover:-translate-y-1 group">
       <div className="p-3 bg-primary-100 rounded-full w-12 h-12 flex items-center justify-center mb-4 group-hover:bg-primary-100 transition-colors duration-300">
@@ -179,19 +202,24 @@ function FeatureCard({ icon: Icon, title, description, checkItems }: FeatureCard
         ))}
       </ul>
     </div>
-  )
+  );
 }
 
 function TrustBadge({ icon: Icon, text }: TrustBadgeProps) {
   return (
     <div className="flex items-center transition-all duration-300 hover:scale-110 hover:text-primary-600 group">
-      <Icon className="h-6 w-6 text-primary-600 mr-2 group-hover:text-primary-700" />
-      <span className="text-gray-700 font-medium group-hover:text-primary-600">{text}</span>
+      <Icon className="h-4 w-4 sm:h-5 md:h-6 sm:w-5 md:w-6 text-primary-600 mr-2 group-hover:text-primary-700" />
+      <span className="text-sm sm:text-base font-medium group-hover:text-primary-600">
+        {text}
+      </span>
     </div>
-  )
+  );
 }
 
-function AnimatedBackground({ className = "", children }: AnimatedBackgroundProps) {
+function AnimatedBackground({
+  className = "",
+  children,
+}: AnimatedBackgroundProps) {
   return (
     <div className={`relative overflow-hidden ${className}`}>
       <div className="absolute top-0 left-0 w-full h-full">
@@ -202,87 +230,100 @@ function AnimatedBackground({ className = "", children }: AnimatedBackgroundProp
       </div>
       <div className="relative z-10">{children}</div>
     </div>
-  )
+  );
 }
 
-function DecorativeCircle({ size = "md", position, color = "primary", className = "" }: DecorativeCircleProps) {
+function DecorativeCircle({
+  size = "md",
+  position,
+  color = "primary",
+  className = "",
+}: DecorativeCircleProps) {
   const sizeClasses = {
     sm: "w-16 h-16",
     md: "w-24 h-24",
     lg: "w-32 h-32",
     xl: "w-48 h-48",
-  }
+  };
   const colorClasses = {
     primary: "bg-primary/10",
     secondary: "bg-primary-200/20",
     accent: "bg-primary-300/15",
-  }
+  };
   return (
     <div
       className={`absolute rounded-full animate-rotate-slow ${sizeClasses[size]} ${colorClasses[color]} ${className}`}
     ></div>
-  )
+  );
 }
 
-function AnimatedCounter({ end, duration = 2000, prefix = "", suffix = "" }: AnimatedCounterProps) {
-  const [count, setCount] = useState(0)
+function AnimatedCounter({
+  end,
+  duration = 2000,
+  prefix = "",
+  suffix = "",
+}: AnimatedCounterProps) {
+  const [count, setCount] = useState(0);
   useEffect(() => {
-    let startTime: number
-    let animationFrame: number
+    let startTime: number;
+    let animationFrame: number;
     const animate = (timestamp: number) => {
-      if (!startTime) startTime = timestamp
-      const progress = timestamp - startTime
-      const percentage = Math.min(progress / duration, 1)
-      setCount(Math.floor(percentage * end))
+      if (!startTime) startTime = timestamp;
+      const progress = timestamp - startTime;
+      const percentage = Math.min(progress / duration, 1);
+      setCount(Math.floor(percentage * end));
       if (percentage < 1) {
-        animationFrame = requestAnimationFrame(animate)
+        animationFrame = requestAnimationFrame(animate);
       }
-    }
-    animationFrame = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(animationFrame)
-  }, [end, duration])
+    };
+    animationFrame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [end, duration]);
   return (
     <span className="font-bold text-4xl text-primary-600">
       {prefix}
       {count.toLocaleString()}
       {suffix}
     </span>
-  )
+  );
 }
 
 export default function Home() {
-  const [settings, setSettings] = useState<any>(null)
-  const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
+  const [settings, setSettings] = useState<any>(null);
+  const [colors, setColors] = useState<{
+    primaryColor: string;
+    secondaryColor: string;
+  } | null>(null);
 
-  // Fetch settings for social media URLs (unchanged)
+  // Fetch settings for logo and social media URLs
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch('/api/home')
+        const response = await fetch("/api/home");
         if (response.ok) {
-          const data = await response.json()
-          setSettings(data)
+          const data = await response.json();
+          setSettings(data);
         } else {
-          console.error('Failed to fetch settings')
+          console.error("Failed to fetch settings");
         }
       } catch (error) {
-        console.error('Error fetching settings:', error)
+        console.error("Error fetching settings:", error);
       }
-    }
-    fetchSettings()
-  }, [])
+    };
+    fetchSettings();
+  }, []);
 
   // Fetch colors from the new endpoint and set CSS variables
   useEffect(() => {
     const fetchColors = async () => {
       try {
-        const response = await fetch('/api/colors')
+        const response = await fetch("/api/colors");
         if (response.ok) {
-          const data = await response.json()
-          setColors(data)
+          const data = await response.json();
+          setColors(data);
 
-          const primary = Color(data.primaryColor)
-          const secondary = Color(data.secondaryColor)
+          const primary = Color(data.primaryColor);
+          const secondary = Color(data.secondaryColor);
 
           const generateShades = (color: typeof Color.prototype) => ({
             50: color.lighten(0.5).hex(),
@@ -295,35 +336,57 @@ export default function Home() {
             700: color.darken(0.2).hex(),
             800: color.darken(0.3).hex(),
             900: color.darken(0.4).hex(),
-          })
+          });
 
-          const primaryShades = generateShades(primary)
-          const secondaryShades = generateShades(secondary)
+          const primaryShades = generateShades(primary);
+          const secondaryShades = generateShades(secondary);
 
           Object.entries(primaryShades).forEach(([shade, color]) => {
-            document.documentElement.style.setProperty(`--primary-${shade}`, color)
-          })
+            document.documentElement.style.setProperty(
+              `--primary-${shade}`,
+              color
+            );
+          });
 
           Object.entries(secondaryShades).forEach(([shade, color]) => {
-            document.documentElement.style.setProperty(`--secondary-${shade}`, color)
-          })
+            document.documentElement.style.setProperty(
+              `--secondary-${shade}`,
+              color
+            );
+          });
         } else {
-          console.error('Failed to fetch colors')
+          console.error("Failed to fetch colors");
         }
       } catch (error) {
-        console.error('Error fetching colors:', error)
+        console.error("Error fetching colors:", error);
       }
-    }
-    fetchColors()
-  }, [])
+    };
+    fetchColors();
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen">
-      <style jsx global>{`${enhancedStyles}`}</style>
+      <style jsx global>{`
+        ${enhancedStyles}
+      `}</style>
       <header className="border-b border-border bg-gradient-to-r from-primary-800 to-secondary-900 sticky top-0 z-50 shadow-sm">
         <div className="container flex h-16 items-center px-4 sm:px-6 lg:px-8">
           <div className="flex items-center">
-            <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto" />
+          {settings?.logoUrl ? (
+  <img
+    src={settings.logoUrl}
+    alt="Site Logo"
+    className="h-8 w-auto"
+    loading="lazy"
+  />
+) : (
+  <img
+    src="/zelle-logo.svg"
+    alt="Zelle"
+    className="h-8 w-auto"
+    loading="lazy"
+  />
+)}
           </div>
           <div className="ml-auto flex items-center gap-4">
             <Button
@@ -333,7 +396,10 @@ export default function Home() {
             >
               <Link href="/login">Sign In</Link>
             </Button>
-            <Button className="bg-white text-primary-800 hover:bg-gray-100 animate-pulse-glow" asChild>
+            <Button
+              className="bg-white text-primary-800 hover:bg-gray-100 animate-pulse-glow"
+              asChild
+            >
               <Link href="/register">Register</Link>
             </Button>
           </div>
@@ -341,10 +407,10 @@ export default function Home() {
       </header>
       <main className="flex-1">
         {/* Hero Section */}
-        <AnimatedBackground className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-br from-primary-50 via-white to-secondary-50">
+        <AnimatedBackground className="w-full py-8 md:py-16 lg:py-24 bg-gradient-to-br from-primary-50 via-white to-secondary-50">
           <div className="container px-4 md:px-6">
             <div className="grid gap-6 lg:grid-cols-2 lg:gap-12 items-center">
-              <div className="space-y-6">
+              <div className="space-y-6 -mt-20">
                 <div className="inline-block rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-700 animate-shimmer">
                   Banking Reimagined
                 </div>
@@ -352,7 +418,8 @@ export default function Home() {
                   Banking made simple, secure, and fast
                 </h1>
                 <p className="text-gray-600 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed max-w-[600px]">
-                  Access your accounts, send money instantly, and manage your finances with our secure banking platform.
+                  Access your accounts, send money instantly, and manage your
+                  finances with our secure banking platform.
                 </p>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                   <Button
@@ -374,48 +441,74 @@ export default function Home() {
                   </Button>
                 </div>
               </div>
-              <div className="relative mx-auto w-full max-w-[500px] lg:max-w-none group">
-                <div className="absolute inset-0 bg-gradient-to-r from-primary-200/30 to-primary-100/30 rounded-3xl transform rotate-3 group-hover:rotate-0 transition-transform duration-500"></div>
+              <div className="relative mx-auto w-auto max-w-[400px] lg:max-w-none group">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary-200/20 to-primary-100/20 rounded-3xl transform rotate-3 group-hover:rotate-0 transition-transform duration-500"></div>
                 <img
                   src="/banking-app-mockup.svg"
                   alt="Banking app interface"
                   className="relative z-10 w-full h-auto rounded-2xl shadow-2xl transition-transform duration-500 group-hover:scale-105"
+                  style={{ imageRendering: "crisp-edges" }}
                 />
-                <DecorativeCircle size="md" position="top-right" className="-top-8 -right-8" />
-                <DecorativeCircle size="sm" position="bottom-left" color="accent" className="-bottom-4 -left-4" />
+                <DecorativeCircle
+                  size="md"
+                  position="top-right"
+                  className="-top-8 -right-8"
+                />
+                <DecorativeCircle
+                  size="sm"
+                  position="bottom-left"
+                  color="accent"
+                  className="-bottom-4 -left-4"
+                />
               </div>
             </div>
           </div>
         </AnimatedBackground>
 
         {/* Stats Section */}
-        <section className="w-full py-10 bg-gradient-to-r from-primary-50 to-white">
-          <div className="container px-4 md:px-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+        <section className="w-full py-6 sm:py-10 bg-gradient-to-r from-primary-50 to-white">
+          <div className="container px-2 sm:px-4 md:px-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 text-center">
               <div className="space-y-2">
-                <h3 className="text-3xl font-bold text-primary-600">Zelle</h3>
-                <p className="text-gray-600">Instant Transfers</p>
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary-600">
+                  Zelle
+                </h3>
+                <p className="text-sm sm:text-base text-gray-600">
+                  Instant Transfers
+                </p>
               </div>
               <div className="space-y-2">
-                <h3 className="text-3xl font-bold text-primary-600">Free</h3>
-                <p className="text-gray-600">Checking Account</p>
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary-600">
+                  Free
+                </h3>
+                <p className="text-sm sm:text-base text-gray-600">
+                  Checking Account
+                </p>
               </div>
               <div className="space-y-2">
-                <h3 className="text-3xl font-bold text-primary-600">Free</h3>
-                <p className="text-gray-600">Savings Account</p>
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary-600">
+                  Free
+                </h3>
+                <p className="text-sm sm:text-base text-gray-600">
+                  Savings Account
+                </p>
               </div>
               <div className="space-y-2">
-                <h3 className="text-3xl font-bold text-primary-600">AES-256</h3>
-                <p className="text-gray-600">Wire Transfers</p>
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-primary-600">
+                  AES-256
+                </h3>
+                <p className="text-sm sm:text-base text-gray-600">
+                  Wire Transfers
+                </p>
               </div>
             </div>
           </div>
         </section>
 
         {/* Trust Badges Section */}
-        <section className="w-full py-8 bg-white border-y border-gray-100">
-          <div className="container px-4 md:px-6">
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12">
+        <section className="w-full py-4 sm:py-8 bg-white border-y border-gray-100">
+          <div className="container px-2 sm:px-4 md:px-6">
+            <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-8 md:gap-12">
               <TrustBadge icon={ShieldCheck} text="Bank-Level Security" />
               <TrustBadge icon={Lock} text="End-to-End Encryption" />
               <TrustBadge icon={BadgeCheck} text="FDIC Insured" />
@@ -433,19 +526,31 @@ export default function Home() {
                 icon={Shield}
                 title="Secure Banking"
                 description="Advanced security features including two-factor authentication keep your money safe."
-                checkItems={["End-to-end encryption", "Two Factor Authentication", "Biometric authentication (Future)"]}
+                checkItems={[
+                  "End-to-end encryption",
+                  "Two Factor Authentication",
+                  "Biometric authentication (Future)",
+                ]}
               />
               <FeatureCard
                 icon={Zap}
                 title="Instant Transfers"
                 description="Send money instantly to friends, family, or businesses with just a few clicks."
-                checkItems={["Real-time Account Transfers", "No hidden fees", "Zelle Enabled Banking"]}
+                checkItems={[
+                  "Real-time Account Transfers",
+                  "No hidden fees",
+                  "Zelle Enabled Banking",
+                ]}
               />
               <FeatureCard
                 icon={Smartphone}
                 title="User-Friendly"
                 description="An intuitive interface makes banking accessible and easy to understand."
-                checkItems={["Simple navigation", "Open 5 Days a week", "Avg 2 minutes answer times"]}
+                checkItems={[
+                  "Simple navigation",
+                  "Open 5 Days a week",
+                  "Avg 2 minutes answer times",
+                ]}
               />
             </div>
           </div>
@@ -453,7 +558,11 @@ export default function Home() {
 
         {/* Partners & Integrations Section */}
         <section className="w-full py-16 md:py-24 bg-gray-50 overflow-hidden relative">
-          <DecorativeCircle size="xl" position="top-left" className="-top-24 -left-24 opacity-30" />
+          <DecorativeCircle
+            size="xl"
+            position="top-left"
+            className="-top-24 -left-24 opacity-30"
+          />
           <DecorativeCircle
             size="lg"
             position="bottom-right"
@@ -466,7 +575,8 @@ export default function Home() {
                 Connecting You With the World
               </h2>
               <p className="mx-auto max-w-[700px] text-gray-600 md:text-xl/relaxed">
-                We accept international transfers from all major banks and cryptocurrencies all in one place
+                We accept international transfers from all major banks and
+                cryptocurrencies all in one place
               </p>
             </div>
             <div className="relative max-w-5xl mx-auto h-[400px] md:h-[500px]">
@@ -477,42 +587,74 @@ export default function Home() {
               </div>
               <div className="absolute top-[15%] left-[18%] transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500 hover:scale-110">
                 <div className="bg-white rounded-2xl shadow-lg p-4 w-20 h-20 md:w-24 md:h-24 flex items-center justify-center">
-                  <img src="/logos/chase.svg" alt="Chase Bank" className="w-16 h-16 object-contain" />
+                  <img
+                    src="/logos/chase.svg"
+                    alt="Chase Bank"
+                    className="w-16 h-16 object-contain"
+                  />
                 </div>
               </div>
               <div className="absolute top-[75%] left-[22%] transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500 hover:scale-110">
                 <div className="bg-white rounded-2xl shadow-lg p-4 w-20 h-20 md:w-24 md:h-24 flex items-center justify-center">
-                  <img src="/logos/bofa.svg" alt="Bank of America" className="w-16 h-16 object-contain" />
+                  <img
+                    src="/logos/bofa.svg"
+                    alt="Bank of America"
+                    className="w-16 h-16 object-contain"
+                  />
                 </div>
               </div>
               <div className="absolute top-[35%] left-[10%] transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500 hover:scale-110">
                 <div className="bg-white rounded-2xl shadow-lg p-4 w-20 h-20 md:w-24 md:h-24 flex items-center justify-center">
-                  <img src="/logos/wells-fargo.svg" alt="Wells Fargo" className="w-16 h-16 object-contain" />
+                  <img
+                    src="/logos/wells-fargo.svg"
+                    alt="Wells Fargo"
+                    className="w-16 h-16 object-contain"
+                  />
                 </div>
               </div>
               <div className="absolute top-[60%] left-[30%] transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500 hover:scale-110">
                 <div className="bg-white rounded-2xl shadow-lg p-4 w-20 h-20 md:w-24 md:h-24 flex items-center justify-center">
-                  <img src="/logos/citi.svg" alt="Citibank" className="w-16 h-16 object-contain" />
+                  <img
+                    src="/logos/citi.svg"
+                    alt="Citibank"
+                    className="w-16 h-16 object-contain"
+                  />
                 </div>
               </div>
               <div className="absolute top-[20%] right-[15%] transform translate-x-1/2 -translate-y-1/2 transition-all duration-500 hover:scale-110">
                 <div className="bg-white rounded-2xl shadow-lg p-4 w-20 h-20 md:w-24 md:h-24 flex items-center justify-center">
-                  <img src="/logos/bitcoin.svg" alt="Bitcoin" className="w-16 h-16 object-contain" />
+                  <img
+                    src="/logos/bitcoin.svg"
+                    alt="Bitcoin"
+                    className="w-16 h-16 object-contain"
+                  />
                 </div>
               </div>
               <div className="absolute top-[65%] right-[18%] transform translate-x-1/2 -translate-y-1/2 transition-all duration-500 hover:scale-110">
                 <div className="bg-white rounded-2xl shadow-lg p-4 w-20 h-20 md:w-24 md:h-24 flex items-center justify-center">
-                  <img src="/logos/ethereum.svg" alt="Ethereum" className="w-16 h-16 object-contain" />
+                  <img
+                    src="/logos/ethereum.svg"
+                    alt="Ethereum"
+                    className="w-16 h-16 object-contain"
+                  />
                 </div>
               </div>
               <div className="absolute top-[40%] right-[8%] transform translate-x-1/2 -translate-y-1/2 transition-all duration-500 hover:scale-110">
                 <div className="bg-white rounded-2xl shadow-lg p-4 w-20 h-20 md:w-24 md:h-24 flex items-center justify-center">
-                  <img src="/logos/litecoin.svg" alt="Litecoin" className="w-16 h-16 object-contain" />
+                  <img
+                    src="/logos/litecoin.svg"
+                    alt="Litecoin"
+                    className="w-16 h-16 object-contain"
+                  />
                 </div>
               </div>
               <div className="absolute top-[85%] right-[25%] transform translate-x-1/2 -translate-y-1/2 transition-all duration-500 hover:scale-110">
                 <div className="bg-white rounded-2xl shadow-lg p-4 w-20 h-20 md:w-24 md:h-24 flex items-center justify-center">
-                  <img src="/logos/ripple.svg" alt="Ripple" className="w-16 h-16 object-contain" />
+                  <img
+                    src="/logos/ripple.svg"
+                    alt="Ripple"
+                    className="w-16 h-16 object-contain"
+                  />
                 </div>
               </div>
             </div>
@@ -541,8 +683,8 @@ export default function Home() {
                   Your Security is Our Top Priority
                 </h2>
                 <p className="text-gray-600 md:text-xl/relaxed">
-                  We employ multiple layers of security to ensure your financial information and transactions remain
-                  protected at all times.
+                  We employ multiple layers of security to ensure your financial
+                  information and transactions remain protected at all times.
                 </p>
                 <div className="space-y-4">
                   <FeatureItem
@@ -571,7 +713,12 @@ export default function Home() {
                     className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                   />
                 </div>
-                <DecorativeCircle size="md" position="top-right" color="accent" className="-top-6 -right-6" />
+                <DecorativeCircle
+                  size="md"
+                  position="top-right"
+                  color="accent"
+                  className="-top-6 -right-6"
+                />
               </div>
             </div>
           </div>
@@ -590,7 +737,12 @@ export default function Home() {
                     className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                   />
                 </div>
-                <DecorativeCircle size="md" position="bottom-right" color="secondary" className="-bottom-6 -right-6" />
+                <DecorativeCircle
+                  size="md"
+                  position="bottom-right"
+                  color="secondary"
+                  className="-bottom-6 -right-6"
+                />
               </div>
               <div className="space-y-6">
                 <div className="inline-block rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-700 animate-shimmer">
@@ -600,8 +752,9 @@ export default function Home() {
                   No Hidden Fees, No Surprises
                 </h2>
                 <p className="text-gray-600 md:text-xl/relaxed">
-                  We believe in complete transparency. All our fees and rates are clearly displayed, and we'll never
-                  surprise you with hidden charges.
+                  We believe in complete transparency. All our fees and rates
+                  are clearly displayed, and we'll never surprise you with
+                  hidden charges.
                 </p>
                 <div className="space-y-4">
                   <FeatureItem
@@ -633,9 +786,12 @@ export default function Home() {
                 <div className="inline-block rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-700 animate-shimmer">
                   Here For You
                 </div>
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl text-gray-900">5 Day A Week Customer Support</h2>
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl text-gray-900">
+                  5 Day A Week Customer Support
+                </h2>
                 <p className="text-gray-600 md:text-xl/relaxed">
-                  Our dedicated support team is available around the clock to assist you with any questions or concerns.
+                  Our dedicated support team is available around the clock to
+                  assist you with any questions or concerns.
                 </p>
                 <div className="space-y-4">
                   <FeatureItem
@@ -664,7 +820,12 @@ export default function Home() {
                     className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                   />
                 </div>
-                <DecorativeCircle size="sm" position="top-left" color="accent" className="-top-4 -left-4" />
+                <DecorativeCircle
+                  size="sm"
+                  position="top-left"
+                  color="accent"
+                  className="-top-4 -left-4"
+                />
               </div>
             </div>
           </div>
@@ -721,18 +882,31 @@ export default function Home() {
 
         {/* CTA Section */}
         <section className="w-full py-12 md:py-24 bg-gradient-to-r from-primary-800 to-secondary-900 relative overflow-hidden">
-          <DecorativeCircle size="xl" position="top-right" className="opacity-10 -top-32 -right-32" />
-          <DecorativeCircle size="lg" position="bottom-left" className="opacity-10 -bottom-24 -left-24" />
+          <DecorativeCircle
+            size="xl"
+            position="top-right"
+            className="opacity-10 -top-32 -right-32"
+          />
+          <DecorativeCircle
+            size="lg"
+            position="bottom-left"
+            className="opacity-10 -bottom-24 -left-24"
+          />
           <div className="container px-4 md:px-6 text-center relative z-10">
             <div className="mx-auto max-w-[800px] space-y-6">
               <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-white">
                 Ready to Transform Your Banking Experience?
               </h2>
               <p className="text-white md:text-xl/relaxed">
-                Join thousands of satisfied customers who have switched to Zelle for a better banking experience.
+                Join thousands of satisfied customers who have switched to Zelle
+                for a better banking experience.
               </p>
               <div className="flex flex-col sm:flex-row justify-center gap-4">
-                <Button size="lg" className="bg-white text-primary-800 hover:bg-gray-100 animate-pulse-glow" asChild>
+                <Button
+                  size="lg"
+                  className="bg-white text-primary-800 hover:bg-gray-100 animate-pulse-glow"
+                  asChild
+                >
                   <Link href="/register">
                     Get Started Now <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
@@ -752,16 +926,36 @@ export default function Home() {
       </main>
 
       {/* Redesigned Footer */}
-      <footer className="bg-gradient-to-b from-primary-900 to-secondary-950 text-white py-8">
+      <footer className="bg-gradient-to-b from-secondary-900 to-primary-900 text-white py-8">
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
             <div className="flex items-center gap-4">
-              <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto" />
-              <p className="text-gray-400 text-sm">© {new Date().getFullYear()} DP Security & Company. All rights reserved.</p>
+            {settings?.logoUrl ? (
+  <img
+    src={settings.logoUrl}
+    alt="Site Logo"
+    className="h-8 w-auto"
+    loading="lazy"
+  />
+) : (
+  <img
+    src="/zelle-logo.svg"
+    alt="Zelle"
+    className="h-8 w-auto"
+    loading="lazy"
+  />
+)}
+              <p className="text-white text-sm">
+                © {new Date().getFullYear()} DP Security & Company. All rights
+                reserved.
+              </p>
             </div>
             <div className="flex space-x-6">
               {settings?.facebookUrl && (
-                <Link href={settings.facebookUrl} className="text-gray-400 hover:text-primary-300 transition-colors duration-300">
+                <Link
+                  href={settings.facebookUrl}
+                  className="text-white hover:text-primary-300 transition-colors duration-300"
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="24"
@@ -779,7 +973,10 @@ export default function Home() {
                 </Link>
               )}
               {settings?.twitterUrl && (
-                <Link href={settings.twitterUrl} className="text-gray-400 hover:text-primary-300 transition-colors duration-300">
+                <Link
+                  href={settings.twitterUrl}
+                  className="text-white hover:text-primary-300 transition-colors duration-300"
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="24"
@@ -797,7 +994,10 @@ export default function Home() {
                 </Link>
               )}
               {settings?.instagramUrl && (
-                <Link href={settings.instagramUrl} className="text-gray-400 hover:text-primary-300 transition-colors duration-300">
+                <Link
+                  href={settings.instagramUrl}
+                  className="text-white hover:text-primary-300 transition-colors duration-300"
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="24"
@@ -821,5 +1021,5 @@ export default function Home() {
         </div>
       </footer>
     </div>
-  )
+  );
 }

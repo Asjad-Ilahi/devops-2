@@ -83,21 +83,12 @@ export default function RegistrationSuccessPage() {
             <div className="text-left">
               <p className="font-medium text-primary-800">Pending Approval</p>
               <p className="text-sm text-primary-700">
-                Your account is currently under review by our team. This process typically takes 1-2 business days.
+                Your account is currently under review by our team.
               </p>
             </div>
           </div>
 
-          <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-4 flex items-start gap-3">
-            <Mail className="h-5 w-5 text-secondary-500 mt-0.5 flex-shrink-0" />
-            <div className="text-left">
-              <p className="font-medium text-secondary-800">Check Your Email</p>
-              <p className="text-sm text-secondary-700">
-                We've sent a confirmation email to your registered address. You'll receive another email once your
-                account is approved.
-              </p>
-            </div>
-          </div>
+
 
           <div className="pt-2">
             <p className="text-sm text-primary-600">

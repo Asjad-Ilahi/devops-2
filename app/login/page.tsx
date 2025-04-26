@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [showTwoFactor, setShowTwoFactor] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null);
+  const [settings, setSettings] = useState<any>(null);
 
   useEffect(() => {
     const fetchColors = async () => {
@@ -61,6 +62,21 @@ export default function LoginPage() {
       }
     };
     fetchColors();
+
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch("/api/home");
+        if (response.ok) {
+          const data = await response.json();
+          setSettings(data);
+        } else {
+          setSettings(null);
+        }
+      } catch (error) {
+        setSettings(null);
+      }
+    };
+    fetchSettings();
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -128,9 +144,19 @@ export default function LoginPage() {
           <div className="flex justify-center">
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full blur opacity-25"></div>
-              <div className="relative bg-white p-2 rounded-full">
-                <img src="/zelle-logo.svg" alt="Zelle" className="h-12 w-auto" />
-              </div>
+              {settings?.logoUrl ? (
+                <img
+                  src={settings.logoUrl}
+                  alt="Site Logo"
+                  className="relative h-12 w-auto"
+                />
+              ) : (
+                <img
+                  src="/zelle-logo.svg"
+                  alt="Zelle"
+                  className="relative h-12 w-auto"
+                />
+              )}
             </div>
           </div>
           <h2 className="mt-6 text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-600">
