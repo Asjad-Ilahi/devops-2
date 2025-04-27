@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo, JSX } from "react";
+import { useState, useEffect, useMemo, JSX, Suspense } from "react"; // Added Suspense
 import Link from "next/link";
-import { useSearchParams } from "next/navigation"; // Import useSearchParams
+import { useSearchParams } from "next/navigation";
 import Color from "color";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -196,6 +196,26 @@ function parseContent(content: string, siteName: string, supportEmail: string, s
   return elements;
 }
 
+// New client component to handle useSearchParams
+function BackLinkButton() {
+  const searchParams = useSearchParams();
+  const backLink = searchParams.get("from") === "login" ? "/login" : "/register";
+  const backText = searchParams.get("from") === "login" ? "Login" : "Registration";
+
+  return (
+    <Button
+      variant="ghost"
+      asChild
+      className="p-0 mb-4 text-primary-600 hover:text-primary-700"
+    >
+      <Link href={backLink}>
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back to {backText}
+      </Link>
+    </Button>
+  );
+}
+
 export default function PrivacyPolicyPage() {
   const [settings, setSettings] = useState<any>(null);
   const [colors, setColors] = useState<{
@@ -211,10 +231,6 @@ export default function PrivacyPolicyPage() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const searchParams = useSearchParams(); // Use useSearchParams to get query parameters
-
-  // Determine the back link based on the 'from' query parameter
-  const backLink = searchParams.get("from") === "login" ? "/login" : "/register";
 
   // Fetch settings for logo and social media URLs
   useEffect(() => {
@@ -356,16 +372,9 @@ export default function PrivacyPolicyPage() {
           <div className="container px-4 md:px-6">
             <div className="max-w-4xl mx-auto">
               <div className="mb-8">
-                <Button
-                  variant="ghost"
-                  asChild
-                  className="p-0 mb-4 text-primary-600 hover:text-primary-700"
-                >
-                  <Link href={backLink}>
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to {searchParams.get("from") === "login" ? "Login" : "Registration"}
-                  </Link>
-                </Button>
+                <Suspense fallback={<div>Loading navigation...</div>}>
+                  <BackLinkButton />
+                </Suspense>
                 <div className="inline-block rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-700 animate-shimmer mb-4">
                   Privacy Policy
                 </div>
