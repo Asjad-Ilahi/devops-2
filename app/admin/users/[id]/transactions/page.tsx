@@ -6,21 +6,6 @@ import { useParams, useRouter } from "next/navigation";
 import Color from "color";
 import {
   ArrowLeft,
-<<<<<<< HEAD
-  ArrowUpDown,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  Filter,
-  Loader2,
-  Search,
-  Trash2,
-  X,
-  Calendar,
-} from "lucide-react";
-
-=======
   ArrowUp,
   CreditCard,
   ArrowUpDown,
@@ -35,26 +20,12 @@ import {
   Search,
   X,
 } from "lucide-react";
->>>>>>> temp-branch
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-<<<<<<< HEAD
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Textarea } from "@/components/ui/textarea";
-=======
 import {
   Select,
   SelectContent,
@@ -70,7 +41,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
->>>>>>> temp-branch
 
 // Interface for Colors
 interface Colors {
@@ -78,8 +48,6 @@ interface Colors {
   secondaryColor: string;
 }
 
-<<<<<<< HEAD
-=======
 // Interface for User
 interface User {
   id: string;
@@ -91,7 +59,6 @@ interface User {
 }
 
 // Interface for Transaction
->>>>>>> temp-branch
 interface Transaction {
   id: string;
   userId: string;
@@ -103,18 +70,6 @@ interface Transaction {
   date: string;
   status: string;
   account: string;
-<<<<<<< HEAD
-  relatedTransactionId?: string;
-}
-
-interface User {
-  id: string;
-  fullName: string;
-  username: string;
-  email: string;
-  accountNumber: string;
-  balance: number;
-=======
   memo?: string;
   transferId?: string;
 }
@@ -130,7 +85,6 @@ interface TransactionGroup {
   accounts: string[];
   transactionIds: string[];
   type: string;
->>>>>>> temp-branch
 }
 
 export default function UserTransactionsPage() {
@@ -141,12 +95,9 @@ export default function UserTransactionsPage() {
   // State
   const [user, setUser] = useState<User | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-<<<<<<< HEAD
-=======
   const [groupedTransactions, setGroupedTransactions] = useState<
     TransactionGroup[]
   >([]);
->>>>>>> temp-branch
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -165,25 +116,6 @@ export default function UserTransactionsPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [sortField, setSortField] = useState<string>("date");
 
-<<<<<<< HEAD
-  // Delete dialog
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
-
-  // Edit dialog
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
-  const [editFormData, setEditFormData] = useState({
-    description: "",
-    amount: "",
-    type: "",
-    status: "",
-    date: "",
-  });
-  const [editFormError, setEditFormError] = useState<string | null>(null);
-
-=======
->>>>>>> temp-branch
   // Fetch colors and set CSS custom properties
   useEffect(() => {
     const fetchColors = async () => {
@@ -213,13 +145,6 @@ export default function UserTransactionsPage() {
         const secondaryShades = generateShades(secondary);
 
         Object.entries(primaryShades).forEach(([shade, color]) => {
-<<<<<<< HEAD
-          document.documentElement.style.setProperty(`--primary-${shade}`, color);
-        });
-
-        Object.entries(secondaryShades).forEach(([shade, color]) => {
-          document.documentElement.style.setProperty(`--secondary-${shade}`, color);
-=======
           document.documentElement.style.setProperty(
             `--primary-${shade}`,
             color
@@ -230,16 +155,11 @@ export default function UserTransactionsPage() {
             `--secondary-${shade}`,
             color
           );
->>>>>>> temp-branch
         });
       } catch (error) {
         console.error("Error fetching colors:", error);
       }
     };
-<<<<<<< HEAD
-=======
-
->>>>>>> temp-branch
     fetchColors();
   }, []);
 
@@ -258,43 +178,13 @@ export default function UserTransactionsPage() {
         setLoading(true);
         const [userRes, transactionsRes] = await Promise.all([
           fetch(`/api/admin/users/${userId}`, { credentials: "include" }),
-<<<<<<< HEAD
-          fetch(`/api/admin/users/${userId}/transactions`, { credentials: "include" }),
-=======
           fetch(`/api/admin/transactions`, { credentials: "include" }),
->>>>>>> temp-branch
         ]);
 
         let userData = null;
         if (userRes.ok) {
           const data = await userRes.json();
           userData = data.user;
-<<<<<<< HEAD
-        }
-
-        if (!transactionsRes.ok) {
-          throw new Error("Failed to fetch transactions");
-        }
-        const transactionsData = await transactionsRes.json();
-        setTransactions(transactionsData.transactions);
-
-        // If user fetch failed, fall back to transaction data
-        if (!userData && transactionsData.transactions.length > 0) {
-          const firstTx = transactionsData.transactions[0];
-          userData = {
-            id: firstTx.userId,
-            fullName: firstTx.userName,
-            username: "",
-            email: firstTx.userEmail,
-            accountNumber: "",
-            balance: 0,
-          };
-        }
-
-        setUser(userData);
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "Failed to load user data and transactions";
-=======
         } else {
           throw new Error("Failed to fetch user data");
         }
@@ -325,7 +215,6 @@ export default function UserTransactionsPage() {
           error instanceof Error
             ? error.message
             : "Failed to load user data and transactions";
->>>>>>> temp-branch
         setError(errorMessage);
       } finally {
         setLoading(false);
@@ -335,17 +224,6 @@ export default function UserTransactionsPage() {
     fetchData();
   }, [userId, router]);
 
-<<<<<<< HEAD
-  // Compute filtered and sorted transactions
-  const filteredTransactions = useMemo(() => {
-    let result = [...transactions];
-
-    if (debouncedSearchTerm) {
-      result = result.filter(
-        (txn) =>
-          txn.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-          txn.id.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-=======
   // Group and filter transactions
   useEffect(() => {
     if (!user || !transactions.length) return;
@@ -517,41 +395,21 @@ export default function UserTransactionsPage() {
             .toLowerCase()
             .includes(debouncedSearchTerm.toLowerCase()) ||
           group.id.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
->>>>>>> temp-branch
       );
     }
 
     if (typeFilter !== "all") {
-<<<<<<< HEAD
-      result = result.filter((txn) => txn.type === typeFilter);
-    }
-
-    if (statusFilter !== "all") {
-      result = result.filter((txn) => txn.status === statusFilter);
-=======
       result = result.filter((group) => group.type === typeFilter);
     }
 
     if (statusFilter !== "all") {
       result = result.filter((group) => group.status === statusFilter);
->>>>>>> temp-branch
     }
 
     if (dateFilter !== "all") {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       if (dateFilter === "today") {
-<<<<<<< HEAD
-        result = result.filter((txn) => new Date(txn.date) >= today);
-      } else if (dateFilter === "week") {
-        const weekAgo = new Date(today);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        result = result.filter((txn) => new Date(txn.date) >= weekAgo);
-      } else if (dateFilter === "month") {
-        const monthAgo = new Date(today);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        result = result.filter((txn) => new Date(txn.date) >= monthAgo);
-=======
         result = result.filter((group) => new Date(group.date) >= today);
       } else if (dateFilter === "week") {
         const weekAgo = new Date(today);
@@ -561,7 +419,6 @@ export default function UserTransactionsPage() {
         const monthAgo = new Date(today);
         monthAgo.setMonth(monthAgo.getMonth() - 1);
         result = result.filter((group) => new Date(group.date) >= monthAgo);
->>>>>>> temp-branch
       }
     }
 
@@ -571,21 +428,14 @@ export default function UserTransactionsPage() {
           ? new Date(a.date).getTime() - new Date(b.date).getTime()
           : new Date(b.date).getTime() - new Date(a.date).getTime();
       } else if (sortField === "amount") {
-<<<<<<< HEAD
-        return sortDirection === "asc" ? a.amount - b.amount : b.amount - a.amount;
-=======
         return sortDirection === "asc"
           ? a.amount - b.amount
           : b.amount - a.amount;
->>>>>>> temp-branch
       }
       return 0;
     });
 
     return result;
-<<<<<<< HEAD
-  }, [transactions, debouncedSearchTerm, typeFilter, statusFilter, dateFilter, sortField, sortDirection]);
-=======
   }, [
     groupedTransactions,
     debouncedSearchTerm,
@@ -595,7 +445,6 @@ export default function UserTransactionsPage() {
     sortField,
     sortDirection,
   ]);
->>>>>>> temp-branch
 
   // Compute total pages
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
@@ -614,101 +463,6 @@ export default function UserTransactionsPage() {
     return filteredTransactions.slice(startIndex, endIndex);
   }, [filteredTransactions, currentPage, itemsPerPage]);
 
-<<<<<<< HEAD
-  // Handle transaction deletion
-  const handleDeleteTransaction = async () => {
-    if (!transactionToDelete) return;
-
-    try {
-      const response = await fetch(`/api/admin/transactions/${transactionToDelete}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete transaction");
-      }
-
-      setTransactions((prev) => prev.filter((t) => t.id !== transactionToDelete));
-      if (user) {
-        const transaction = transactions.find((t) => t.id === transactionToDelete);
-        if (transaction) {
-          setUser({ ...user, balance: user.balance - transaction.amount });
-        }
-      }
-
-      setSuccess("Transaction removed successfully");
-      setIsDeleteDialogOpen(false);
-      setTransactionToDelete(null);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to delete transaction";
-      setError(errorMessage);
-    }
-  };
-
-  // Handle transaction editing
-  const handleEditTransaction = async () => {
-    if (!transactionToEdit) return;
-
-    setEditFormError(null);
-    const amount = Number.parseFloat(editFormData.amount);
-    if (isNaN(amount)) {
-      setEditFormError("Please enter a valid amount");
-      return;
-    }
-    if (!editFormData.description) {
-      setEditFormError("Description is required");
-      return;
-    }
-    if (!editFormData.date || isNaN(new Date(editFormData.date).getTime())) {
-      setEditFormError("Please enter a valid date");
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/admin/transactions/${transactionToEdit.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          ...editFormData,
-          amount,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update transaction");
-      }
-
-      const updatedTransaction = await response.json();
-      setTransactions((prev) =>
-        prev.map((t) => (t.id === updatedTransaction.id ? updatedTransaction : t))
-      );
-      setSuccess("Transaction updated successfully");
-      setIsEditDialogOpen(false);
-      setTransactionToEdit(null);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to update transaction";
-      setError(errorMessage);
-    }
-  };
-
-  // Open edit dialog
-  const openEditDialog = (transaction: Transaction) => {
-    setTransactionToEdit(transaction);
-    setEditFormData({
-      description: transaction.description,
-      amount: transaction.amount.toString(),
-      type: transaction.type,
-      status: transaction.status,
-      date: new Date(transaction.date).toISOString().slice(0, 16),
-    });
-    setEditFormError(null);
-    setIsEditDialogOpen(true);
-  };
-
-=======
->>>>>>> temp-branch
   // Reset filters
   const resetFilters = () => {
     setSearchTerm("");
@@ -721,9 +475,6 @@ export default function UserTransactionsPage() {
 
   // Export transactions (placeholder)
   const exportTransactions = () => {
-<<<<<<< HEAD
-    alert("In a production environment, this would download a CSV file of the transactions.");
-=======
     alert(
       "In a production environment, this would download a CSV file of the transactions."
     );
@@ -751,7 +502,6 @@ export default function UserTransactionsPage() {
       default:
         return <CreditCard className="h-5 w-5 text-gray-600" />;
     }
->>>>>>> temp-branch
   };
 
   if (loading) {
@@ -767,11 +517,6 @@ export default function UserTransactionsPage() {
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50">
         <div className="text-center">
           <X className="mx-auto h-12 w-12 text-red-500" />
-<<<<<<< HEAD
-          <h2 className="mt-4 text-2xl font-bold text-primary-900">User Not Found</h2>
-          <p className="mt-2 text-primary-600">The requested user could not be found.</p>
-          <Button asChild className="mt-6 bg-primary-600 hover:bg-primary-700 text-white">
-=======
           <h2 className="mt-4 text-2xl font-bold text-primary-900">
             User Not Found
           </h2>
@@ -782,7 +527,6 @@ export default function UserTransactionsPage() {
             asChild
             className="mt-6 bg-primary-600 hover:bg-primary-700 text-white"
           >
->>>>>>> temp-branch
             <Link href="/admin/users">Back to Users</Link>
           </Button>
         </div>
@@ -803,10 +547,6 @@ export default function UserTransactionsPage() {
             Back to User Profile
           </Link>
         </Button>
-<<<<<<< HEAD
-=======
-
->>>>>>> temp-branch
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
@@ -830,25 +570,17 @@ export default function UserTransactionsPage() {
         {success && (
           <Alert className="mb-6 bg-green-50 border-green-200">
             <Check className="h-4 w-4 text-green-700" />
-<<<<<<< HEAD
-            <AlertDescription className="text-green-700">{success}</AlertDescription>
-=======
             <AlertDescription className="text-green-700">
               {success}
             </AlertDescription>
->>>>>>> temp-branch
           </Alert>
         )}
 
         {error && (
-<<<<<<< HEAD
-          <Alert variant="destructive" className="mb-6 bg-red-50 border-red-200">
-=======
           <Alert
             variant="destructive"
             className="mb-6 bg-red-50 border-red-200"
           >
->>>>>>> temp-branch
             <X className="h-4 w-4 text-red-700" />
             <AlertDescription className="text-red-700">{error}</AlertDescription>
           </Alert>
@@ -876,13 +608,6 @@ export default function UserTransactionsPage() {
                 </div>
               </div>
               <div>
-<<<<<<< HEAD
-                <Label htmlFor="type-filter" className="mb-2 block text-primary-800">
-                  Type
-                </Label>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger id="type-filter" className="border-primary-200 bg-white/80">
-=======
                 <Label
                   htmlFor="type-filter"
                   className="mb-2 block text-primary-800"
@@ -894,7 +619,6 @@ export default function UserTransactionsPage() {
                     id="type-filter"
                     className="border-primary-200 bg-white/80"
                   >
->>>>>>> temp-branch
                     <SelectValue placeholder="All Types" />
                   </SelectTrigger>
                   <SelectContent>
@@ -912,13 +636,6 @@ export default function UserTransactionsPage() {
                 </Select>
               </div>
               <div>
-<<<<<<< HEAD
-                <Label htmlFor="status-filter" className="mb-2 block text-primary-800">
-                  Status
-                </Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger id="status-filter" className="border-primary-200 bg-white/80">
-=======
                 <Label
                   htmlFor="status-filter"
                   className="mb-2 block text-primary-800"
@@ -930,7 +647,6 @@ export default function UserTransactionsPage() {
                     id="status-filter"
                     className="border-primary-200 bg-white/80"
                   >
->>>>>>> temp-branch
                     <SelectValue placeholder="All Statuses" />
                   </SelectTrigger>
                   <SelectContent>
@@ -942,20 +658,6 @@ export default function UserTransactionsPage() {
                 </Select>
               </div>
               <div>
-<<<<<<< HEAD
-                <Label htmlFor="date-filter" className="mb-2 block text-primary-800">
-                  Date Range
-                </Label>
-                <Select value={dateFilter} onValueChange={setDateFilter}>
-                  <SelectTrigger id="date-filter" className="border-primary-200 bg-white/80">
-                    <SelectValue placeholder="All Time" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="week">Last 7 Days</SelectItem>
-                    <SelectItem value="month">Last 30 Days</SelectItem>
-=======
                 <Label
                   htmlFor="date-filter"
                   className="mb-2 block text-primary-800"
@@ -974,7 +676,6 @@ export default function UserTransactionsPage() {
                     <SelectItem value="week">Last 7 Days</SelectItem>
                     <SelectItem value="month">Last 30 Days</SelectItem>
                     <SelectItem value="all">All Time</SelectItem>
->>>>>>> temp-branch
                   </SelectContent>
                 </Select>
               </div>
@@ -990,13 +691,6 @@ export default function UserTransactionsPage() {
                 Reset Filters
               </Button>
               <div className="flex items-center gap-2">
-<<<<<<< HEAD
-                <Label htmlFor="sort-field" className="text-sm text-primary-800">
-                  Sort by:
-                </Label>
-                <Select value={sortField} onValueChange={setSortField}>
-                  <SelectTrigger id="sort-field" className="w-[120px] border-primary-200 bg-white/80">
-=======
                 <Label
                   htmlFor="sort-field"
                   className="text-sm text-primary-800"
@@ -1008,7 +702,6 @@ export default function UserTransactionsPage() {
                     id="sort-field"
                     className="w-[120px] border-primary-200 bg-white/80"
                   >
->>>>>>> temp-branch
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1019,24 +712,16 @@ export default function UserTransactionsPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-<<<<<<< HEAD
-                  onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
-=======
                   onClick={() =>
                     setSortDirection(sortDirection === "asc" ? "desc" : "asc")
                   }
->>>>>>> temp-branch
                   className="text-primary-700 hover:bg-primary-100"
                 >
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </div>
             </div>
-<<<<<<< HEAD
-            </CardContent>
-=======
           </CardContent>
->>>>>>> temp-branch
         </Card>
 
         <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
@@ -1044,10 +729,6 @@ export default function UserTransactionsPage() {
             <div className="flex justify-between items-center">
               <CardTitle className="text-primary-900">Transactions</CardTitle>
               <div className="text-sm text-primary-600">
-<<<<<<< HEAD
-                Showing {filteredTransactions.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}-
-                {Math.min(currentPage * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length}
-=======
                 Showing{" "}
                 {filteredTransactions.length > 0
                   ? (currentPage - 1) * itemsPerPage + 1
@@ -1058,7 +739,6 @@ export default function UserTransactionsPage() {
                   filteredTransactions.length
                 )}{" "}
                 of {filteredTransactions.length}
->>>>>>> temp-branch
               </div>
             </div>
           </CardHeader>
@@ -1068,11 +748,6 @@ export default function UserTransactionsPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b bg-primary-50/50">
-<<<<<<< HEAD
-                      <th className="text-left p-4 text-primary-800">Date</th>
-                      <th className="text-left p-4 text-primary-800">Description</th>
-                      <th className="text-left p-4 text-primary-800">Type</th>
-=======
                       <th className="text-left p-4 text-primary-800">ID</th>
                       <th className="text-left p-4 text-primary-800">Users</th>
                       <th className="text-left p-4 text-primary-800">
@@ -1082,87 +757,12 @@ export default function UserTransactionsPage() {
                       <th className="text-left p-4 text-primary-800">
                         Accounts
                       </th>
->>>>>>> temp-branch
                       <th className="text-right p-4 text-primary-800">Amount</th>
                       <th className="text-center p-4 text-primary-800">Status</th>
                       <th className="text-center p-4 text-primary-800">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-primary-100">
-<<<<<<< HEAD
-                    {currentPageItems.map((transaction) => (
-                      <tr key={transaction.id} className="hover:bg-primary-50/50 transition-colors">
-                        <td className="p-4 text-sm text-primary-900">
-                          {new Date(transaction.date).toLocaleString()}
-                        </td>
-                        <td className="p-4 text-sm text-primary-900">{transaction.description}</td>
-                        <td className="p-4">
-                          <Badge
-                            variant="outline"
-                            className={
-                              transaction.type === "deposit"
-                                ? "bg-green-50 text-green-700 border-green-200"
-                                : transaction.type === "withdrawal"
-                                ? "bg-red-50 text-red-700 border-red-200"
-                                : transaction.type === "transfer"
-                                ? "bg-blue-50 text-blue-700 border-blue-200"
-                                : transaction.type === "payment"
-                                ? "bg-orange-50 text-orange-700 border-orange-200"
-                                : transaction.type === "fee"
-                                ? "bg-gray-50 text-gray-700 border-gray-200"
-                                : transaction.type === "interest"
-                                ? "bg-green-50 text-green-700 border-green-200"
-                                : transaction.type === "crypto_buy" || transaction.type === "crypto_sell"
-                                ? "bg-secondary-50 text-secondary-700 border-secondary-200"
-                                : transaction.type === "refund"
-                                ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                                : "bg-gray-50 text-gray-700 border-gray-200"
-                            }
-                          >
-                            {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-right text-sm text-primary-900">
-                          ${transaction.amount.toFixed(2)}
-                        </td>
-                        <td className="p-4 text-center">
-                          <Badge
-                            variant="outline"
-                            className={
-                              transaction.status === "completed"
-                                ? "bg-green-50 text-green-700 border-green-200"
-                                : transaction.status === "pending"
-                                ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                                : "bg-red-50 text-red-700 border-red-200"
-                            }
-                          >
-                            {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditDialog(transaction)}
-                            className="text-primary-700 hover:text-primary-900"
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setTransactionToDelete(transaction.id);
-                              setIsDeleteDialogOpen(true);
-                            }}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            Delete
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-=======
                     {currentPageItems.map((group) => {
                       const userNames = group.userIds.map(
                         (id) =>
@@ -1279,7 +879,6 @@ export default function UserTransactionsPage() {
                         </tr>
                       );
                     })}
->>>>>>> temp-branch
                   </tbody>
                 </table>
               </div>
@@ -1295,14 +894,10 @@ export default function UserTransactionsPage() {
                   Page {currentPage} of {totalPages}
                 </div>
                 <div className="flex items-center gap-2">
-<<<<<<< HEAD
-                  <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
-=======
                   <Select
                     value={itemsPerPage.toString()}
                     onValueChange={(value) => setItemsPerPage(Number(value))}
                   >
->>>>>>> temp-branch
                     <SelectTrigger className="w-[100px] border-primary-200 bg-white/80">
                       <SelectValue />
                     </SelectTrigger>
@@ -1325,13 +920,9 @@ export default function UserTransactionsPage() {
                   <Button
                     variant="outline"
                     size="icon"
-<<<<<<< HEAD
-                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-=======
                     onClick={() =>
                       setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                     }
->>>>>>> temp-branch
                     disabled={currentPage === totalPages}
                     className="border-primary-200 text-primary-700 hover:bg-primary-50"
                   >
@@ -1342,155 +933,6 @@ export default function UserTransactionsPage() {
             )}
           </CardContent>
         </Card>
-<<<<<<< HEAD
-
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-[500px] backdrop-blur-sm bg-white/60 border border-primary-100">
-            <DialogHeader>
-              <DialogTitle className="text-primary-900">Edit Transaction</DialogTitle>
-              <DialogDescription className="text-primary-600">
-                Modify the transaction details below.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              {editFormError && (
-                <Alert variant="destructive" className="bg-red-50 border-red-200">
-                  <X className="h-4 w-4 text-red-700" />
-                  <AlertDescription className="text-red-700">{editFormError}</AlertDescription>
-                </Alert>
-              )}
-              <div className="grid gap-2">
-                <Label htmlFor="edit-description" className="text-primary-800">
-                  Description
-                </Label>
-                <Textarea
-                  id="edit-description"
-                  value={editFormData.description}
-                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                  className="border-primary-200 focus:border-primary-400 bg-white/80"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-amount" className="text-primary-800">
-                    Amount
-                  </Label>
-                  <Input
-                    id="edit-amount"
-                    type="number"
-                    step="0.01"
-                    value={editFormData.amount}
-                    onChange={(e) => setEditFormData({ ...editFormData, amount: e.target.value })}
-                    className="border-primary-200 focus:border-primary-400 bg-white/80"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-date" className="text-primary-800">
-                    Date
-                  </Label>
-                  <Input
-                    id="edit-date"
-                    type="datetime-local"
-                    value={editFormData.date}
-                    onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
-                    className="border-primary-200 focus:border-primary-400 bg-white/80"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-type" className="text-primary-800">
-                    Type
-                  </Label>
-                  <Select value={editFormData.type} onValueChange={(value) => setEditFormData({ ...editFormData, type: value })}>
-                    <SelectTrigger id="edit-type" className="border-primary-200 bg-white/80">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="deposit">Deposit</SelectItem>
-                      <SelectItem value="withdrawal">Withdrawal</SelectItem>
-                      <SelectItem value="transfer">Transfer</SelectItem>
-                      <SelectItem value="payment">Payment</SelectItem>
-                      <SelectItem value="fee">Fee</SelectItem>
-                      <SelectItem value="interest">Interest</SelectItem>
-                      <SelectItem value="crypto_buy">Crypto Buy</SelectItem>
-                      <SelectItem value="crypto_sell">Crypto Sell</SelectItem>
-                      <SelectItem value="refund">Refund</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-status" className="text-primary-800">
-                    Status
-                  </Label>
-                  <Select
-                    value={editFormData.status}
-                    onValueChange={(value) => setEditFormData({ ...editFormData, status: value })}
-                  >
-                    <SelectTrigger id="edit-status" className="border-primary-200 bg-white/80">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="failed">Failed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsEditDialogOpen(false);
-                  setEditFormError(null);
-                }}
-                className="border-primary-200 text-primary-700 hover:bg-primary-50"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleEditTransaction}
-                className="bg-primary-600 text-white hover:bg-primary-700"
-              >
-                Save Changes
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="backdrop-blur-sm bg-white/60 border border-primary-100">
-            <DialogHeader>
-              <DialogTitle className="text-primary-900">Delete Transaction</DialogTitle>
-              <DialogDescription className="text-primary-600">
-                Are you sure you want to delete this transaction? This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsDeleteDialogOpen(false);
-                  setTransactionToDelete(null);
-                }}
-                className="border-primary-200 text-primary-700 hover:bg-primary-50"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteTransaction}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                Delete
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-=======
->>>>>>> temp-branch
       </div>
     </div>
   );
