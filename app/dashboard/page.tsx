@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [userData, setUserData] = useState<UserData | null>(null)
   const [cryptoValue, setCryptoValue] = useState<number>(0)
-  const [btcPrice, setBtcPrice] = useState<number>(44256.32)
+  const [btcPrice, setBtcPrice] = useState<number>(0)
   const [error, setError] = useState<string | null>(null)
   const [recentContacts, setRecentContacts] = useState<Contact[]>([])
   const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
@@ -120,7 +120,7 @@ export default function DashboardPage() {
 
     const fetchSettings = async () => {
       try {
-        const response = await fetch("/api/home")
+        const response = await fetch("/api/admin/settings")
         if (response.ok) {
           const data = await response.json()
           setSettings(data)
@@ -136,7 +136,7 @@ export default function DashboardPage() {
     fetchSettings()
   }, [])
 
-  // Fetch user data and transactions on mount
+  // Fetch user data, transactions, and initial BTC price
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -153,6 +153,13 @@ export default function DashboardPage() {
           cryptoBalance: userData.cryptoBalance || 0,
           email: userData.email || "",
         })
+
+        // Fetch BTC price (public endpoint, no auth required)
+        const priceResponse = await fetch("/api/price")
+        if (!priceResponse.ok) throw new Error("Failed to fetch BTC price")
+        const priceData = await priceResponse.json()
+        const newBtcPrice: number = priceData.bitcoin?.usd || 0
+        setBtcPrice(newBtcPrice)
 
         // Fetch transactions
         const transactionsResponse = await apiFetch("/api/transactions")
@@ -192,16 +199,22 @@ export default function DashboardPage() {
     }
   }, [userData, btcPrice])
 
-  // Simulate BTC price updates every 30 seconds
+  // Fetch BTC price every 10 minutes
   useEffect(() => {
-    const interval = setInterval(() => {
-      const priceDelta = Math.random() * 400 - 200
-      const newPrice = btcPrice + priceDelta
-      setBtcPrice(newPrice)
-    }, 30000)
+    const priceInterval = setInterval(async () => {
+      try {
+        const response = await fetch("/api/price")
+        if (!response.ok) throw new Error("Price update failed")
+        const data = await response.json()
+        const newBtcPrice: number = data.bitcoin?.usd || 0
+        setBtcPrice(newBtcPrice)
+      } catch (error: unknown) {
+        console.error("Price update error:", error instanceof Error ? error.message : 'Unknown error')
+      }
+    }, 600000) // 10 minutes = 600,000 ms
 
-    return () => clearInterval(interval)
-  }, [btcPrice])
+    return () => clearInterval(priceInterval)
+  }, [])
 
   return (
     <div className="flex min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">

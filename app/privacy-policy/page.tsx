@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useMemo, JSX } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation"; // Import useSearchParams
 import Color from "color";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Define interfaces for component props and state
+// Define interfaces for component props
 interface DecorativeCircleProps {
   size?: "sm" | "md" | "lg" | "xl";
   position?: string;
@@ -17,13 +18,6 @@ interface DecorativeCircleProps {
 interface AnimatedBackgroundProps {
   className?: string;
   children: React.ReactNode;
-}
-
-interface Settings {
-  logoUrl: string;
-  facebookUrl?: string;
-  twitterUrl?: string;
-  instagramUrl?: string;
 }
 
 // Enhanced animations from homepage
@@ -203,12 +197,12 @@ function parseContent(content: string, siteName: string, supportEmail: string, s
 }
 
 export default function PrivacyPolicyPage() {
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const [settings, setSettings] = useState<any>(null);
   const [colors, setColors] = useState<{
     primaryColor: string;
     secondaryColor: string;
   } | null>(null);
-  const [policyData, setPolicyData] = useState<{
+  const [privacyData, setPrivacyData] = useState<{
     privacyPolicy: string;
     updatedAt: string;
     siteName: string;
@@ -217,6 +211,10 @@ export default function PrivacyPolicyPage() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams(); // Use useSearchParams to get query parameters
+
+  // Determine the back link based on the 'from' query parameter
+  const backLink = searchParams.get("from") === "login" ? "/login" : "/register";
 
   // Fetch settings for logo and social media URLs
   useEffect(() => {
@@ -289,13 +287,13 @@ export default function PrivacyPolicyPage() {
 
   // Fetch privacy policy content
   useEffect(() => {
-    const fetchPolicy = async () => {
+    const fetchPrivacy = async () => {
       try {
         setIsLoading(true);
         const response = await fetch("/api/privacy-policy");
         if (response.ok) {
           const data = await response.json();
-          setPolicyData(data);
+          setPrivacyData(data);
         } else {
           setError("Failed to load privacy policy");
         }
@@ -306,19 +304,19 @@ export default function PrivacyPolicyPage() {
         setIsLoading(false);
       }
     };
-    fetchPolicy();
+    fetchPrivacy();
   }, []);
 
   // Memoize parsed content
   const parsedContent = useMemo(() => {
-    if (!policyData?.privacyPolicy) return [];
+    if (!privacyData?.privacyPolicy) return [];
     return parseContent(
-      policyData.privacyPolicy,
-      policyData.siteName,
-      policyData.supportEmail,
-      policyData.supportPhone
+      privacyData.privacyPolicy,
+      privacyData.siteName,
+      privacyData.supportEmail,
+      privacyData.supportPhone
     );
-  }, [policyData]);
+  }, [privacyData]);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -363,9 +361,9 @@ export default function PrivacyPolicyPage() {
                   asChild
                   className="p-0 mb-4 text-primary-600 hover:text-primary-700"
                 >
-                  <Link href="/register">
+                  <Link href={backLink}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Registration
+                    Back to {searchParams.get("from") === "login" ? "Login" : "Registration"}
                   </Link>
                 </Button>
                 <div className="inline-block rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-700 animate-shimmer mb-4">
@@ -376,8 +374,8 @@ export default function PrivacyPolicyPage() {
                 </h1>
                 <p className="text-gray-600 mt-2">
                   Last updated:{" "}
-                  {policyData?.updatedAt
-                    ? new Date(policyData.updatedAt).toLocaleDateString()
+                  {privacyData?.updatedAt
+                    ? new Date(privacyData.updatedAt).toLocaleDateString()
                     : "N/A"}
                 </p>
               </div>

@@ -32,6 +32,7 @@ interface ITransaction {
   description?: string;
   memo?: string;
   transferId?: string;
+  category?: string; // Add category as an optional field
   __v?: number;
 }
 
@@ -48,6 +49,7 @@ interface IProcessedTransaction {
   status: string;
   account: string;
   memo: string;
+  category: string; // Ensure category is always included
   transferId?: string;
 }
 
@@ -70,8 +72,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
     }
 
-    // Fetch all transactions and populate user details
+    // Fetch all transactions, sorted by date in descending order, and populate user details
     const transactions = await Transaction.find()
+      .sort({ date: -1 }) // Sort by date in descending order (latest first)
       .populate("userId", "fullName email accountNumber savingsNumber")
       .lean() as ITransaction[];
 
@@ -136,6 +139,7 @@ export async function GET(req: NextRequest) {
             status: sourceTx.status,
             account: sourceAccount,
             memo: sourceTx.memo || "",
+            category: sourceTx.category || "Transfer", // Set category with fallback
             transferId,
           });
           processedIds.add(sourceTx._id.toString());
@@ -175,6 +179,7 @@ export async function GET(req: NextRequest) {
             status: senderTx.status,
             account: senderTx.accountType,
             memo: senderTx.memo || "",
+            category: senderTx.category || "External Transfer", // Set category with fallback
             transferId,
           });
           processedIds.add(senderTx._id.toString());
@@ -196,6 +201,7 @@ export async function GET(req: NextRequest) {
         status: tx.status,
         account: tx.accountType,
         memo: tx.memo || "",
+        category: tx.category || "Unknown", // Set category with fallback
         transferId: tx.transferId,
       });
       processedIds.add(txId);

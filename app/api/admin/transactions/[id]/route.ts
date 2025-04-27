@@ -23,7 +23,7 @@ async function verifyAdminToken(req: NextRequest) {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { adminId: string; role?: string };
+    const decoded = jwt.verify(token, JWT_SECRET as string) as unknown as { adminId: string; role?: string };
     console.log("DEBUG: Token decoded:", decoded);
 
     if (decoded.role !== "admin") {
@@ -273,6 +273,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         userName: transaction.userId.fullName,
         userEmail: transaction.userId.email,
         type: transaction.type,
+        category: transaction.category || "Unknown",
         amount: transaction.amount,
         description: transaction.description,
         date: transaction.date.toISOString(),

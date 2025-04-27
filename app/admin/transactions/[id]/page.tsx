@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -39,6 +38,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+
+
+
 
 interface Colors {
   primaryColor: string
@@ -95,6 +97,7 @@ interface UserType {
 }
 
 export default function TransactionDetailPage() {
+
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -112,6 +115,8 @@ export default function TransactionDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [confirmRefund, setConfirmRefund] = useState(false)
   const [colors, setColors] = useState<Colors | null>(null)
+  const from = searchParams.get("from")
+  const backLink = from === "dashboard" ? "/admin/dashboard" : "/admin/transactions"
   const [editFormSender, setEditFormSender] = useState<EditForm>({
     description: "",
     amount: 0,
@@ -181,7 +186,6 @@ export default function TransactionDetailPage() {
 
       try {
         setLoading(true)
-
         // Fetch sender transaction
         console.log("DEBUG: Fetching sender transaction...")
         const senderTxRes = await fetch(`/api/admin/transactions/${transactionId}`, {
@@ -262,7 +266,7 @@ export default function TransactionDetailPage() {
           console.log("DEBUG: Failed to fetch sender refunds")
         }
 
-        // Check if this is an internal transfer, Zelle transfer, or External transfer and fetch the receiver transaction
+        // Check if this is an internal transfer, Zelle transfer, or External transfer
         if ((senderTx.category === "Transfer" || senderTx.category === "Zelle") && senderTx.transferId && !receiverId) {
           console.log("DEBUG: Detected internal or Zelle transfer, fetching corresponding receiver transaction...")
           const relatedTxRes = await fetch(`/api/admin/transactions?transferId=${senderTx.transferId}`, {
@@ -272,7 +276,6 @@ export default function TransactionDetailPage() {
           if (relatedTxRes.ok) {
             const { transactions: relatedTransactions } = await relatedTxRes.json()
             console.log("DEBUG: Related transactions:", relatedTransactions)
-            // Find the receiver transaction (the credit transaction, positive amount)
             const receiverTx = relatedTransactions.find(
               (tx: Transaction) => tx.id !== senderTx.id && tx.amount > 0
             )
@@ -340,7 +343,7 @@ export default function TransactionDetailPage() {
           }
         }
 
-        // Fetch receiver transaction if receiverId exists (for Zelle transfers with paired transactions)
+        // Fetch receiver transaction if receiverId exists
         if (receiverId) {
           console.log("DEBUG: Fetching receiver transaction...")
           const receiverTxRes = await fetch(`/api/admin/transactions/${receiverId}`, {
@@ -413,8 +416,8 @@ export default function TransactionDetailPage() {
             const { transactions: receiverRefunds } = await receiverRefundsRes.json()
             console.log("DEBUG: Receiver refunds:", receiverRefunds)
             setRefundedTransactions((prev) => {
-              const existingIds = new Set(prev.map((tx) => tx.id))
-              const newRefunds = receiverRefunds.filter((tx: Transaction) => !existingIds.has(tx.id))
+              const existingIds = new Set();
+              const newRefunds = receiverRefunds.filter((tx: Transaction) => !existingIds.has(tx.id));
               return [...prev, ...newRefunds]
             })
           } else {
@@ -432,6 +435,7 @@ export default function TransactionDetailPage() {
     }
     fetchTransactionData()
   }, [transactionId, receiverId, router])
+
   const getTransactionIcon = (type: string) => {
     console.log("DEBUG: Getting transaction icon for type:", type)
     switch (type) {
@@ -513,147 +517,142 @@ export default function TransactionDetailPage() {
       console.log("DEBUG: handleSaveChanges completed")
     }
   }
+
   const handleRefundTransaction = async () => {
-    console.log("DEBUG: Starting handleRefundTransaction...");
+    console.log("DEBUG: Starting handleRefundTransaction...")
     if (!senderTransaction || !senderUser) {
-      console.log("DEBUG: No sender transaction or sender user to refund");
-      return;
+      console.log("DEBUG: No sender transaction or sender user to refund")
+      return
     }
-  
-    setSaving(true);
-    setSuccess(null);
-    setError(null);
-  
+
+    setSaving(true)
+    setSuccess(null)
+    setError(null)
+
     try {
-      // Determine the transfer type based on category
       const transferType = {
         isInternalTransfer: senderTransaction.category === "Transfer",
         isZelleTransfer: senderTransaction.category === "Zelle",
         isExternalTransfer: senderTransaction.category === "External Transfer",
-      };
-  
-      console.log("DEBUG: Transfer type:", transferType);
-  
-      // Create request body for the refund
+      }
+
+      console.log("DEBUG: Transfer type:", transferType)
+
       const requestBody: any = {
         senderTransactionId: senderTransaction.id,
         ...transferType,
-      };
-  
-      if (receiverTransaction) {
-        requestBody.receiverTransactionId = receiverTransaction.id;
       }
-  
-      console.log("DEBUG: Refund request body:", requestBody);
-  
-      const refundEndpoint = `/api/admin/transactions/${senderTransaction.id}`;
-      console.log("DEBUG: Sending refund request to:", refundEndpoint);
+
+      if (receiverTransaction) {
+        requestBody.receiverTransactionId = receiverTransaction.id
+      }
+
+      console.log("DEBUG: Refund request body:", requestBody)
+
+      const refundEndpoint = `/api/admin/transactions/${senderTransaction.id}`
+      console.log("DEBUG: Sending refund request to:", refundEndpoint)
       const res = await fetch(refundEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(requestBody),
-      });
-      console.log("DEBUG: Refund response status:", res.status);
-  
+      })
+      console.log("DEBUG: Refund response status:", res.status)
+
       if (!res.ok) {
-        const errorDataText = await res.text();
-        console.log("DEBUG: Refund error response text:", errorDataText);
-        let errorData;
+        const errorDataText = await res.text()
+        console.log("DEBUG: Refund error response text:", errorDataText)
+        let errorData
         try {
-          errorData = JSON.parse(errorDataText);
-          console.log("DEBUG: Refund error data parsed:", errorData);
+          errorData = JSON.parse(errorDataText)
+          console.log("DEBUG: Refund error data parsed:", errorData)
         } catch (parseError) {
-          console.error("DEBUG: Failed to parse refund error response as JSON:", parseError);
-          throw new Error(`Failed to process refund: ${errorDataText}`);
+          console.error("DEBUG: Failed to parse refund error response as JSON:", parseError)
+          throw new Error(`Failed to process refund: ${errorDataText}`)
         }
-        throw new Error(errorData.error || "Failed to process refund");
+        throw new Error(errorData.error || "Failed to process refund")
       }
-  
-      const responseData = await res.json();
-      console.log("DEBUG: Refund response parsed:", responseData);
-  
-      const { message, refundTransactions } = responseData;
-      console.log("DEBUG: Refund message:", message);
-      console.log("DEBUG: Refund transactions:", refundTransactions);
-      setSuccess(message);
-  
-      // Update refunded transactions
+
+      const responseData = await res.json()
+      console.log("DEBUG: Refund response parsed:", responseData)
+
+      const { message, refundTransactions } = responseData
+      console.log("DEBUG: Refund message:", message)
+      console.log("DEBUG: Refund transactions:", refundTransactions)
+      setSuccess(message)
+
       setRefundedTransactions((prev) => {
-        const existingIds = new Set(prev.map((tx) => tx.id));
-        const newRefunds = refundTransactions.filter((tx: Transaction) => !existingIds.has(tx.id));
-        console.log("DEBUG: New refunds to add:", newRefunds);
-        return [...prev, ...newRefunds];
-      });
-  
-      // Update user data
-      const userIds = new Set(refundTransactions.map((tx: Transaction) => tx.userId));
-      console.log("DEBUG: User IDs to update:", Array.from(userIds));
+        const existingIds = new Set(prev.map((tx) => tx.id))
+        const newRefunds = refundTransactions.filter((tx: Transaction) => !existingIds.has(tx.id))
+        console.log("DEBUG: New refunds to add:", newRefunds)
+        return [...prev, ...newRefunds]
+      })
+
+      const userIds = new Set(refundTransactions.map((tx: Transaction) => tx.userId))
+      console.log("DEBUG: User IDs to update:", Array.from(userIds))
       const userPromises = Array.from(userIds).map((userId) =>
         fetch(`/api/admin/users/${userId}`, { credentials: "include" }).then((res) => {
-          console.log(`DEBUG: Fetch user ${userId} response status:`, res.status);
-          if (!res.ok) throw new Error(`Failed to fetch user ${userId}`);
-          return res.json();
+          console.log(`DEBUG: Fetch user ${userId} response status:`, res.status)
+          if (!res.ok) throw new Error(`Failed to fetch user ${userId}`)
+          return res.json()
         })
-      );
-      const userDataArray = await Promise.all(userPromises);
-      console.log("DEBUG: Updated user data:", userDataArray);
+      )
+      const userDataArray = await Promise.all(userPromises)
+      console.log("DEBUG: Updated user data:", userDataArray)
       userDataArray.forEach((data) => {
-        const user = data.user;
+        const user = data.user
         if (user.id === senderTransaction.userId) {
-          setSenderUser(user);
-          console.log("DEBUG: Updated sender user:", user);
+          setSenderUser(user)
+          console.log("DEBUG: Updated sender user:", user)
         }
         if (receiverTransaction && user.id === receiverTransaction.userId) {
-          setReceiverUser(user);
-          console.log("DEBUG: Updated receiver user:", user);
+          setReceiverUser(user)
+          console.log("DEBUG: Updated receiver user:", user)
         }
-      });
-  
-      // Refresh refunded transactions
+      })
+
       if (senderTransaction) {
-        console.log("DEBUG: Fetching sender refunds post-refund...");
+        console.log("DEBUG: Fetching sender refunds post-refund...")
         const senderRefundsRes = await fetch(`/api/admin/transactions?relatedTransactionId=${senderTransaction.id}`, {
           credentials: "include",
-        });
-        console.log("DEBUG: Sender refunds post-refund response status:", senderRefundsRes.status);
+        })
+        console.log("DEBUG: Sender refunds post-refund response status:", senderRefundsRes.status)
         if (senderRefundsRes.ok) {
-          const { transactions: senderRefunds } = await senderRefundsRes.json();
-          console.log("DEBUG: Sender refunds post-refund:", senderRefunds);
+          const { transactions: senderRefunds } = await senderRefundsRes.json()
+          console.log("DEBUG: Sender refunds post-refund:", senderRefunds)
           setRefundedTransactions((prev) => {
-            const existingIds = new Set(prev.map((tx) => tx.id));
-            const newRefunds = senderRefunds.filter((tx: Transaction) => !existingIds.has(tx.id));
-            return [...prev, ...newRefunds];
-          });
+            const existingIds = new Set(prev.map((tx) => tx.id))
+            const newRefunds = senderRefunds.filter((tx: Transaction) => !existingIds.has(tx.id))
+            return [...prev, ...newRefunds]
+          })
         }
       }
       if (receiverTransaction) {
-        console.log("DEBUG: Fetching receiver refunds post-refund...");
+        console.log("DEBUG: Fetching receiver refunds post-refund...")
         const receiverRefundsRes = await fetch(`/api/admin/transactions?relatedTransactionId=${receiverTransaction.id}`, {
           credentials: "include",
-        });
-        console.log("DEBUG: Receiver refunds post-refund response status:", receiverRefundsRes.status);
+        })
+        console.log("DEBUG: Receiver refunds post-refund response status:", receiverRefundsRes.status)
         if (receiverRefundsRes.ok) {
-          const { transactions: receiverRefunds } = await receiverRefundsRes.json();
-          console.log("DEBUG: Receiver refunds post-refund:", receiverRefunds);
+          const { transactions: receiverRefunds } = await receiverRefundsRes.json()
+          console.log("DEBUG: Receiver refunds post-refund:", receiverRefunds)
           setRefundedTransactions((prev) => {
-            const existingIds = new Set(prev.map((tx) => tx.id));
-            const newRefunds = receiverRefunds.filter((tx: Transaction) => !existingIds.has(tx.id));
-            return [...prev, ...newRefunds];
-          });
+            const existingIds = new Set(prev.map((tx) => tx.id))
+            const newRefunds = receiverRefunds.filter((tx: Transaction) => !existingIds.has(tx.id))
+            return [...prev, ...newRefunds]
+          })
         }
       }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An error occurred during refund";
-      console.error("DEBUG: Refund error:", errorMessage);
-      setError(errorMessage);
+      const errorMessage = error instanceof Error ? error.message : "An error occurred during refund"
+      console.error("DEBUG: Refund error:", errorMessage)
+      setError(errorMessage)
     } finally {
-      setSaving(false);
-      setConfirmRefund(false);
-      console.log("DEBUG: handleRefundTransaction completed");
+      setSaving(false)
+      setConfirmRefund(false)
+      console.log("DEBUG: handleRefundTransaction completed")
     }
-  };
-
+  }
 
   if (loading) {
     console.log("DEBUG: Rendering loading state...")
@@ -703,11 +702,11 @@ export default function TransactionDetailPage() {
   console.log("DEBUG: Is group transaction:", isGroupTransaction)
 
   // Determine the title based on the transfer type
-  const senderAccount = senderTransaction.accountType
-  const receiverAccount = receiverTransaction?.accountType
+  const senderAccount = senderTransaction.type
+  const receiverAccount = receiverTransaction?.type
   let transferTitle = "Transaction Details"
-  if (isInternalTransfer) {
-    transferTitle = `From ${senderAccount.charAt(0).toUpperCase() + senderAccount.slice(1)} to ${(receiverAccount ?? "").charAt(0).toUpperCase() + (receiverAccount ?? "").slice(1)}`
+  if (isInternalTransfer && senderAccount && receiverAccount) {
+    transferTitle = `From ${senderAccount.charAt(0).toUpperCase() + senderAccount.slice(1)} to ${receiverAccount.charAt(0).toUpperCase() + receiverAccount.slice(1)}`
   } else if (isZelleTransfer) {
     transferTitle = `${senderUser.fullName} transferred $${Math.abs(senderTransaction.amount).toFixed(2)} to ${receiverUser?.fullName || "Unknown"} (Zelle)`
   } else if (isExternalTransfer) {
@@ -720,16 +719,16 @@ export default function TransactionDetailPage() {
     <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
       <div className="container mx-auto p-6">
         <div className="mb-6">
-          <Button
-            variant="ghost"
-            asChild
-            className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
-          >
-            <Link href="/admin/transactions">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Transactions
-            </Link>
-          </Button>
+        <Button
+          variant="ghost"
+          asChild
+          className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
+        >
+          <Link href={backLink}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Link>
+        </Button>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between sm:items-end gap-4">
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
@@ -764,7 +763,7 @@ export default function TransactionDetailPage() {
                     <Edit className="mr-2 h-4 w-4" />
                     Edit
                   </Button>
-                  <Button
+                  {!isInternalTransfer && (<Button
                     variant="secondary"
                     onClick={() => setConfirmRefund(true)}
                     disabled={saving || senderTransaction.category === "admin"}
@@ -773,6 +772,7 @@ export default function TransactionDetailPage() {
                     <RefreshCcw className="mr-2 h-4 w-4" />
                     {isGroupTransaction || isInternalTransfer ? "Refund Both Transactions" : "Refund Transaction"}
                   </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -792,7 +792,7 @@ export default function TransactionDetailPage() {
           <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
             <CardHeader>
               <CardTitle className="text-primary-900 flex items-center gap-2">
-                Sender Details (From {(senderAccount ?? "").charAt(0).toUpperCase() + (senderAccount ?? "").slice(1)})
+                Sender Details {senderAccount ? `(From ${senderAccount.charAt(0).toUpperCase() + senderAccount.slice(1)})` : ""}
                 <Badge
                   variant={getBadgeVariant(senderTransaction.status)}
                   className={
@@ -967,11 +967,11 @@ export default function TransactionDetailPage() {
                     </div>
                     <div>
                       <p className="text-sm text-primary-600">Account Type</p>
-                      <p className="text-lg font-medium text-primary-900">{senderAccount}</p>
+                      <p className="text-lg font-medium text-primary-900">{senderAccount || "Unknown"}</p>
                     </div>
                     <div>
                       <p className="text-sm text-primary-600">Category</p>
-                      <p className="text-lg font-medium text-primary-900">{senderTransaction.category}</p>
+                      <p className="text-lg font-medium text-primary-900">{senderTransaction.category || "Uncategorized"}</p>
                     </div>
                     {senderTransaction.memo && (
                       <div className="col-span-2">
@@ -983,11 +983,11 @@ export default function TransactionDetailPage() {
                       <>
                         <div>
                           <p className="text-sm text-primary-600">Crypto Amount</p>
-                          <p className="text-lg font-medium text-primary-900">{senderTransaction.cryptoAmount?.toFixed(6)}</p>
+                          <p className="text-lg font-medium text-primary-900">{senderTransaction.cryptoAmount?.toFixed(6) || "0.000000"}</p>
                         </div>
                         <div>
                           <p className="text-sm text-primary-600">Crypto Price</p>
-                          <p className="text-lg font-medium text-primary-900">${senderTransaction.cryptoPrice?.toFixed(2)}</p>
+                          <p className="text-lg font-medium text-primary-900">${senderTransaction.cryptoPrice?.toFixed(2) || "0.00"}</p>
                         </div>
                       </>
                     )}
@@ -1019,7 +1019,7 @@ export default function TransactionDetailPage() {
             <Card className="backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-primary-900 flex items-center gap-2">
-                  Receiver Details (To {(receiverAccount ?? "").charAt(0).toUpperCase() + (receiverAccount ?? "").slice(1)})
+                  Receiver Details {receiverAccount ? `(To ${receiverAccount.charAt(0).toUpperCase() + receiverAccount.slice(1)})` : ""}
                   <Badge
                     variant={getBadgeVariant(receiverTransaction.status)}
                     className={
@@ -1039,7 +1039,7 @@ export default function TransactionDetailPage() {
                 {editMode.receiver ? (
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="receiver-description" className="text-primary-800 font-medium"> Description</Label>
+                      <Label htmlFor="receiver-description" className="text-primary-800 font-medium">Description</Label>
                       <Input
                         id="receiver-description"
                         value={editFormReceiver.description}
@@ -1194,11 +1194,11 @@ export default function TransactionDetailPage() {
                       </div>
                       <div>
                         <p className="text-sm text-primary-600">Account Type</p>
-                        <p className="text-lg font-medium text-primary-900">{receiverAccount}</p>
+                        <p className="text-lg font-medium text-primary-900">{receiverAccount || "Unknown"}</p>
                       </div>
                       <div>
                         <p className="text-sm text-primary-600">Category</p>
-                        <p className="text-lg font-medium text-primary-900">{receiverTransaction.category}</p>
+                        <p className="text-lg font-medium text-primary-900">{receiverTransaction.category || "Uncategorized"}</p>
                       </div>
                       {receiverTransaction.memo && (
                         <div className="col-span-2">
@@ -1210,11 +1210,11 @@ export default function TransactionDetailPage() {
                         <>
                           <div>
                             <p className="text-sm text-primary-600">Crypto Amount</p>
-                            <p className="text-lg font-medium text-primary-900">{receiverTransaction.cryptoAmount?.toFixed(6)}</p>
+                            <p className="text-lg font-medium text-primary-900">{receiverTransaction.cryptoAmount?.toFixed(6) || "0.000000"}</p>
                           </div>
                           <div>
                             <p className="text-sm text-primary-600">Crypto Price</p>
-                            <p className="text-lg font-medium text-primary-900">${receiverTransaction.cryptoPrice?.toFixed(2)}</p>
+                            <p className="text-lg font-medium text-primary-900">${receiverTransaction.cryptoPrice?.toFixed(2) || "0.00"}</p>
                           </div>
                         </>
                       )}
@@ -1244,40 +1244,12 @@ export default function TransactionDetailPage() {
             </Card>
           )}
         </div>
-        {refundedTransactions.length > 0 && (
-          <Card className="mt-6 backdrop-blur-sm bg-white/60 border border-indigo-100 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-primary-900">Refund Transactions</CardTitle>
-              <CardDescription className="text-primary-600">Related refund transactions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {refundedTransactions.map((refund) => (
-                  <div key={refund.id} className="flex items-center gap-3 border-b border-primary-100 pb-2">
-                    <div className="h-8 w-8 rounded-full flex items-center justify-center bg-muted">
-                      {getTransactionIcon(refund.type)}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-primary-900">{refund.description}</p>
-                      <p className="text-sm text-primary-600">
-                        ID: {refund.id} | {new Date(refund.date).toLocaleString()}
-                      </p>
-                    </div>
-                    <p className={`text-lg font-medium ${refund.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {refund.amount >= 0 ? "+" : ""}${Math.abs(refund.amount).toFixed(2)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
         <Dialog open={confirmRefund} onOpenChange={setConfirmRefund}>
           <DialogContent className="bg-white/90 backdrop-blur-sm border border-primary-100">
             <DialogHeader>
               <DialogTitle className="text-primary-900">Confirm Refund</DialogTitle>
               <DialogDescription className="text-primary-600">
-                {(isGroupTransaction || isInternalTransfer)
+                {isGroupTransaction || isInternalTransfer
                   ? "Are you sure you want to refund both transactions in this group? This will credit the sender and debit the receiver."
                   : "Are you sure you want to refund this transaction? This action cannot be undone."}
               </DialogDescription>

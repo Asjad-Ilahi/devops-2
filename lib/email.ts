@@ -22,18 +22,22 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export async function sendVerificationEmail(to: string, code: string) {
+export async function sendVerificationEmail(to: string, message: string) {
+  if (!to) {
+    throw new Error("No recipient email provided");
+  }
+
   const mailOptions = {
     from: EMAIL_USER,
     to,
-    subject: "Verify Your Email",
-    text: `Your verification code is: ${code}`,
-    html: `<p>Your verification code is: <strong>${code}</strong></p>`,
+    subject: "Password Recovery Code",
+    text: message,
+    html: `<p>${message}</p>`,
   };
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log("Email sent successfully:", info.response, "to:", to, "with code:", code);
+    console.log("Email sent successfully:", info.response, "to:", to);
     return info;
   } catch (error) {
     console.error("Error sending email:", error);

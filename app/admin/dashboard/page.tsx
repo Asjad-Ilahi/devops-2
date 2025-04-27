@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { CreditCard, Home, LogOut, Menu, Plus, Settings, Users, Loader, User, AlertCircle } from "lucide-react"
+import { CreditCard, Home, LogOut, Menu, Plus, Settings, Users, Loader, User, AlertCircle, MoreHorizontal } from "lucide-react"
 import Color from "color"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,6 +22,14 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 // Interface for User
 interface User {
@@ -40,11 +48,29 @@ interface User {
 interface Transaction {
   id: string
   userId: string
-  type: "deposit" | "withdrawal" | "transfer" | "adjustment"
+  userName: string
+  userEmail: string
+  type: string
   amount: number
   description: string
   date: string
-  status: "completed" | "pending" | "failed"
+  status: string
+  account: string
+  memo?: string
+  transferId?: string
+}
+
+// Interface for TransactionGroup
+interface TransactionGroup {
+  id: string
+  userIds: string[]
+  description: string
+  date: string
+  amount: number
+  status: string
+  accounts: string[]
+  transactionIds: string[]
+  type: string
 }
 
 // Interface for PendingUser
@@ -85,6 +111,7 @@ export default function AdminDashboardPage() {
   const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true)
   const [users, setUsers] = useState<User[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [groupedTransactions, setGroupedTransactions] = useState<TransactionGroup[]>([])
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([])
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -153,7 +180,7 @@ export default function AdminDashboardPage() {
 
     const fetchSettings = async () => {
       try {
-        const response = await fetch("/api/home")
+        const response = await fetch("/api/admin/settings")
         if (response.ok) {
           const data = await response.json()
           setSettings(data)
@@ -245,6 +272,129 @@ export default function AdminDashboardPage() {
 
     checkAuth()
   }, [router])
+
+  // Group transactions
+  useEffect(() => {
+    const userMap = new Map(users.map((user) => [user.id, user]))
+    const transferGroups = new Map<string, Transaction[]>()
+    const remainingTransactions: Transaction[] = []
+
+    transactions.forEach((tx) => {
+      if (tx.transferId) {
+        const key = tx.transferId
+        if (!transferGroups.has(key)) transferGroups.set(key, [])
+        transferGroups.get(key)!.push(tx)
+      } else {
+        remainingTransactions.push(tx)
+      }
+    })
+
+    const grouped: TransactionGroup[] = []
+    transferGroups.forEach((txs, transferId) => {
+      const userIds = [...new Set(txs.map((tx) => tx.userId))]
+      const date = txs[0].date
+      const status = txs.every((tx) => tx.status === "completed") ? "completed" : "pending"
+      const accounts = [...new Set(txs.map((tx) => tx.account))]
+      const transactionIds = txs.map((tx) => tx.id)
+
+      if (txs.length === 2) {
+        const senderTx = txs.find((tx) => tx.amount < 0)
+        const receiverTx = txs.find((tx) => tx.amount > 0)
+        if (senderTx && receiverTx) {
+          const sender = userMap.get(senderTx.userId)
+          const receiver = userMap.get(receiverTx.userId)
+          grouped.push({
+            id: transferId,
+            userIds,
+            description: `Zelle transfer from ${sender?.name || "Unknown"} to ${receiver?.name || "Unknown"}`,
+            date,
+            amount: Math.abs(senderTx.amount),
+            status,
+            accounts,
+            transactionIds,
+            type: "transfer",
+          })
+        }
+      } else {
+        txs.forEach((tx) => {
+          grouped.push({
+            id: tx.id,
+            userIds: [tx.userId],
+            description: tx.description,
+            date: tx.date,
+            amount: Math.abs(tx.amount),
+            status: tx.status,
+            accounts: [tx.account],
+            transactionIds: [tx.id],
+            type: tx.type,
+          })
+        })
+      }
+    })
+
+    const txByDate = new Map<string, Transaction[]>()
+    remainingTransactions.forEach((tx) => {
+      const key = tx.date
+      if (!txByDate.has(key)) txByDate.set(key, [])
+      txByDate.get(key)!.push(tx)
+    })
+
+    txByDate.forEach((txs, date) => {
+      const unpaired: Transaction[] = [...txs]
+      while (unpaired.length >= 2) {
+        let paired = false
+        for (let i = 0; i < unpaired.length - 1; i++) {
+          for (let j = i + 1; j < unpaired.length; j++) {
+            const tx1 = unpaired[i]
+            const tx2 = unpaired[j]
+            if (
+              tx1.amount === -tx2.amount &&
+              (tx1.type === "deposit" || tx1.type === "transfer") &&
+              (tx2.type === "deposit" || tx2.type === "transfer")
+            ) {
+              const senderTx = tx1.amount < 0 ? tx1 : tx2
+              const receiverTx = tx1.amount < 0 ? tx2 : tx1
+              const sender = userMap.get(senderTx.userId)
+              const receiver = userMap.get(receiverTx.userId)
+              grouped.push({
+                id: `${senderTx.id}-${receiverTx.id}`,
+                userIds: [senderTx.userId, receiverTx.userId],
+                description: `Zelle transfer from ${sender?.name || "Unknown"} to ${receiver?.name || "Unknown"}`,
+                date,
+                amount: Math.abs(senderTx.amount),
+                status: senderTx.status === "completed" && receiverTx.status === "completed" ? "completed" : "pending",
+                accounts: [senderTx.account, receiverTx.account],
+                transactionIds: [senderTx.id, receiverTx.id],
+                type: "transfer",
+              })
+              unpaired.splice(j, 1)
+              unpaired.splice(i, 1)
+              paired = true
+              break
+            }
+          }
+          if (paired) break
+        }
+        if (!paired) break
+      }
+      unpaired.forEach((tx) => {
+        grouped.push({
+          id: tx.id,
+          userIds: [tx.userId],
+          description: tx.description,
+          date: tx.date,
+          amount: Math.abs(tx.amount),
+          status: tx.status,
+          accounts: [tx.account],
+          transactionIds: [tx.id],
+          type: tx.type,
+        })
+      })
+    })
+    grouped.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    setGroupedTransactions(grouped.slice(0, 5)) // Limit to 5 for dashboard
+  }, [transactions, users])
 
   // Handle adding a new transaction
   const handleAddTransaction = async () => {
@@ -435,6 +585,44 @@ export default function AdminDashboardPage() {
       console.error("Logout error:", error)
       router.push("/admin/login")
     }
+  }
+
+  // Transaction icon helper
+  const getTransactionIcon = (type: string) => {
+    switch (type) {
+      case "deposit":
+      case "interest":
+        return <CreditCard className="h-5 w-5 text-green-600" />
+      case "withdrawal":
+        return <CreditCard className="h-5 w-5 text-red-600" />
+      case "transfer":
+        return <CreditCard className="h-5 w-5 text-primary-600" />
+      case "payment":
+        return <CreditCard className="h-5 w-5 text-orange-600" />
+      case "fee":
+        return <CreditCard className="h-5 w-5 text-gray-600" />
+      case "refund":
+        return <CreditCard className="h-5 w-5 text-yellow-600" />
+      case "crypto_buy":
+      case "crypto_sell":
+        return <CreditCard className="h-5 w-5 text-purple-600" />
+      default:
+        return <CreditCard className="h-5 w-5 text-gray-600" />
+    }
+  }
+
+  // Handle status change
+  const handleStatusChange = (transactionId: string, newStatus: "completed" | "pending" | "failed") => {
+    setTransactions((prev) =>
+      prev.map((transaction) =>
+        transaction.id === transactionId ? { ...transaction, status: newStatus } : transaction
+      )
+    )
+    setGroupedTransactions((prev) =>
+      prev.map((group) =>
+        group.transactionIds.includes(transactionId) ? { ...group, status: newStatus } : group
+      )
+    )
   }
 
   // Render loading state or redirect if not authenticated
@@ -730,15 +918,21 @@ export default function AdminDashboardPage() {
                           </Badge>
                         </td>
                         <td className="p-2 sm:p-4 text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-primary-600 hover:text-primary-800 hover:bg-primary-50"
-                            asChild
-                          >
-                            <Link href={`/admin/users/${user.id}`}>Manage</Link>
-                          </Button>
-                        </td>
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="ghost" size="icon" className="h-8 w-8">
+        <MoreHorizontal className="h-4 w-4" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end">
+      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem asChild>
+        <Link href={`/admin/users/${user.id}?from=dashboard`}>Manage</Link>
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+</td>
                       </tr>
                     ))}
                   </tbody>
@@ -753,64 +947,157 @@ export default function AdminDashboardPage() {
           <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full">
                   <thead>
                     <tr className="border-b bg-primary-50/50">
-                      <th className="text-left p-2 sm:p-4 text-primary-800">ID</th>
-                      <th className="text-left p-2 sm:p-4 text-primary-800">User</th>
-                      <th className="text-left p-2 sm:p-4 text-primary-800 hidden md:table-cell">Type</th>
-                      <th className="text-right p-2 sm:p-4 text-primary-800">Amount</th>
-                      <th className="text-left p-2 sm:p-4 text-primary-800 hidden lg:table-cell">Description</th>
-                      <th className="text-left p-2 sm:p-4 text-primary-800 hidden md:table-cell">Date</th>
-                      <th className="text-center p-2 sm:p-4 text-primary-800 hidden sm:table-cell">Status</th>
+                      <th className="text-left p-4 text-primary-800">ID</th>
+                      <th className="text-left p-4 text-primary-800">Users</th>
+                      <th className="text-left p-4 text-primary-800">Description</th>
+                      <th className="text-left p-4 text-primary-800">Date</th>
+                      <th className="text-left p-4 text-primary-800">Accounts</th>
+                      <th className="text-right p-4 text-primary-800">Amount</th>
+                      <th className="text-center p-4 text-primary-800">Status</th>
+                      <th className="text-center p-4 text-primary-800">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-primary-100">
-                    {transactions.slice(0, 5).map((transaction) => {
-                      const user = users.find((u) => u.id === transaction.userId)
+                    {groupedTransactions.map((group) => {
+                      const userNames = group.userIds.map(
+                        (id) => users.find((u) => u.id === id)?.name || "Unknown User"
+                      )
+                      const isGroup = group.transactionIds.length > 1
+                      const senderTxId = group.transactionIds.find((txId) => {
+                        const tx = transactions.find((t) => t.id === txId)
+                        return (tx?.amount ?? 0) < 0
+                      })
+                      const receiverTxId = group.transactionIds.find((txId) => {
+                        const tx = transactions.find((t) => t.id === txId)
+                        return (tx?.amount ?? 0) > 0
+                      })
+                      const detailLink = isGroup
+                        ? `/admin/transactions/${senderTxId}?receiverId=${receiverTxId}`
+                        : `/admin/transactions/${group.transactionIds[0]}`
+
                       return (
-                        <tr key={transaction.id} className="hover:bg-primary-50/50 transition-colors">
-                          <td className="p-2 sm:p-4 font-mono text-xs text-primary-700">{transaction.id}</td>
-                          <td className="p-2 sm:p-4 text-sm text-primary-900">{user?.name || "Unknown User"}</td>
-                          <td className="p-2 sm:p-4 capitalize hidden md:table-cell text-primary-900">
-                            {transaction.type}
+                        <tr key={group.id} className="hover:bg-primary-50/50 transition-colors">
+                          <td className="p-4 font-mono text-xs">
+                            {isGroup ? `Group: ${group.id}` : group.id}
                           </td>
-                          <td
-                            className={`p-2 sm:p-4 text-right font-medium text-sm ${
-                              transaction.amount > 0 ? "text-green-600" : "text-red-600"
-                            }`}
-                          >
-                            {transaction.amount > 0 ? "+" : ""}${Math.abs(transaction.amount).toFixed(2)}
+                          <td className="p-4">
+                            <div>
+                              <div className="font-medium text-primary-900">{userNames.join(" to ")}</div>
+                              <div className="text-sm text-primary-600">
+                                {userNames.map((name, index) => (
+                                  <span key={group.userIds[index]}>
+                                    {users.find((u) => u.id === group.userIds[index])?.email || ""}
+                                    {index < userNames.length - 1 ? " to " : ""}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
                           </td>
-                          <td className="p-2 sm:p-4 text-sm hidden lg:table-cell text-primary-900">
-                            {transaction.description}
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 rounded-full flex items-center justify-center bg-muted">
+                                {getTransactionIcon(group.type)}
+                              </div>
+                              <div>
+                                <div className="font-medium">{group.description}</div>
+                                <div className="text-sm text-muted-foreground capitalize">
+                                  {group.type.replace("_", " ")}
+                                </div>
+                              </div>
+                            </div>
                           </td>
-                          <td className="p-2 sm:p-4 text-xs hidden md:table-cell text-primary-700">
-                            {formatDate(transaction.date)}
+                          <td className="p-4">{new Date(group.date).toLocaleString()}</td>
+                          <td className="p-4">{group.accounts.join(", ")}</td>
+                          <td className="p-4 text-right font-medium text-green-600">
+                            ${group.amount.toFixed(2)}
                           </td>
-                          <td className="p-2 sm:p-4 text-center hidden sm:table-cell">
+                          <td className="p-4 text-center">
                             <Badge
                               variant={
-                                transaction.status === "completed"
+                                group.status === "completed"
                                   ? "default"
-                                  : transaction.status === "pending"
+                                  : group.status === "pending"
                                   ? "secondary"
                                   : "destructive"
                               }
                               className={
-                                transaction.status === "completed"
+                                group.status === "completed"
                                   ? "bg-green-100 text-green-800 border-green-200 hover:bg-green-200"
-                                  : transaction.status === "pending"
+                                  : group.status === "pending"
                                   ? "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
                                   : "bg-red-100 text-red-800 border-red-200 hover:bg-red-200"
                               }
                             >
-                              {transaction.status}
+                              {group.status.charAt(0).toUpperCase() + group.status.slice(1)}
                             </Badge>
                           </td>
+                          <td className="p-4 text-center">
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="ghost" size="icon" className="h-8 w-8">
+        <MoreHorizontal className="h-4 w-4" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end">
+      <DropdownMenuLabel>Transaction Actions</DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      {isGroup ? (
+        <DropdownMenuItem asChild>
+          <Link href={`${detailLink}&from=dashboard`}>View Transactions</Link>
+        </DropdownMenuItem>
+      ) : (
+        <DropdownMenuItem asChild>
+          <Link href={`${detailLink}?from=dashboard`}>
+            View Details (ID: {group.transactionIds[0]})
+          </Link>
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuItem asChild>
+        <Link href={`/admin/users/${group.userIds[0]}?from=dashboard`}>View User</Link>
+      </DropdownMenuItem>
+      {group.userIds.length > 1 && (
+        <DropdownMenuItem asChild>
+          <Link href={`/admin/users/${group.userIds[1]}?from=dashboard`}>View Recipient</Link>
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuSeparator />
+      {group.status === "pending" && (
+        <>
+          <DropdownMenuItem
+            onClick={() => handleStatusChange(group.transactionIds[0], "completed")}
+          >
+            Mark as Completed
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => handleStatusChange(group.transactionIds[0], "failed")}
+          >
+            Mark as Failed
+          </DropdownMenuItem>
+        </>
+      )}
+      {group.status === "failed" && (
+        <DropdownMenuItem
+          onClick={() => handleStatusChange(group.transactionIds[0], "completed")}
+        >
+          Mark as Completed
+        </DropdownMenuItem>
+      )}
+    </DropdownMenuContent>
+  </DropdownMenu>
+</td>
                         </tr>
                       )
                     })}
+                    {groupedTransactions.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="p-4 text-center text-muted-foreground">
+                          No transactions found
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
