@@ -85,7 +85,7 @@ export default function RegisterPage() {
 
     const fetchSettings = async () => {
       try {
-        const response = await fetch("/api/home");
+        const response = await fetch("/api/admin/settings");
         if (response.ok) {
           const data = await response.json();
           setSettings(data);
@@ -485,7 +485,7 @@ export default function RegisterPage() {
               </div>
               <div className="flex flex-col items-center">
                 <div
-                  className={`rounded-full ${step >= 2 ? "bg-gradient-to-r from-primary-600 to-secondary-600" : "bg-gray-200"} text-white flex items-center justify-center h-10 w-10 text-sm shadow-md`}
+                  className={`rounded-full ${step >= 2 ? "bg-gradient-to-r from-primary-600 to-secondary-600" : "bg-gray-300"} text-white flex items-center justify-center h-10 w-10 text-sm shadow-md`}
                 >
                   2
                 </div>
@@ -493,7 +493,7 @@ export default function RegisterPage() {
               </div>
               <div className="flex flex-col items-center">
                 <div
-                  className={`rounded-full ${step >= 3 ? "bg-gradient-to-r from-primary-600 to-secondary-600" : "bg-gray-200"} text-white flex items-center justify-center h-10 w-10 text-sm shadow-md`}
+                  className={`rounded-full ${step >= 3 ? "bg-gradient-to-r from-primary-600 to-secondary-600" : "bg-gray-300"} text-white flex items-center justify-center h-10 w-10 text-sm shadow-md`}
                 >
                   3
                 </div>
@@ -840,11 +840,11 @@ export default function RegisterPage() {
             <div className="text-center">
               <p className="text-sm text-primary-700">
                 By creating an account, you agree to our{" "}
-                <Link href="/terms-of-services" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
+                <Link href="/terms-of-services?from=register" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
                   Terms of Service
                 </Link>{" "}
                 and{" "}
-                <Link href="privacy-policy" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
+                <Link href="/privacy-policy?from=register" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
                   Privacy Policy
                 </Link>
               </p>

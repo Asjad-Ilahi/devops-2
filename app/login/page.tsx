@@ -65,7 +65,7 @@ export default function LoginPage() {
 
     const fetchSettings = async () => {
       try {
-        const response = await fetch("/api/home");
+        const response = await fetch("/api/admin/settings");
         if (response.ok) {
           const data = await response.json();
           setSettings(data);
@@ -205,7 +205,7 @@ export default function LoginPage() {
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       placeholder="Enter your username"
-                      className="mt-1 bg-primary-50 border-primary-200 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                      className="mt-1 bg-white border-primary-200 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                     />
                   </div>
                   <div>
@@ -230,7 +230,7 @@ export default function LoginPage() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Enter your password"
-                        className="pr-10 bg-primary-50 border-primary-200 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                        className="pr-10 bg-white border-primary-200 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                       />
                       <button
                         type="button"
@@ -263,11 +263,11 @@ export default function LoginPage() {
                 <div className="text-center">
                   <p className="text-sm text-primary-600">
                     By signing in, you agree to our{" "}
-                    <Link href="#" className="font-medium text-primary-600 hover:text-primary-500">
+                    <Link href="/terms-of-services?from=login" className="font-medium text-primary-600 hover:text-primary-500">
                       Terms of Service
                     </Link>{" "}
                     and{" "}
-                    <Link href="#" className="font-medium text-primary-600 hover:text-primary-500">
+                    <Link href="/privacy-policy?from=login" className="font-medium text-primary-600 hover:text-primary-500">
                       Privacy Policy
                     </Link>
                   </p>

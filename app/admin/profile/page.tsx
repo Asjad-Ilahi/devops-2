@@ -1,66 +1,59 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import Color from "color"
-import { Lock, Save, ArrowLeft, Eye, EyeOff } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import Color from "color";
+import { Lock, Save, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// Interface for Colors
 interface Colors {
-  primaryColor: string
-  secondaryColor: string
+  primaryColor: string;
+  secondaryColor: string;
 }
 
-// Interface for Admin Profile
 interface AdminProfile {
-  username: string
-  email: string
+  username: string;
+  email: string;
 }
 
-// Interface for Password Data
 interface PasswordData {
-  currentPassword: string
-  newPassword: string
-  confirmPassword: string
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
 }
 
 export default function AdminProfilePage() {
-  const [profile, setProfile] = useState<AdminProfile>({
-    username: "",
-    email: ""
-  })
+  const [profile, setProfile] = useState<AdminProfile>({ username: "", email: "" });
   const [passwordData, setPasswordData] = useState<PasswordData>({
     currentPassword: "",
     newPassword: "",
-    confirmPassword: ""
-  })
-  const [showPassword, setShowPassword] = useState<boolean>(false)
-  const [showNewPassword, setShowNewPassword] = useState<boolean>(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false)
-  const [successMessage, setSuccessMessage] = useState<string>("")
-  const [errorMessage, setErrorMessage] = useState<string>("")
-  const [isLoading, setIsLoading] = useState<boolean>(false)
-  const [colors, setColors] = useState<Colors | null>(null)
+    confirmPassword: "",
+  });
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showNewPassword, setShowNewPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
+  const [successMessage, setSuccessMessage] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [colors, setColors] = useState<Colors | null>(null);
 
-  // Fetch colors and set CSS custom properties
   useEffect(() => {
     const fetchColors = async () => {
       try {
-        const response = await fetch("/api/colors")
-        if (!response.ok) throw new Error("Failed to fetch colors")
-        const data: Colors = await response.json()
-        setColors(data)
+        const response = await fetch("/api/colors");
+        if (!response.ok) throw new Error("Failed to fetch colors");
+        const data: Colors = await response.json();
+        setColors(data);
 
-        const primary = Color(data.primaryColor)
-        const secondary = Color(data.secondaryColor)
+        const primary = Color(data.primaryColor);
+        const secondary = Color(data.secondaryColor);
 
         const generateShades = (color: typeof Color.prototype) => ({
           50: color.lighten(0.5).hex(),
@@ -73,143 +66,165 @@ export default function AdminProfilePage() {
           700: color.darken(0.2).hex(),
           800: color.darken(0.3).hex(),
           900: color.darken(0.4).hex(),
-        })
+        });
 
-        const primaryShades = generateShades(primary)
-        const secondaryShades = generateShades(secondary)
+        const primaryShades = generateShades(primary);
+        const secondaryShades = generateShades(secondary);
 
         Object.entries(primaryShades).forEach(([shade, color]) => {
-          document.documentElement.style.setProperty(`--primary-${shade}`, color)
-        })
+          document.documentElement.style.setProperty(`--primary-${shade}`, color);
+        });
 
         Object.entries(secondaryShades).forEach(([shade, color]) => {
-          document.documentElement.style.setProperty(`--secondary-${shade}`, color)
-        })
+          document.documentElement.style.setProperty(`--secondary-${shade}`, color);
+        });
       } catch (error) {
-        console.error("Error fetching colors:", error)
+        console.error("Error fetching colors:", error);
       }
-    }
-    fetchColors()
-  }, [])
+    };
+    fetchColors();
+  }, []);
 
   useEffect(() => {
-    fetchProfile()
-  }, [])
+    fetchProfile();
+  }, []);
 
   const fetchProfile = async (): Promise<void> => {
     try {
-      setIsLoading(true)
+      setIsLoading(true);
       const response = await fetch('/api/admin/profile', {
         method: 'GET',
-        credentials: 'include'
-      })
+        credentials: 'include',
+      });
       if (!response.ok) {
-        throw new Error('Failed to fetch profile')
+        throw new Error('Failed to fetch profile');
       }
-      const data: AdminProfile = await response.json()
+      const data: AdminProfile = await response.json();
       setProfile({
         username: data.username || "",
-        email: data.email || ""
-      })
+        email: data.email || "",
+      });
     } catch (error: unknown) {
-      setErrorMessage("Failed to load profile")
-      setTimeout(() => setErrorMessage(""), 3000)
+      setErrorMessage("Failed to load profile");
+      setTimeout(() => setErrorMessage(""), 3000);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleSaveProfile = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault()
+    e.preventDefault();
+    if (!profile.username.trim() || !profile.email.trim()) {
+      setErrorMessage("Username and email are required");
+      setSuccessMessage("");
+      setTimeout(() => setErrorMessage(""), 3000);
+      return;
+    }
     try {
-      setIsLoading(true)
+      setIsLoading(true);
+      console.log('Sending profile update:', profile); // Debug
       const response = await fetch('/api/admin/profile', {
         method: 'PUT',
         credentials: 'include',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(profile)
-      })
+        body: JSON.stringify(profile),
+      });
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to update profile')
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update profile');
       }
 
-      setSuccessMessage("Profile updated successfully")
-      setErrorMessage("")
-      setTimeout(() => setSuccessMessage(""), 3000)
+      setSuccessMessage("Profile updated successfully");
+      setErrorMessage("");
+      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to update profile"
-      setErrorMessage(message)
-      setSuccessMessage("")
-      setTimeout(() => setErrorMessage(""), 3000)
+      const message = error instanceof Error ? error.message : "Failed to update profile";
+      setErrorMessage(message);
+      setSuccessMessage("");
+      setTimeout(() => setErrorMessage(""), 3000);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleChangePassword = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault()
-    
+    e.preventDefault();
+
+    if (!passwordData.currentPassword.trim() || !passwordData.newPassword.trim()) {
+      setErrorMessage("Current and new passwords are required");
+      setSuccessMessage("");
+      setTimeout(() => setErrorMessage(""), 3000);
+      return;
+    }
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setErrorMessage("New passwords do not match")
-      setSuccessMessage("")
-      setTimeout(() => setErrorMessage(""), 3000)
-      return
+      setErrorMessage("New passwords do not match");
+      setSuccessMessage("");
+      setTimeout(() => setErrorMessage(""), 3000);
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      setErrorMessage("New password must be at least 8 characters long");
+      setSuccessMessage("");
+      setTimeout(() => setErrorMessage(""), 3000);
+      return;
     }
 
     try {
-      setIsLoading(true)
+      setIsLoading(true);
+      console.log('Sending password change:', { currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword }); // Debug
       const response = await fetch('/api/admin/profile', {
         method: 'PUT',
         credentials: 'include',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           currentPassword: passwordData.currentPassword,
-          newPassword: passwordData.newPassword
-        })
-      })
+          newPassword: passwordData.newPassword,
+        }),
+      });
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to change password')
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to change password');
       }
 
-      setSuccessMessage("Password changed successfully")
-      setErrorMessage("")
+      setSuccessMessage("Password changed successfully");
+      setErrorMessage("");
       setPasswordData({
         currentPassword: "",
         newPassword: "",
-        confirmPassword: ""
-      })
-      setTimeout(() => setSuccessMessage(""), 3000)
+        confirmPassword: "",
+      });
+      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to change password"
-      setErrorMessage(message)
-      setSuccessMessage("")
-      setTimeout(() => setErrorMessage(""), 3000)
+      const message = error instanceof Error ? error.message : "Failed to change password";
+      setErrorMessage(message);
+      setSuccessMessage("");
+      setTimeout(() => setErrorMessage(""), 3000);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     setProfile({
       ...profile,
-      [e.target.id]: e.target.value
-    })
-  }
+      [e.target.id]: e.target.value,
+    });
+  };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     setPasswordData({
       ...passwordData,
-      [e.target.id]: e.target.value
-    })
-  }
+      [e.target.id]: e.target.value,
+    });
+  };
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
@@ -226,11 +241,6 @@ export default function AdminProfilePage() {
               Back to Dashboard
             </Link>
           </Button>
-
-          <div className="flex items-center mb-2">
-            <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto mr-2" />
-            <Badge variant="secondary">Admin</Badge>
-          </div>
         </div>
 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
@@ -451,5 +461,5 @@ export default function AdminProfilePage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

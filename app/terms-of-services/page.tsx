@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, JSX } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation"; // Import useSearchParams
 import Color from "color";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,9 +40,7 @@ const enhancedStyles = `
   }
   @keyframes pulse-glow {
     0%, 100% { box-shadow: 0 0 0 rgba(140, 53, 234, 0.4); }
-    50% { box-shadow: 0 0 20px rgba(140, 53, 234
-
-0.6); }
+    50% { box-shadow: 0 0 20px rgba(140, 53, 234, 0.6); }
   }
   @keyframes shimmer {
     0% { background-position: -100% 0; }
@@ -212,6 +211,10 @@ export default function TermsOfServicePage() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams(); // Use useSearchParams to get query parameters
+
+  // Determine the back link based on the 'from' query parameter
+  const backLink = searchParams.get("from") === "login" ? "/login" : "/register";
 
   // Fetch settings for logo and social media URLs
   useEffect(() => {
@@ -358,9 +361,9 @@ export default function TermsOfServicePage() {
                   asChild
                   className="p-0 mb-4 text-primary-600 hover:text-primary-700"
                 >
-                  <Link href="/register">
+                  <Link href={backLink}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Registration
+                    Back to {searchParams.get("from") === "login" ? "Login" : "Registration"}
                   </Link>
                 </Button>
                 <div className="inline-block rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-700 animate-shimmer mb-4">
@@ -441,7 +444,7 @@ export default function TermsOfServicePage() {
                   aria-label="Facebook"
                 >
                   <svg
-                    xmlns="http://www.w3 |/2000/svg"
+                    xmlns="http://www.w3.org/2000/svg"
                     width="24"
                     height="24"
                     viewBox="0 0 24 24"

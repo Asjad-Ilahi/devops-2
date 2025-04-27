@@ -3,9 +3,9 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Color from "color";
-import { ArrowLeft, Check, CreditCard, Edit2, Key, Loader2, Mail, Shield, User, AlertCircle, Phone } from "lucide-react";
+import { ArrowLeft, Check, Key, Mail, Shield, User, AlertCircle, Phone, Edit2, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,7 +15,6 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -68,13 +67,14 @@ export default function UserManagementPage() {
   const params = useParams();
   const router = useRouter();
   const userId = params.id as string;
+  const searchParams = useSearchParams();
 
   // User state
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const from = searchParams.get("from");
 
   // Edit states
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -84,6 +84,7 @@ export default function UserManagementPage() {
     username: "",
     phoneNumber: "",
   });
+  const backLink = from === "dashboard" ? "/admin/dashboard" : "/admin/users"
 
   // Reset password dialog
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
@@ -154,7 +155,7 @@ export default function UserManagementPage() {
     fetchColors();
   }, []);
 
-  // Fetch user data and transactions from API
+  // Fetch user data from API
   useEffect(() => {
     const fetchUserData = async () => {
       setLoading(true);
@@ -197,32 +198,6 @@ export default function UserManagementPage() {
           username: formattedUser.username,
           phoneNumber: formattedUser.phoneNumber,
         });
-
-        // Fetch transactions
-        const transactionsResponse = await fetch(`/api/admin/users/${userId}/transactions`, {
-          method: "GET",
-          credentials: "include",
-        });
-        if (!transactionsResponse.ok) {
-          const data = await transactionsResponse.json();
-          throw new Error(data.error || "Failed to fetch transactions");
-        }
-        const { transactions: transactionsData } = await transactionsResponse.json();
-        setTransactions(
-          transactionsData.map((txn: any) => ({
-            id: txn._id,
-            userId: txn.userId,
-            type: txn.type,
-            amount: txn.amount,
-            description: txn.description || "N/A",
-            date: new Date(txn.date).toISOString().replace("T", " ").substring(0, 19),
-            status: txn.status,
-            category: txn.category || "N/A",
-            accountType: txn.accountType,
-            cryptoAmount: txn.cryptoAmount,
-            cryptoPrice: txn.cryptoPrice,
-          }))
-        );
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : "Failed to load user data";
         setError(errorMessage);
@@ -344,6 +319,14 @@ export default function UserManagementPage() {
       setError("Please enter a valid amount");
       return;
     }
+    // Check for sufficient balance for withdrawal
+    if (newTransaction.type === "withdrawal" && user) {
+      const withdrawalAmount = Math.abs(amount); // Ensure positive value for comparison
+      if (user.checkingBalance < withdrawalAmount) {
+        setError(`User account don't have the selected amount. Total amount in checking account $${user.checkingBalance.toFixed(2)}`);
+        return;
+      }
+    }
     if (["crypto_buy", "crypto_sell"].includes(newTransaction.type)) {
       setIsCryptoDialogOpen(true);
       return;
@@ -377,7 +360,6 @@ export default function UserManagementPage() {
         category: newTxn.category,
         accountType: newTxn.accountType,
       };
-      setTransactions((prev) => [transaction, ...prev]);
       setUser((prev) => ({
         ...prev!,
         checkingBalance: prev!.checkingBalance + amount,
@@ -445,7 +427,6 @@ export default function UserManagementPage() {
         cryptoAmount: newTxn.cryptoAmount,
         cryptoPrice: newTxn.cryptoPrice,
       };
-      setTransactions((prev) => [transaction, ...prev]);
       setUser((prev) => ({
         ...prev!,
         cryptoBalance: prev!.cryptoBalance + cryptoAmount,
@@ -507,9 +488,9 @@ export default function UserManagementPage() {
           asChild
           className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
         >
-          <Link href="/admin/users">
+          <Link href={backLink}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Users
+            Back
           </Link>
         </Button>
         <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
@@ -557,8 +538,8 @@ export default function UserManagementPage() {
                       user.status === "active"
                         ? "bg-green-100 text-green-800 border-green-200"
                         : user.status === "pending"
-                        ? "bg-amber-100 text-amber-800 border-amber-200"
-                        : "bg-red-100 text-red-800 border-red-200"
+                          ? "bg-amber-100 text-amber-800 border-amber-200"
+                          : "bg-red-100 text-red-800 border-red-200"
                     }
                   >
                     {user.status}
@@ -628,7 +609,6 @@ export default function UserManagementPage() {
                 <Shield className="mr-2 h-4 w-4" />
                 Manage 2FA
               </Button>
-
             </div>
           </CardContent>
         </Card>
@@ -754,112 +734,74 @@ export default function UserManagementPage() {
                   </div>
                 </div>
 
-                <Tabs defaultValue="transactions">
-                  <TabsList className="grid w-full grid-cols-2 bg-primary-100/70 p-1 rounded-lg">
-                    <TabsTrigger
-                      value="transactions"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
-                    >
-                      Recent Transactions
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="add"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
-                    >
-                      Add Transaction
-                    </TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="transactions" className="space-y-4 pt-4">
-                    {transactions.length > 0 ? (
-                      <div className="space-y-3">
-                        {transactions.map((transaction) => (
-                          <div
-                            key={transaction.id}
-                            className="flex items-center justify-between p-3 border border-primary-100 rounded-md bg-white/80 hover:bg-white transition-colors"
-                          >
-                            <div>
-                              <div className="font-medium text-primary-900">{transaction.description}</div>
-                              <div className="text-sm text-primary-600">{transaction.date}</div>
-                            </div>
-                            <div className={`font-bold ${transaction.amount > 0 ? "text-green-600" : "text-red-600"}`}>
-                              {transaction.amount > 0 ? "+" : ""}
-                              {transaction.amount.toFixed(2)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-primary-600">No transactions found</div>
-                    )}
-                  </TabsContent>
-                  <TabsContent value="add" className="pt-4">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="transactionType" className="text-primary-800">
-                          Transaction Type
-                        </Label>
-                        <Select
-                          value={newTransaction.type}
-                          onValueChange={(value) =>
-                            setNewTransaction({ ...newTransaction, type: value as Transaction["type"] })
-                          }
-                        >
-                          <SelectTrigger
-                            id="transactionType"
-                            className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
-                          >
-                            <SelectValue placeholder="Select transaction type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="deposit">Deposit</SelectItem>
-                            <SelectItem value="withdrawal">Withdrawal</SelectItem>
-                            <SelectItem value="transfer">Transfer</SelectItem>
-                            <SelectItem value="payment">Payment</SelectItem>
-                            <SelectItem value="crypto_buy">Add Crypto</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="amount" className="text-primary-800">
-                          Amount
-                        </Label>
-                        <div className="relative">
-                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-600">$</div>
-                          <Input
-                            id="amount"
-                            type="number"
-                            step="0.01"
-                            className="pl-7 border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
-                            placeholder="0.00"
-                            value={newTransaction.amount}
-                            onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
-                          />
-                        </div>
-                        <p className="text-sm text-primary-600">
-                          Use negative values for withdrawals only that reduce balance.
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="description" className="text-primary-800">
-                          Description
-                        </Label>
-                        <Input
-                          id="description"
-                          placeholder="Enter transaction description"
+                <div className="space-y-4 pt-4">
+                  <h3 className="text-lg font-medium text-primary-900">Add Transaction</h3>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="transactionType" className="text-primary-800">
+                        Transaction Type
+                      </Label>
+                      <Select
+                        value={newTransaction.type}
+                        onValueChange={(value) =>
+                          setNewTransaction({ ...newTransaction, type: value as Transaction["type"] })
+                        }
+                      >
+                        <SelectTrigger
+                          id="transactionType"
                           className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
-                          value={newTransaction.description}
-                          onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
+                        >
+                          <SelectValue placeholder="Select transaction type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="deposit">Deposit</SelectItem>
+                          <SelectItem value="withdrawal">Withdrawal</SelectItem>
+                          <SelectItem value="transfer">Transfer</SelectItem>
+                          <SelectItem value="payment">Payment</SelectItem>
+                          <SelectItem value="crypto_buy">Add Crypto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="amount" className="text-primary-800">
+                        Amount
+                      </Label>
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-600">$</div>
+                        <Input
+                          id="amount"
+                          type="number"
+                          step="0.01"
+                          className="pl-7 border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                          placeholder="0.00"
+                          value={newTransaction.amount}
+                          onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
                         />
                       </div>
-                      <Button
-                        className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
-                        onClick={handleAddTransaction}
-                      >
-                        Add Transaction
-                      </Button>
+                      <p className="text-sm text-primary-600">
+                        Use negative values for withdrawals only that reduce balance.
+                      </p>
                     </div>
-                  </TabsContent>
-                </Tabs>
+                    <div className="space-y-2">
+                      <Label htmlFor="description" className="text-primary-800">
+                        Description
+                      </Label>
+                      <Input
+                        id="description"
+                        placeholder="Enter transaction description"
+                        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                        value={newTransaction.description}
+                        onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
+                      />
+                    </div>
+                    <Button
+                      className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
+                      onClick={handleAddTransaction}
+                    >
+                      Add Transaction
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>
@@ -880,7 +822,7 @@ export default function UserManagementPage() {
               </Alert>
             )}
             <div className="space-y-2">
-              <Label htmlFor="newPassword" className="text-primary-800">
+              <Label htmlFor="newPassword" className="title-primary-800">
                 New Password
               </Label>
               <Input

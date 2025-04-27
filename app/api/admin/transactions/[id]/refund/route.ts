@@ -23,7 +23,7 @@ async function verifyAdminToken(req: NextRequest) {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { adminId: string; role?: string };
+    const decoded = jwt.verify(token, JWT_SECRET as string) as unknown as { adminId: string; role?: string };
     console.log("DEBUG: Token decoded:", decoded);
 
     if (decoded.role !== "admin") {

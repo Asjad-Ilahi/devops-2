@@ -16,6 +16,7 @@ import {
   RefreshCcw,
   Loader2,
   ArrowLeft,
+  MoreHorizontal,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -158,18 +159,17 @@ export default function AdminTransactionsPage() {
 
         const transactionsData = await transactionsRes.json()
         const usersData = await usersRes.json()
-        
+
         // Log raw transactions for debugging
         console.log("Raw transactions:", transactionsData.transactions)
         console.log("Raw users:", usersData.users)
-        
+
         // Filter out transactions with invalid amounts
         const validTransactions = transactionsData.transactions.filter(
           (tx: Transaction) => typeof tx.amount === "number" && !isNaN(tx.amount) && tx.userId
         )
         setTransactions(validTransactions)
         setUsers(usersData.users)
-        
         if (validTransactions.length === 0) {
           setError("No valid transactions found")
         }
@@ -231,7 +231,7 @@ export default function AdminTransactionsPage() {
             userIds: [tx.userId],
             description: tx.description,
             date: tx.date,
-            amount: tx.amount,
+            amount: Math.abs(tx.amount),
             status: tx.status,
             accounts: [tx.account],
             transactionIds: [tx.id],
@@ -292,7 +292,7 @@ export default function AdminTransactionsPage() {
           userIds: [tx.userId],
           description: tx.description,
           date: tx.date,
-          amount: tx.amount,
+          amount: Math.abs(tx.amount),
           status: tx.status,
           accounts: [tx.account],
           transactionIds: [tx.id],
@@ -333,6 +333,10 @@ export default function AdminTransactionsPage() {
     } else if (amountFilter === "negative") {
       filtered = filtered.filter((group) => group.amount < 0)
     }
+
+    // Sort filtered transactions by date in descending order (most recent first)
+    filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
     setGroupedTransactions(filtered)
   }, [searchTerm, dateRange, typeFilter, statusFilter, amountFilter, transactions, users])
 
@@ -385,151 +389,6 @@ export default function AdminTransactionsPage() {
       from: range?.from,
       to: range?.to,
     })
-  }
-
-  const handleRefundGroup = async (groupId: string) => {
-    try {
-      setSuccess(null)
-      setError(null)
-
-      // Fetch transactions in the group
-      const response = await fetch(`/api/admin/transactions?transferId=${groupId}`, {
-        method: "GET",
-        credentials: "include",
-      })
-      if (!response.ok) throw new Error("Failed to fetch group transactions")
-      const { transactions } = await response.json()
-      if (transactions.length !== 2) throw new Error("Invalid group: must contain exactly 2 transactions")
-
-      const senderTx = transactions.find((tx: Transaction) => tx.amount < 0)
-      const receiverTx = transactions.find((tx: Transaction) => tx.amount > 0)
-      if (!senderTx || !receiverTx) throw new Error("Invalid group: missing sender or receiver transaction")
-
-      // Check for existing refunds
-      const [senderRefundRes, receiverRefundRes] = await Promise.all([
-        fetch(`/api/admin/transactions?relatedTransactionId=${senderTx.id}`, {
-          method: "GET",
-          credentials: "include",
-        }),
-        fetch(`/api/admin/transactions?relatedTransactionId=${receiverTx.id}`, {
-          method: "GET",
-          credentials: "include",
-        }),
-      ])
-      const senderRefunds = await senderRefundRes.json()
-      const receiverRefunds = await receiverRefundRes.json()
-
-      if (senderRefunds.transactions.length > 0 && receiverRefunds.transactions.length > 0) {
-        throw new Error("Both sender and receiver transactions have already been refunded")
-      }
-
-      const refundTransactions: Transaction[] = []
-      const balanceUpdates: { userId: string; balanceChange: number }[] = []
-
-      // Refund sender if not already refunded
-      if (senderRefunds.transactions.length === 0) {
-        refundTransactions.push({
-          id: "",
-          userId: senderTx.userId,
-          userName: senderTx.userName,
-          userEmail: senderTx.userEmail,
-          description: `Refund for ${senderTx.description}`,
-          amount: Math.abs(senderTx.amount),
-          date: new Date().toISOString(),
-          type: "refund",
-          status: "completed",
-          account: senderTx.account,
-          memo: senderTx.memo,
-          transferId: senderTx.transferId,
-        })
-        balanceUpdates.push({
-          userId: senderTx.userId,
-          balanceChange: Math.abs(senderTx.amount),
-        })
-      }
-
-      // Refund receiver if not already refunded
-      if (receiverRefunds.transactions.length === 0) {
-        refundTransactions.push({
-          id: "",
-          userId: receiverTx.userId,
-          userName: receiverTx.userName,
-          userEmail: receiverTx.userEmail,
-          description: `Refund deduction for ${receiverTx.description}`,
-          amount: -Math.abs(receiverTx.amount),
-          date: new Date().toISOString(),
-          type: "refund",
-          status: "completed",
-          account: receiverTx.account,
-          memo: receiverTx.memo,
-          transferId: receiverTx.transferId,
-        })
-        balanceUpdates.push({
-          userId: receiverTx.userId,
-          balanceChange: -Math.abs(receiverTx.amount),
-        })
-      }
-
-      if (refundTransactions.length === 0) {
-        throw new Error("No transactions require refunding")
-      }
-
-      // Process refunds
-      const refundPromises = refundTransactions.map((refund) =>
-        fetch("/api/admin/transactions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ ...refund, relatedTransactionId: refund.amount > 0 ? senderTx.id : receiverTx.id }),
-        })
-      )
-      const refundResponses = await Promise.all(refundPromises)
-      const createdRefunds: Transaction[] = []
-      for (const res of refundResponses) {
-        if (!res.ok) {
-          const errorData = await res.json()
-          throw new Error(errorData.error || "Failed to create refund transaction")
-        }
-        const { transaction } = await res.json()
-        createdRefunds.push(transaction)
-      }
-
-      // Update balances
-      const balanceUpdatePromises = balanceUpdates.map((update) =>
-        fetch(`/api/admin/users/${update.userId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ balanceChange: update.balanceChange }),
-        })
-      )
-      const balanceUpdateResponses = await Promise.all(balanceUpdatePromises)
-      for (const res of balanceUpdateResponses) {
-        if (!res.ok) {
-          // Roll back refunds if balance update fails
-          await Promise.all(
-            createdRefunds.map((refund) =>
-              fetch(`/api/admin/transactions/${refund.id}`, {
-                method: "DELETE",
-                credentials: "include",
-              })
-            )
-          )
-          throw new Error("Failed to update user balance")
-        }
-      }
-
-      // Update local state
-      setTransactions((prev) => [...createdRefunds, ...prev])
-      setSuccess(
-        createdRefunds.length === 2
-          ? "Both sender and receiver transactions refunded successfully"
-          : `Refunded ${createdRefunds.length === 1 && createdRefunds[0].amount > 0 ? "sender" : "receiver"} transaction successfully`
-      )
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "An error occurred during group refund")
-      console.error("Refund group error:", error)
-    }
   }
 
   if (loading) {
@@ -638,7 +497,6 @@ export default function AdminTransactionsPage() {
                     <SelectItem value="interest">Interest</SelectItem>
                     <SelectItem value="crypto_buy">Crypto Buy</SelectItem>
                     <SelectItem value="crypto_sell">Crypto Sell</SelectItem>
-                    <SelectItem value="refund">Refunds</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -723,11 +581,11 @@ export default function AdminTransactionsPage() {
                     const isGroup = group.transactionIds.length > 1
                     const senderTxId = group.transactionIds.find((txId) => {
                       const tx = transactions.find((t) => t.id === txId)
-                      return tx?.amount < 0
+                      return tx?.amount !== undefined && tx.amount < 0
                     })
                     const receiverTxId = group.transactionIds.find((txId) => {
                       const tx = transactions.find((t) => t.id === txId)
-                      return tx?.amount > 0
+                      return tx?.amount !== undefined && tx.amount > 0
                     })
                     const detailLink = isGroup
                       ? `/admin/transactions/${senderTxId}?receiverId=${receiverTxId}`
@@ -766,12 +624,8 @@ export default function AdminTransactionsPage() {
                         </td>
                         <td className="p-4">{new Date(group.date).toLocaleString()}</td>
                         <td className="p-4">{group.accounts.join(", ")}</td>
-                        <td
-                          className={`p-4 text-right font-medium ${
-                            group.amount > 0 ? "text-green-600" : "text-red-600"
-                          }`}
-                        >
-                          {group.amount > 0 ? "+" : ""}${Math.abs(group.amount).toFixed(2)}
+                        <td className="p-4 text-right font-medium text-green-600">
+                          ${group.amount.toFixed(2)}
                         </td>
                         <td className="p-4 text-center">
                           <Badge
@@ -796,12 +650,8 @@ export default function AdminTransactionsPage() {
                         <td className="p-4 text-center">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-primary-600 hover:text-primary-800 hover:bg-primary-50"
-                              >
-                                Actions
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -823,14 +673,6 @@ export default function AdminTransactionsPage() {
                                 <DropdownMenuItem asChild>
                                   <Link href={`/admin/users/${group.userIds[1]}`}>View Recipient</Link>
                                 </DropdownMenuItem>
-                              )}
-                              {isGroup && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => handleRefundGroup(group.id)}>
-                                    Refund Group
-                                  </DropdownMenuItem>
-                                </>
                               )}
                               <DropdownMenuSeparator />
                               {group.status === "pending" && (

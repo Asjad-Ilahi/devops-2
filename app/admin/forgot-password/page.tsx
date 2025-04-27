@@ -1,197 +1,138 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import Color from "color"
-import { ArrowLeft, Loader2, ShieldAlert } from "lucide-react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
 
-// Interface for Colors
-interface Colors {
-  primaryColor: string
-  secondaryColor: string
-}
-
-export default function AdminForgotPasswordPage() {
-  const [email, setEmail] = useState("")
+export default function ForgotPasswordPage() {
+  const [username, setUsername] = useState("")
+  const [code, setCode] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [step, setStep] = useState(1) // 1: request code, 2: reset password
   const [isLoading, setIsLoading] = useState(false)
-  const [isSubmitted, setIsSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [colors, setColors] = useState<Colors | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
 
-  // Fetch colors and set CSS custom properties
-  useEffect(() => {
-    const fetchColors = async () => {
-      try {
-        const response = await fetch("/api/colors")
-        if (!response.ok) throw new Error("Failed to fetch colors")
-        const data: Colors = await response.json()
-        setColors(data)
-
-        const primary = Color(data.primaryColor)
-        const secondary = Color(data.secondaryColor)
-
-        const generateShades = (color: typeof Color.prototype) => ({
-          50: color.lighten(0.5).hex(),
-          100: color.lighten(0.4).hex(),
-          200: color.lighten(0.3).hex(),
-          300: color.lighten(0.2).hex(),
-          400: color.lighten(0.1).hex(),
-          500: color.hex(),
-          600: color.darken(0.1).hex(),
-          700: color.darken(0.2).hex(),
-          800: color.darken(0.3).hex(),
-          900: color.darken(0.4).hex(),
-        })
-
-        const primaryShades = generateShades(primary)
-        const secondaryShades = generateShades(secondary)
-
-        Object.entries(primaryShades).forEach(([shade, color]) => {
-          document.documentElement.style.setProperty(`--primary-${shade}`, color)
-        })
-
-        Object.entries(secondaryShades).forEach(([shade, color]) => {
-          document.documentElement.style.setProperty(`--secondary-${shade}`, color)
-        })
-      } catch (error) {
-        console.error("Error fetching colors:", error)
-      }
-    }
-    fetchColors()
-  }, [])
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRequestCode = async (e: React.MouseEvent) => {
     e.preventDefault()
-    setError(null)
     setIsLoading(true)
-
+    setError(null)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      setIsSubmitted(true)
-    } catch (error) {
-      setError("An error occurred. Please try again later.")
+      const response = await fetch("/api/admin/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      })
+      const data = await response.json()
+      if (response.ok) {
+        setMessage(data.message)
+        setStep(2)
+      } else {
+        setError(data.error)
+      }
+    } catch (err) {
+      setError("An error occurred. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleResetPassword = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await fetch("/api/admin/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, newPassword }),
+      })
+      const data = await response.json()
+      if (response.ok) {
+        setMessage("Password has been reset successfully. You can now log in with your new password.")
+      } else {
+        setError(data.error)
+      }
+    } catch (err) {
+      setError("An error occurred. Please try again.")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
-      <div className="flex items-center justify-center h-full px-4 py-12">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
-              <img src="/zelle-logo.svg" alt="Zelle" className="h-10 w-auto" />
-              <span className="ml-2 text-gray-800 font-bold text-xl">Admin Portal</span>
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Reset Admin Password</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              We'll send you instructions to reset your administrator password
-            </p>
-          </div>
-
-          <Card className="border-primary-100 bg-white/60 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardHeader className="border-b border-gray-100 bg-gray-50">
-              <CardTitle className="flex items-center text-xl text-gray-800">
-                <ShieldAlert className="mr-2 h-5 w-5 text-primary-600" />
-                Password Recovery
-              </CardTitle>
-              <CardDescription className="text-gray-600">
-                Secure password reset for authorized administrators
-              </CardDescription>
-            </CardHeader>
-
-            {error && (
-              <Alert variant="destructive" className="mx-6 mt-6 bg-red-50 border-red-200">
-                <AlertDescription className="text-red-700">{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <CardContent className="pt-6">
-              {!isSubmitted ? (
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-gray-700">
-                      Email Address
-                    </Label>
-                    <p className="text-sm text-gray-600 mb-2">
-                      Enter the email address associated with your administrator account
-                    </p>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@bankdomain.com"
-                      className="border-gray-300"
-                    />
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      "Send Reset Instructions"
-                    )}
-                  </Button>
-                </form>
-              ) : (
-                <div className="py-4 text-center">
-                  <div className="rounded-full bg-green-100 p-3 w-12 h-12 mx-auto mb-4 flex items-center justify-center">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      className="h-6 w-6 text-green-600"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Reset Instructions Sent</h3>
-                  <p className="text-gray-600 mb-4">
-                    If an account exists with the email <span className="font-medium text-gray-800">{email}</span>, you
-                    will receive password reset instructions shortly.
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Please check your email and follow the instructions to reset your password.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-
-            <CardFooter className="border-t border-gray-100 flex justify-center">
-              <Button variant="link" className="text-gray-600 hover:text-gray-800" asChild>
-                <Link href="/admin/login">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to admin login
-                </Link>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50">
+      <Card className="w-full max-w-md border-primary-100 bg-white/60 backdrop-blur-sm shadow-lg">
+        <CardHeader className="border-b border-primary-100 bg-primary-50/50">
+          <CardTitle className="text-xl text-primary-900">Forgot Password</CardTitle>
+          <CardDescription className="text-primary-600">Reset your admin password</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {step === 1 ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username" className="text-primary-700">Username</Label>
+                <Input
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  className="border-primary-200 bg-white/80 focus:border-primary-300"
+                  placeholder="Enter your username"
+                />
+              </div>
+              <Button
+                onClick={handleRequestCode}
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
+              >
+                {isLoading ? "Sending..." : "Request Recovery Code"}
               </Button>
-            </CardFooter>
-          </Card>
-
-          <div className="mt-6 text-center">
-            <Link href="/" className="text-sm text-gray-600 hover:text-gray-800">
-              Return to main site
-            </Link>
-          </div>
-        </div>
-      </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="code" className="text-primary-700">Recovery Code</Label>
+                <Input
+                  id="code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  required
+                  className="border-primary-200 bg-white/80 focus:border-primary-300"
+                  placeholder="Enter the 6-digit code"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newPassword" className="text-primary-700">New Password</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  className="border-primary-200 bg-white/80 focus:border-primary-300"
+                  placeholder="Enter your new password"
+                />
+              </div>
+              <Button
+                onClick={handleResetPassword}
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
+              >
+                {isLoading ? "Resetting..." : "Reset Password"}
+              </Button>
+            </div>
+          )}
+          {error && <p className="text-red-500 mt-2">{error}</p>}
+          {message && <p className="text-green-500 mt-2">{message}</p>}
+        </CardContent>
+        <CardFooter className="border-t border-primary-100">
+          <Link href="/admin/login" className="text-sm text-primary-600 hover:text-primary-800">Back to login</Link>
+        </CardFooter>
+      </Card>
     </div>
   )
 }

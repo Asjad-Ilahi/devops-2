@@ -133,7 +133,7 @@ export default function AdminReportsPage() {
                     mode="range"
                     defaultMonth={dateRange.from}
                     selected={dateRange}
-                    onSelect={setDateRange}
+                    onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
                     numberOfMonths={2}
                   />
                 </PopoverContent>

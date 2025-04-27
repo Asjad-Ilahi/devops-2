@@ -299,7 +299,7 @@ export default function Home() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch("/api/home");
+        const response = await fetch("/api/admin/settings");
         if (response.ok) {
           const data = await response.json();
           setSettings(data);
@@ -946,7 +946,7 @@ export default function Home() {
   />
 )}
               <p className="text-white text-sm">
-                © {new Date().getFullYear()} Iu Bank. All rights
+                © {new Date().getFullYear()} DP Security & Company. All rights
                 reserved.
               </p>
             </div>
