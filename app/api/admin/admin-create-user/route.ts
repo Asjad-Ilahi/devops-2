@@ -1,7 +1,7 @@
 // app/api/admin/admin-create-user/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import User from "@/models/User";
 
