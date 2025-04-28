@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     });
     
     // Add caching headers
-    response.headers.set('Cache-Control', 'public, max-age=10, s-maxage=10, stale-while-revalidate=10');
+    response.headers.set('Cache-Control', 'public, max-age=1, s-maxage=1, stale-while-revalidate=1');
     return response;
   } catch (error) {
     console.error('Settings fetch error:', error);

@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
         }
         const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
         if (!isPasswordValid) {
-          return NextResponse.json({ error: "Invalid current password" }, { status: 401 });
+          return NextResponse.json({ error: "Invalid current password" }, { status: 400 }); // Changed from 401 to 400
         }
       }
 
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (user.twoFactorCode !== verificationCode) {
-        return NextResponse.json({ error: "Invalid verification code" }, { status: 401 });
+        return NextResponse.json({ error: "Invalid verification code" }, { status: 400 }); // Changed from 401 to 400
       }
 
       const hashedPassword = await bcrypt.hash(newPassword, 10);

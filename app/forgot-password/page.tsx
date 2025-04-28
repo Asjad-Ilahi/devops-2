@@ -1,10 +1,9 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Check, Loader2, Mail } from "lucide-react"
+import { ArrowLeft, Check, Loader2, User } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,50 +13,53 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function ForgotPasswordPage() {
-  // State for email request
-  const [email, setEmail] = useState("")
-  const [isEmailSubmitting, setIsEmailSubmitting] = useState(false)
-  const [emailSuccess, setEmailSuccess] = useState(false)
+  const [username, setUsername] = useState("")
+  const [isRequestSubmitting, setIsRequestSubmitting] = useState(false)
+  const [requestSuccess, setRequestSuccess] = useState(false)
 
-  // State for verification code
   const [verificationCode, setVerificationCode] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isResetSubmitting, setIsResetSubmitting] = useState(false)
   const [resetSuccess, setResetSuccess] = useState(false)
 
-  // Error state
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
 
-  // Active tab
   const [activeTab, setActiveTab] = useState("request")
 
-  // Handle email request submission
-  const handleEmailSubmit = async (e: React.FormEvent) => {
+  const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    setIsEmailSubmitting(true)
+    setIsRequestSubmitting(true)
 
-    if (!email) {
-      setError("Please enter your email address")
-      setIsEmailSubmitting(false)
+    if (!username) {
+      setError("Please enter your username")
+      setIsRequestSubmitting(false)
       return
     }
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      setEmailSuccess(true)
-      setActiveTab("reset")
+      const response = await fetch("/api/forget-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, step: "requestCode" }),
+      })
+      const data = await response.json()
+      if (response.ok) {
+        setMessage(data.message || "Verification code sent to your registered email")
+        setRequestSuccess(true)
+        setActiveTab("reset")
+      } else {
+        setError(data.error || "An error occurred. Please try again.")
+      }
     } catch (error) {
-      setError("An error occurred. Please try again.")
+      setError("An unexpected error occurred. Please try again.")
     } finally {
-      setIsEmailSubmitting(false)
+      setIsRequestSubmitting(false)
     }
   }
 
-  // Handle password reset submission
   const handleResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -82,12 +84,25 @@ export default function ForgotPasswordPage() {
     }
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      setResetSuccess(true)
+      const response = await fetch("/api/forget-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          step: "verifyCode",
+          verificationCode,
+          newPassword,
+        }),
+      })
+      const data = await response.json()
+      if (response.ok) {
+        setResetSuccess(true)
+        setMessage(data.message || "Password reset successfully")
+      } else {
+        setError(data.error || "An error occurred. Please try again.")
+      }
     } catch (error) {
-      setError("An error occurred. Please try again.")
+      setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsResetSubmitting(false)
     }
@@ -99,7 +114,7 @@ export default function ForgotPasswordPage() {
         <div className="text-center">
           <img src="/zelle-logo.svg" alt="Zelle" className="h-12 w-auto mx-auto" />
           <h2 className="mt-6 text-3xl font-bold tracking-tight">Reset your password</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Enter your email to receive a password reset link</p>
+          <p className="mt-2 text-sm text-muted-foreground">Enter your username to receive a password reset code</p>
         </div>
 
         <Card>
@@ -108,16 +123,16 @@ export default function ForgotPasswordPage() {
               <TabsTrigger value="request" disabled={resetSuccess}>
                 Request Reset
               </TabsTrigger>
-              <TabsTrigger value="reset" disabled={!emailSuccess || resetSuccess}>
+              <TabsTrigger value="reset" disabled={!requestSuccess || resetSuccess}>
                 Reset Password
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="request">
-              <form onSubmit={handleEmailSubmit}>
+              <form onSubmit={handleRequestSubmit}>
                 <CardHeader>
                   <CardTitle className="text-xl">Request Password Reset</CardTitle>
-                  <CardDescription>We'll send a verification code to your email</CardDescription>
+                  <CardDescription>We'll send a verification code to your registered email</CardDescription>
                 </CardHeader>
 
                 <CardContent className="space-y-4">
@@ -127,38 +142,38 @@ export default function ForgotPasswordPage() {
                     </Alert>
                   )}
 
-                  {emailSuccess && (
+                  {message && activeTab === "request" && (
                     <Alert>
                       <Check className="h-4 w-4" />
-                      <AlertDescription>Verification code sent! Please check your email.</AlertDescription>
+                      <AlertDescription>{message}</AlertDescription>
                     </Alert>
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
+                    <Label htmlFor="username">Username</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        id="email"
-                        type="email"
-                        placeholder="Enter your email"
+                        id="username"
+                        type="text"
+                        placeholder="Enter your username"
                         className="pl-10"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={isEmailSubmitting || emailSuccess}
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        disabled={isRequestSubmitting || requestSuccess}
                       />
                     </div>
                   </div>
                 </CardContent>
 
                 <CardFooter className="flex flex-col space-y-2">
-                  <Button type="submit" className="w-full" disabled={isEmailSubmitting || emailSuccess}>
-                    {isEmailSubmitting ? (
+                  <Button type="submit" className="w-full" disabled={isRequestSubmitting || requestSuccess}>
+                    {isRequestSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Sending...
                       </>
-                    ) : emailSuccess ? (
+                    ) : requestSuccess ? (
                       <>
                         <Check className="mr-2 h-4 w-4" />
                         Code Sent
@@ -195,7 +210,7 @@ export default function ForgotPasswordPage() {
                   {resetSuccess && (
                     <Alert>
                       <Check className="h-4 w-4" />
-                      <AlertDescription>Your password has been reset successfully!</AlertDescription>
+                      <AlertDescription>{message}</AlertDescription>
                     </Alert>
                   )}
 
@@ -208,7 +223,7 @@ export default function ForgotPasswordPage() {
                       onChange={(e) => setVerificationCode(e.target.value)}
                       disabled={isResetSubmitting || resetSuccess}
                     />
-                    <p className="text-xs text-muted-foreground">The code was sent to {email}</p>
+                    <p className="text-xs text-muted-foreground">Check your registered email for the code sent for {username}</p>
                   </div>
 
                   <div className="space-y-2">

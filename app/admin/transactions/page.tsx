@@ -215,7 +215,7 @@ export default function AdminTransactionsPage() {
           grouped.push({
             id: transferId,
             userIds,
-            description: `Zelle transfer from ${sender?.name || "Unknown"} to ${receiver?.name || "Unknown"}`,
+            description: `${sender?.name || "Unknown"} to ${receiver?.name || "Unknown"}`,
             date,
             amount: Math.abs(senderTx.amount),
             status,
@@ -268,7 +268,7 @@ export default function AdminTransactionsPage() {
               grouped.push({
                 id: `${senderTx.id}-${receiverTx.id}`,
                 userIds: [senderTx.userId, receiverTx.userId],
-                description: `Zelle transfer from ${sender?.name || "Unknown"} to ${receiver?.name || "Unknown"}`,
+                description: `Zelle Transafer from ${sender?.name || "Unknown"} to ${receiver?.name || "Unknown"}`,
                 date,
                 amount: Math.abs(senderTx.amount),
                 status: senderTx.status === "completed" && receiverTx.status === "completed" ? "completed" : "pending",

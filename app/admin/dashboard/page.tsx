@@ -407,7 +407,7 @@ export default function AdminDashboardPage() {
   }, [transactions, users])
 
   // Handle adding a new transaction
-  const handleAddTransaction = async () => {
+  const scams = async () => {
     setTransactionError(null)
     if (!newTransaction.userId || !newTransaction.amount || !newTransaction.description) {
       setTransactionError("Please fill in all fields")
@@ -901,7 +901,7 @@ export default function AdminDashboardPage() {
         </header>
 
         {/* Main Content */}
-        <main className="p-4 sm:p-6">
+        <main className="p-4 sm:p-12">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
               <CardHeader className="pb-2">
@@ -959,7 +959,8 @@ export default function AdminDashboardPage() {
           </h2>
           <Card className="mb-6 sm:mb-8 backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              {/* Desktop Table */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-primary-50/50">
@@ -1033,25 +1034,106 @@ export default function AdminDashboardPage() {
                           </Badge>
                         </td>
                         <td className="p-2 sm:p-4 text-center">
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button variant="ghost" size="icon" className="h-8 w-8">
-        <MoreHorizontal className="h-4 w-4" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
-      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem asChild>
-        <Link href={`/admin/users/${user.id}?from=dashboard`}>Manage</Link>
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
-</td>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem asChild>
+                                <Link href={`/admin/users/${user.id}?from=dashboard`}>Manage</Link>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+              {/* Mobile Card Layout */}
+              <div className="sm:hidden divide-y divide-primary-100">
+                {users.map((user) => (
+                  <div key={user.id} className="p-4 hover:bg-primary-50/50 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8 border-2 border-primary-100">
+                          <AvatarFallback className="bg-gradient-to-br from-primary-500 to-secondary-500 text-white">
+                            {user.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium text-sm text-primary-900">{user.name}</div>
+                          <div className="text-xs text-primary-600">{user.email}</div>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem asChild>
+                            <Link href={`/admin/users/${user.id}?from=dashboard`}>Manage</Link>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-primary-500">Account #:</span>{" "}
+                        <span className="font-mono">{user.accountNumber}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-primary-500">Balance:</span>{" "}
+                        <span className="font-medium">${user.balance.toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-primary-500">Status:</span>{" "}
+                        <Badge
+                          variant={
+                            user.status === "active"
+                              ? "default"
+                              : user.status === "pending"
+                              ? "secondary"
+                              : "destructive"
+                          }
+                          className={
+                            user.status === "active"
+                              ? "bg-green-100 text-green-800 border-green-200"
+                              : user.status === "pending"
+                              ? "bg-amber-100 text-amber-800 border-amber-200"
+                              : "bg-red-100 text-red-800 border-red-200"
+                          }
+                        >
+                          {user.status}
+                        </Badge>
+                      </div>
+                      <div>
+                        <span className="text-primary-500">2FA:</span>{" "}
+                        <Badge
+                          variant="outline"
+                          className={
+                            user.twoFactorEnabled
+                              ? "bg-green-50 text-green-600 border-green-200"
+                              : "bg-gray-50 text-gray-600 border-gray-200"
+                          }
+                        >
+                          {user.twoFactorEnabled ? "Enabled" : "Disabled"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -1061,7 +1143,8 @@ export default function AdminDashboardPage() {
           </h2>
           <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              {/* Desktop Table */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b bg-primary-50/50">
@@ -1150,59 +1233,59 @@ export default function AdminDashboardPage() {
                             </Badge>
                           </td>
                           <td className="p-4 text-center">
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button variant="ghost" size="icon" className="h-8 w-8">
-        <MoreHorizontal className="h-4 w-4" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
-      <DropdownMenuLabel>Transaction Actions</DropdownMenuLabel>
-      <DropdownMenuSeparator />
-      {isGroup ? (
-        <DropdownMenuItem asChild>
-          <Link href={`${detailLink}&from=dashboard`}>View Transactions</Link>
-        </DropdownMenuItem>
-      ) : (
-        <DropdownMenuItem asChild>
-          <Link href={`${detailLink}?from=dashboard`}>
-            View Details (ID: {group.transactionIds[0]})
-          </Link>
-        </DropdownMenuItem>
-      )}
-      <DropdownMenuItem asChild>
-        <Link href={`/admin/users/${group.userIds[0]}?from=dashboard`}>View User</Link>
-      </DropdownMenuItem>
-      {group.userIds.length > 1 && (
-        <DropdownMenuItem asChild>
-          <Link href={`/admin/users/${group.userIds[1]}?from=dashboard`}>View Recipient</Link>
-        </DropdownMenuItem>
-      )}
-      <DropdownMenuSeparator />
-      {group.status === "pending" && (
-        <>
-          <DropdownMenuItem
-            onClick={() => handleStatusChange(group.transactionIds[0], "completed")}
-          >
-            Mark as Completed
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handleStatusChange(group.transactionIds[0], "failed")}
-          >
-            Mark as Failed
-          </DropdownMenuItem>
-        </>
-      )}
-      {group.status === "failed" && (
-        <DropdownMenuItem
-          onClick={() => handleStatusChange(group.transactionIds[0], "completed")}
-        >
-          Mark as Completed
-        </DropdownMenuItem>
-      )}
-    </DropdownMenuContent>
-  </DropdownMenu>
-</td>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Transaction Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {isGroup ? (
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`${detailLink}&from=dashboard`}>View Transactions</Link>
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`${detailLink}?from=dashboard`}>
+                                      View Details (ID: {group.transactionIds[0]})
+                                    </Link>
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/admin/users/${group.userIds[0]}?from=dashboard`}>View User</Link>
+                                </DropdownMenuItem>
+                                {group.userIds.length > 1 && (
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/admin/users/${group.userIds[1]}?from=dashboard`}>View Recipient</Link>
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                {group.status === "pending" && (
+                                  <>
+                                    <DropdownMenuItem
+                                      onClick={() => handleStatusChange(group.transactionIds[0], "completed")}
+                                    >
+                                      Mark as Completed
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleStatusChange(group.transactionIds[0], "failed")}
+                                    >
+                                      Mark as Failed
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                                {group.status === "failed" && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleStatusChange(group.transactionIds[0], "completed")}
+                                  >
+                                    Mark as Completed
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
                         </tr>
                       )
                     })}
@@ -1215,6 +1298,151 @@ export default function AdminDashboardPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+              {/* Mobile Card Layout */}
+              <div className="sm:hidden divide-y divide-primary-100">
+                {groupedTransactions.map((group) => {
+                  const userNames = group.userIds.map(
+                    (id) => users.find((u) => u.id === id)?.name || "Unknown User"
+                  )
+                  const isGroup = group.transactionIds.length > 1
+                  const senderTxId = group.transactionIds.find((txId) => {
+                    const tx = transactions.find((t) => t.id === txId)
+                    return (tx?.amount ?? 0) < 0
+                  })
+                  const receiverTxId = group.transactionIds.find((txId) => {
+                    const tx = transactions.find((t) => t.id === txId)
+                    return (tx?.amount ?? 0) > 0
+                  })
+                  const detailLink = isGroup
+                    ? `/admin/transactions/${senderTxId}?receiverId=${receiverTxId}`
+                    : `/admin/transactions/${group.transactionIds[0]}`
+
+                  return (
+                    <div key={group.id} className="p-4 hover:bg-primary-50/50 transition-colors">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full flex items-center justify-center bg-muted">
+                            {getTransactionIcon(group.type)}
+                          </div>
+                          <div>
+                            <div className="font-medium text-sm text-primary-900">{userNames.join(" to ")}</div>
+                            <div className="text-xs text-primary-600">
+                              {userNames.map((name, index) => (
+                                <span key={group.userIds[index]}>
+                                  {users.find((u) => u.id === group.userIds[index])?.email || ""}
+                                  {index < userNames.length - 1 ? " to " : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Transaction Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {isGroup ? (
+                              <DropdownMenuItem asChild>
+                                <Link href={`${detailLink}&from=dashboard`}>View Transactions</Link>
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem asChild>
+                                <Link href={`${detailLink}?from=dashboard`}>
+                                  View Details (ID: {group.transactionIds[0]})
+                                </Link>
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem asChild>
+                              <Link href={`/admin/users/${group.userIds[0]}?from=dashboard`}>View User</Link>
+                            </DropdownMenuItem>
+                            {group.userIds.length > 1 && (
+                              <DropdownMenuItem asChild>
+                                <Link href={`/admin/users/${group.userIds[1]}?from=dashboard`}>View Recipient</Link>
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            {group.status === "pending" && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={() => handleStatusChange(group.transactionIds[0], "completed")}
+                                >
+                                  Mark as Completed
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleStatusChange(group.transactionIds[0], "failed")}
+                                >
+                                  Mark as Failed
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {group.status === "failed" && (
+                              <DropdownMenuItem
+                                onClick={() => handleStatusChange(group.transactionIds[0], "completed")}
+                              >
+                                Mark as Completed
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <span className="text-primary-500">ID:</span>{" "}
+                          <span className="font-mono">{isGroup ? `Group: ${group.id}` : group.id}</span>
+                        </div>
+                        <div>
+                          <span className="text-primary-500">Description:</span> {group.description}
+                        </div>
+                        <div>
+                          <span className="text-primary-500">Type:</span>{" "}
+                          <span className="capitalize">{group.type.replace("_", " ")}</span>
+                        </div>
+                        <div>
+                          <span className="text-primary-500">Date:</span>{" "}
+                          {new Date(group.date).toLocaleString()}
+                        </div>
+                        <div>
+                          <span className="text-primary-500">Accounts:</span> {group.accounts.join(", ")}
+                        </div>
+                        <div>
+                          <span className="text-primary-500">Amount:</span>{" "}
+                          <span className="font-medium text-green-600">${group.amount.toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="text-primary-500">Status:</span>{" "}
+                          <Badge
+                            variant={
+                              group.status === "completed"
+                                ? "default"
+                                : group.status === "pending"
+                                ? "secondary"
+                                : "destructive"
+                            }
+                            className={
+                              group.status === "completed"
+                                ? "bg-green-100 text-green-800 border-green-200"
+                                : group.status === "pending"
+                                ? "bg-amber-100 text-amber-800 border-amber-200"
+                                : "bg-red-100 text-red-800 border-red-200"
+                            }
+                          >
+                            {group.status.charAt(0).toUpperCase() + group.status.slice(1)}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                {groupedTransactions.length === 0 && (
+                  <div className="p-4 text-center text-muted-foreground">
+                    No transactions found
+                  </div>
+                )}
               </div>
               <div className="p-4 border-t">
                 <Button
@@ -1339,7 +1567,7 @@ export default function AdminDashboardPage() {
             </Button>
             <Button
               className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
-              onClick={handleAddTransaction}
+              onClick={scams}
             >
               Add Transaction
             </Button>
@@ -1349,7 +1577,7 @@ export default function AdminDashboardPage() {
 
       {/* Crypto Transaction Dialog */}
       <Dialog open={isCryptoDialogOpen} onOpenChange={setIsCryptoDialogOpen}>
-        <DialogContent className="bg-white/95 backdrop-blur-sm border border-primary-100">
+        <DialogContent className="max-w-[90vw] sm:max-w-md bg-white/95 backdrop-blur-sm border border-primary-100">
           <DialogHeader>
             <DialogTitle className="text-primary-900">Crypto Transaction Details</DialogTitle>
             <DialogDescription className="text-primary-600">

@@ -297,7 +297,7 @@ export default function AccountsPage() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-          <TabsList className="flex flex-col sm:grid sm:grid-cols-3 gap-2 sm:gap-1 w-full bg-primary-100/70 p-2 rounded-lg mb-6">
+          <TabsList className="flex flex-row sm:grid sm:grid-cols-3 w-full bg-primary-100/70 p-2 rounded-lg mr-[6px] mb-[6px]">
             <TabsTrigger
               value="checking"
               className="text-sm sm:text-base py-2 sm:py-1.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"

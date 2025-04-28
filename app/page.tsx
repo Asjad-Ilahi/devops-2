@@ -946,7 +946,7 @@ export default function Home() {
   />
 )}
               <p className="text-white text-sm">
-                © {new Date().getFullYear()} DP Security & Company. All rights
+                © {new Date().getFullYear()} Iu Bank. All rights
                 reserved.
               </p>
             </div>

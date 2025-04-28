@@ -30,9 +30,27 @@ export async function sendVerificationEmail(to: string, message: string) {
   const mailOptions = {
     from: EMAIL_USER,
     to,
-    subject: "Password Recovery Code",
-    text: message,
-    html: `<p>${message}</p>`,
+    subject: "Verification Code",
+    text: `Your verification code is: ${message}. Please enter this code on the verification page.`,
+    html: `
+      <div style="background-color: #ffffff; padding: 20px; max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif;">
+        <div style="background-color: #4B0082; color: #ffffff; padding: 10px; text-align: center;">
+          <h1>Verification Code</h1>
+        </div>
+        <div style="padding: 20px;">
+          <p>Hello,</p>
+          <p>Please use the following verification code:</p>
+          <div style="text-align: center; margin: 20px 0;">
+            <span style="font-size: 24px; color: #800080; border: 2px solid #800080; padding: 10px 20px; border-radius: 5px;">${message}</span>
+          </div>
+          <p>Enter this code on the verification page to complete the process.</p>
+          <p>If you did not request this, please ignore this email.</p>
+        </div>
+        <div style="text-align: center; padding: 10px; font-size: 12px; color: #666;">
+          <p>&copy; 2023 Your Company Name. All rights reserved.</p>
+        </div>
+      </div>
+    `,
   };
 
   try {

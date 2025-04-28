@@ -363,47 +363,47 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <div className="md:pl-64 flex-1 flex flex-col">
-        <header className="bg-white border-b border-primary-100 h-16 sticky top-0 z-30 flex items-center shadow-sm">
-          <div className="flex-1 px-6 pl-12 md:pl-6">
-            <h1 className="text-xl font-bold md:hidden bg-clip-text text-transparent bg-gradient-to-r from-primary-700 to-secondary-700">
-              Dashboard
-            </h1>
-          </div>
-          <div className="flex items-center gap-4 px-6">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8 border-2 border-primary-100">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" alt="@user" />
-                    <AvatarFallback className="bg-gradient-to-br from-primary-500 to-secondary-500 text-white">
-                      {userData?.fullName?.charAt(0) || "JD"}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/profile">
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/accounts">
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    <span>Accounts</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={logout}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Logout</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </header>
+      <header className="bg-white border-b border-primary-100 h-16 sticky top-0 z-30 flex items-center shadow-sm">
+  <div className="flex-1 px-6 pl-14 md:pl-6">
+    <h1 className="text-xl font-bold md:hidden bg-clip-text text-transparent bg-gradient-to-r from-primary-700 to-secondary-700">
+      Dashboard
+    </h1>
+  </div>
+  <div className="flex items-center gap-4 px-6">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Avatar className="h-8 w-8 border-2 border-primary-100">
+            <AvatarImage src="/placeholder.svg?height=32&width=32" alt="@user" />
+            <AvatarFallback className="bg-gradient-to-br from-primary-500 to-secondary-500 text-white">
+              {userData?.fullName?.charAt(0) || "JD"}
+            </AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/dashboard/profile">
+            <User className="mr-2 h-4 w-4" />
+            <span>Profile</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/dashboard/accounts">
+            <CreditCard className="mr-2 h-4 w-4" />
+            <span>Accounts</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={logout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Logout</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  </div>
+</header>
         <main className="p-4 sm:p-6 flex-1">
           <h1 className="text-2xl font-bold mb-6 hidden md:block bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-600">
             Dashboard
@@ -505,7 +505,7 @@ export default function DashboardPage() {
                                 {contact.initials}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="text-xs">{contact.name}</span>
+                            <span className="text-xs truncate w-full text-center">{contact.name}</span>
                           </Link>
                         </Button>
                       ))}

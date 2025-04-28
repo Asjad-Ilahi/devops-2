@@ -596,7 +596,7 @@ export default function AdminSettingsPage() {
                           <span className="font-bold">{settings.siteName}</span>
                         </div>
                         <div className="flex gap-2">
-                          <Button style={{ backgroundColor: settings.primaryColor }}>
+                          <Button style={{ backgroundColor: settings.primaryColor , color: '#ffffff' }}>
                             Primary Button
                           </Button>
                           <Button variant="outline">Secondary Button</Button>

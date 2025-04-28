@@ -61,18 +61,49 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const storedContacts = localStorage.getItem("recentZelleContacts");
-    const contacts = storedContacts ? JSON.parse(storedContacts) : [];
-    setRecentContacts(contacts);
-    const contactId = searchParams.get("contactId");
-    if (contactId) {
-      const contact = contacts.find((c: Contact) => c.id === contactId);
-      if (contact) {
-        setSelectedContact(contact);
-        setContactType(contact.email ? "email" : "phone");
-        setStep("amount");
+    const fetchAndVerifyContacts = async () => {
+      const storedContacts = localStorage.getItem("recentZelleContacts");
+      let contacts: Contact[] = storedContacts ? JSON.parse(storedContacts) : [];
+
+      // Verify each contact against the database
+      const verifiedContacts = await Promise.all(
+        contacts.map(async (contact: Contact) => {
+          try {
+            const value = contact.email || contact.phone;
+            const type = contact.email ? "email" : "phone";
+            const response = await fetch("/api/user/check", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ contactType: type, value }),
+            });
+            const data = await response.json();
+            if (response.ok && data.exists) {
+              return contact;
+            }
+            return null;
+          } catch (error) {
+            console.error(`Error verifying contact ${contact.id}:`, error);
+            return null;
+          }
+        })
+      );
+
+      // Filter out null values (contacts that don't exist in the database)
+      const validContacts = verifiedContacts.filter((contact): contact is Contact => contact !== null);
+      setRecentContacts(validContacts);
+
+      const contactId = searchParams.get("contactId");
+      if (contactId) {
+        const contact = validContacts.find((c: Contact) => c.id === contactId);
+        if (contact) {
+          setSelectedContact(contact);
+          setContactType(contact.email ? "email" : "phone");
+          setStep("amount");
+        }
       }
-    }
+    };
+
+    fetchAndVerifyContacts();
   }, [searchParams]);
 
   const checkRateLimit = () => {
@@ -177,6 +208,7 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
 
   const handleConfirmation = async () => {
     setIsLoading(true);
+    setError(null); // Clear any previous errors
     const transferAmount = Number.parseFloat(amount);
     if (transferAmount > checkingBalance) {
       setError(`Insufficient balance. Current balance: $${checkingBalance.toFixed(2)}`);
@@ -200,16 +232,20 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
           verificationMethod: "email",
         }),
       });
+
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error || "Transfer request failed");
+        console.error(`API error: ${response.status} ${response.statusText}`, data);
+        setError(data.error || `Transfer request failed: ${response.statusText}`);
         setIsLoading(false);
         return;
       }
 
+      console.log("Transfer request successful:", data);
       setStep("verify");
     } catch (error) {
-      setError("An error occurred while requesting the transfer");
+      console.error("Network or unexpected error:", error);
+      setError("An error occurred while requesting the transfer. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -330,9 +366,9 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
                   <Avatar className="h-10 w-10 mr-4">
                     <AvatarFallback className="bg-primary-100 text-primary-700">{contact.initials}</AvatarFallback>
                   </Avatar>
-                  <div className="text-left">
-                    <div className="font-medium">{contact.name}</div>
-                    <div className="text-sm text-primary-600">{contact.email || contact.phone}</div>
+                  <div className="text-left overflow-hidden">
+                    <div className="font-medium truncate">{contact.name}</div>
+                    <div className="text-sm text-primary-600 truncate">{contact.email || contact.phone}</div>
                   </div>
                 </Button>
               ))}
@@ -496,11 +532,11 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
         <div className="border border-primary-200 rounded-lg p-4 space-y-4 bg-white/80">
           <div className="flex items-center justify-between">
             <span className="text-primary-600">To:</span>
-            <span className="font-medium text-primary-900">{selectedContact?.name}</span>
+            <span className="font-medium text-primary-900 truncate">{selectedContact?.name}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-primary-600">Email/Phone:</span>
-            <span className="text-primary-900">{contactType === "email" ? selectedContact?.email : selectedContact?.phone}</span>
+            <span className="text-primary-900 truncate">{contactType === "email" ? selectedContact?.email : selectedContact?.phone}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-primary-600">Amount:</span>
@@ -509,7 +545,7 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
           {memo && (
             <div className="flex items-center justify-between">
               <span className="text-primary-600">Memo:</span>
-              <span className="text-primary-900">{memo}</span>
+              <span className="text-primary-900 truncate">{memo}</span>
             </div>
           )}
           <div className="flex items-center justify-between">
@@ -517,6 +553,11 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
             <span className="text-primary-900">Email</span>
           </div>
         </div>
+        {error && (
+          <Alert variant="destructive" className="bg-red-50 border-red-200">
+            <AlertDescription className="text-red-700">{error}</AlertDescription>
+          </Alert>
+        )}
         <div className="flex space-x-3">
           <Button
             variant="outline"
@@ -661,19 +702,19 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
   return (
     <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
       <CardHeader>
-      <CardTitle className="text-primary-900">
-  {step === "select" ? (
-    "Select Recipient"
-  ) : step === "amount" ? (
-    "Enter Amount"
-  ) : step === "confirmation" ? (
-    "Confirm Transfer"
-  ) : step === "verify" ? (
-    "Verify Transfer"
-  ) : (
-    "Transfer Status"
-  )}
-</CardTitle>
+        <CardTitle className="text-primary-900">
+          {step === "select" ? (
+            "Select Recipient"
+          ) : step === "amount" ? (
+            "Enter Amount"
+          ) : step === "confirmation" ? (
+            "Confirm Transfer"
+          ) : step === "verify" ? (
+            "Verify Transfer"
+          ) : (
+            "Transfer Status"
+          )}
+        </CardTitle>
         <CardDescription className="text-primary-600">
           {step === "select"
             ? "Choose who you want to send money to"
