@@ -263,11 +263,11 @@ export default function LoginPage() {
                 <div className="text-center">
                   <p className="text-sm text-primary-600">
                     By signing in, you agree to our{" "}
-                    <Link href="/terms-of-services?from=login" className="font-medium text-primary-600 hover:text-primary-500">
+                    <Link href="/terms-of-services?from=login" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
                       Terms of Service
                     </Link>{" "}
                     and{" "}
-                    <Link href="/privacy-policy?from=login" className="font-medium text-primary-600 hover:text-primary-500">
+                    <Link href="/privacy-policy?from=login" className="font-medium text-secondary-600 hover:text-secondary-500 transition-colors">
                       Privacy Policy
                     </Link>
                   </p>
