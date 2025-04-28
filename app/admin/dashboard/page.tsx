@@ -30,6 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Interface for User
 interface User {
@@ -58,6 +59,10 @@ interface Transaction {
   account: string
   memo?: string
   transferId?: string
+  category?: string
+  accountType?: string
+  cryptoAmount?: number
+  cryptoPrice?: number
 }
 
 // Interface for TransactionGroup
@@ -120,9 +125,10 @@ export default function AdminDashboardPage() {
     transactionsToday: 0,
   })
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState<boolean>(false)
+  const [isCryptoDialogOpen, setIsCryptoDialogOpen] = useState(false)
   const [newTransaction, setNewTransaction] = useState<{
     userId: string
-    type: string
+    type: Transaction["type"]
     amount: string
     description: string
   }>({
@@ -130,6 +136,10 @@ export default function AdminDashboardPage() {
     type: "deposit",
     amount: "",
     description: "",
+  })
+  const [cryptoForm, setCryptoForm] = useState({
+    cryptoAmount: "",
+    cryptoPrice: "",
   })
   const [isPendingApprovalsOpen, setIsPendingApprovalsOpen] = useState<boolean>(false)
   const [transactionError, setTransactionError] = useState<string | null>(null)
@@ -398,42 +408,71 @@ export default function AdminDashboardPage() {
 
   // Handle adding a new transaction
   const handleAddTransaction = async () => {
+    setTransactionError(null)
     if (!newTransaction.userId || !newTransaction.amount || !newTransaction.description) {
-      setTransactionError("Please fill in all required fields")
+      setTransactionError("Please fill in all fields")
       return
     }
-
-    const amount = parseFloat(newTransaction.amount)
+    const amount = Number.parseFloat(newTransaction.amount)
     if (isNaN(amount) || amount === 0) {
-      setTransactionError("Please enter a valid non-zero amount")
+      setTransactionError("Please enter a valid amount")
       return
     }
-
+    // Check for sufficient balance for withdrawal
+    if (newTransaction.type === "withdrawal") {
+      const selectedUser = users.find((user) => user.id === newTransaction.userId)
+      if (selectedUser) {
+        const withdrawalAmount = Math.abs(amount)
+        if (selectedUser.balance < withdrawalAmount) {
+          setTransactionError(
+            `User account doesn't have sufficient funds. Total balance: $${selectedUser.balance.toFixed(2)}`
+          )
+          return
+        }
+      }
+    }
+    if (["crypto_buy", "crypto_sell"].includes(newTransaction.type)) {
+      setIsCryptoDialogOpen(true)
+      return
+    }
     try {
-      const response = await fetch("/api/admin/transactions", {
+      const response = await fetch(`/api/admin/users/${newTransaction.userId}/transactions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          userId: newTransaction.userId,
           type: newTransaction.type,
           amount,
           description: newTransaction.description,
+          category: "admin",
+          accountType: "checking",
         }),
       })
-
       if (!response.ok) {
-        const result = await response.json()
-        throw new Error(result.error || "Failed to process transaction")
+        const data = await response.json()
+        throw new Error(data.error || "Failed to add transaction")
       }
-
-      const { transaction, newBalance } = await response.json()
-
+      const newTxn = await response.json()
+      const transaction: Transaction = {
+        id: newTxn._id,
+        userId: newTransaction.userId,
+        userName: users.find((u) => u.id === newTransaction.userId)?.name || "Unknown",
+        userEmail: users.find((u) => u.id === newTransaction.userId)?.email || "Unknown",
+        type: newTxn.type,
+        amount: newTxn.amount,
+        description: newTxn.description,
+        date: new Date(newTxn.date).toISOString(),
+        status: newTxn.status,
+        account: users.find((u) => u.id === newTransaction.userId)?.accountNumber || "Unknown",
+        category: newTxn.category,
+        accountType: newTxn.accountType,
+      }
+      const updatedBalance = users.find((u) => u.id === newTransaction.userId)!.balance + amount
       const updatedUsers = users.map((user) =>
-        user.id === newTransaction.userId ? { ...user, balance: newBalance } : user
+        user.id === newTransaction.userId ? { ...user, balance: updatedBalance } : user
       )
       setUsers(updatedUsers)
-      setTransactions((prev) => [{ ...transaction, id: transaction._id }, ...prev])
+      setTransactions((prev) => [transaction, ...prev])
       setStats((prev) => ({
         ...prev,
         totalBalance: updatedUsers.reduce((sum, user) => sum + user.balance, 0),
@@ -442,13 +481,89 @@ export default function AdminDashboardPage() {
             ? prev.transactionsToday + 1
             : prev.transactionsToday,
       }))
-
       setNewTransaction({ userId: "", type: "deposit", amount: "", description: "" })
       setTransactionError(null)
       setIsAddTransactionOpen(false)
-    } catch (error) {
-      console.error("Error adding transaction:", error)
-      setTransactionError(error instanceof Error ? error.message : "Failed to process transaction")
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to add transaction"
+      setTransactionError(errorMessage)
+    }
+  }
+
+  // Handle crypto transaction
+  const handleCryptoTransaction = async () => {
+    setTransactionError(null)
+    const amount = Number.parseFloat(newTransaction.amount)
+    const cryptoAmount = Number.parseFloat(cryptoForm.cryptoAmount)
+    const cryptoPrice = Number.parseFloat(cryptoForm.cryptoPrice)
+    if (!newTransaction.amount || !newTransaction.description) {
+      setTransactionError("Please fill in all transaction fields")
+      return
+    }
+    if (isNaN(amount) || amount === 0) {
+      setTransactionError("Please enter a valid amount")
+      return
+    }
+    if (!cryptoForm.cryptoAmount || isNaN(cryptoAmount) || cryptoAmount <= 0) {
+      setTransactionError("Please enter a valid crypto amount")
+      return
+    }
+    if (!cryptoForm.cryptoPrice || isNaN(cryptoPrice) || cryptoPrice <= 0) {
+      setTransactionError("Please enter a valid crypto price")
+      return
+    }
+    try {
+      const response = await fetch(`/api/admin/users/${newTransaction.userId}/transactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          type: newTransaction.type,
+          amount,
+          description: newTransaction.description,
+          category: "admin",
+          accountType: "crypto",
+          cryptoAmount,
+          cryptoPrice,
+        }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to add transaction")
+      }
+      const newTxn = await response.json()
+      const transaction: Transaction = {
+        id: newTxn._id,
+        userId: newTransaction.userId,
+        userName: users.find((u) => u.id === newTransaction.userId)?.name || "Unknown",
+        userEmail: users.find((u) => u.id === newTransaction.userId)?.email || "Unknown",
+        type: newTxn.type,
+        amount: newTxn.amount,
+        description: newTxn.description,
+        date: new Date(newTxn.date).toISOString(),
+        status: newTxn.status,
+        account: users.find((u) => u.id === newTransaction.userId)?.accountNumber || "Unknown",
+        category: newTxn.category,
+        accountType: newTxn.accountType,
+        cryptoAmount: newTxn.cryptoAmount,
+        cryptoPrice: newTxn.cryptoPrice,
+      }
+      setTransactions((prev) => [transaction, ...prev])
+      setStats((prev) => ({
+        ...prev,
+        transactionsToday:
+          new Date(transaction.date).toDateString() === new Date().toDateString()
+            ? prev.transactionsToday + 1
+            : prev.transactionsToday,
+      }))
+      setNewTransaction({ userId: "", type: "deposit", amount: "", description: "" })
+      setCryptoForm({ cryptoAmount: "", cryptoPrice: "" })
+      setTransactionError(null)
+      setIsAddTransactionOpen(false)
+      setIsCryptoDialogOpen(false)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to add transaction"
+      setTransactionError(errorMessage)
     }
   }
 
@@ -1125,40 +1240,57 @@ export default function AdminDashboardPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4 px-2 sm:px-0">
-            {transactionError && <div className="text-red-600 text-sm">{transactionError}</div>}
+            {transactionError && (
+              <Alert variant="destructive" className="bg-red-50 border border-red-200">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-700">{transactionError}</AlertDescription>
+              </Alert>
+            )}
             <div className="space-y-2">
               <Label htmlFor="user" className="text-primary-800">
                 Select User
               </Label>
-              <select
-                id="user"
-                className="w-full rounded-md border border-primary-200 bg-white/80 px-3 py-2 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+              <Select
                 value={newTransaction.userId}
-                onChange={(e) => setNewTransaction({ ...newTransaction, userId: e.target.value })}
+                onValueChange={(value) => setNewTransaction({ ...newTransaction, userId: value })}
               >
-                <option value="">Select a user</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name} ({user.accountNumber})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  id="user"
+                  className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                >
+                  <SelectValue placeholder="Select a user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name} ({user.accountNumber})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="type" className="text-primary-800">
+              <Label htmlFor="transactionType" className="text-primary-800">
                 Transaction Type
               </Label>
-              <select
-                id="type"
-                className="w-full rounded-md border border-primary-200 bg-white/80 px-3 py-2 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+              <Select
                 value={newTransaction.type}
-                onChange={(e) => setNewTransaction({ ...newTransaction, type: e.target.value })}
+                onValueChange={(value) => setNewTransaction({ ...newTransaction, type: value })}
               >
-                <option value="deposit">Deposit</option>
-                <option value="withdrawal">Withdrawal</option>
-                <option value="transfer">Transfer</option>
-                <option value="adjustment">Adjustment</option>
-              </select>
+                <SelectTrigger
+                  id="transactionType"
+                  className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                >
+                  <SelectValue placeholder="Select transaction type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="deposit">Deposit</SelectItem>
+                  <SelectItem value="withdrawal">Withdrawal</SelectItem>
+                  <SelectItem value="transfer">Transfer</SelectItem>
+                  <SelectItem value="payment">Payment</SelectItem>
+                  <SelectItem value="crypto_buy">Add Crypto</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="amount" className="text-primary-800">
@@ -1176,12 +1308,15 @@ export default function AdminDashboardPage() {
                   onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
                 />
               </div>
+              <p className="text-sm text-primary-600">
+                Use negative values for withdrawals only that reduce balance.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="description" className="text-primary-800">
                 Description
               </Label>
-              <Textarea
+              <Input
                 id="description"
                 placeholder="Enter transaction description"
                 className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
@@ -1197,6 +1332,7 @@ export default function AdminDashboardPage() {
               onClick={() => {
                 setIsAddTransactionOpen(false)
                 setTransactionError(null)
+                setNewTransaction({ userId: "", type: "deposit", amount: "", description: "" })
               }}
             >
               Cancel
@@ -1205,7 +1341,77 @@ export default function AdminDashboardPage() {
               className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
               onClick={handleAddTransaction}
             >
-              Create Transaction
+              Add Transaction
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Crypto Transaction Dialog */}
+      <Dialog open={isCryptoDialogOpen} onOpenChange={setIsCryptoDialogOpen}>
+        <DialogContent className="bg-white/95 backdrop-blur-sm border border-primary-100">
+          <DialogHeader>
+            <DialogTitle className="text-primary-900">Crypto Transaction Details</DialogTitle>
+            <DialogDescription className="text-primary-600">
+              Provide additional details for the {newTransaction.type} transaction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {transactionError && (
+              <Alert variant="destructive" className="bg-red-50 border border-red-200">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-700">{transactionError}</AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="cryptoAmount" className="text-primary-800">
+                Crypto Amount (BTC)
+              </Label>
+              <Input
+                id="cryptoAmount"
+                type="number"
+                step="0.00000001"
+                className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                placeholder="0.00000000"
+                value={cryptoForm.cryptoAmount}
+                onChange={(e) => setCryptoForm({ ...cryptoForm, cryptoAmount: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cryptoPrice" className="text-primary-800">
+                Crypto Price (USD per BTC)
+              </Label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-600">$</div>
+                <Input
+                  id="cryptoPrice"
+                  type="number"
+                  step="0.01"
+                  className="pl-7 border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                  placeholder="0.00"
+                  value={cryptoForm.cryptoPrice}
+                  onChange={(e) => setCryptoForm({ ...cryptoForm, cryptoPrice: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCryptoDialogOpen(false)
+                setCryptoForm({ cryptoAmount: "", cryptoPrice: "" })
+                setTransactionError(null)
+              }}
+              className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCryptoTransaction}
+              className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
+            >
+              Submit Transaction
             </Button>
           </DialogFooter>
         </DialogContent>
