@@ -65,7 +65,7 @@ export default function LoginPage() {
 
     const fetchSettings = async () => {
       try {
-        const response = await fetch("/api/admin/settings");
+        const response = await fetch("/api/home");
         if (response.ok) {
           const data = await response.json();
           setSettings(data);

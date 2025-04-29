@@ -120,7 +120,7 @@ export default function DashboardPage() {
 
     const fetchSettings = async () => {
       try {
-        const response = await fetch("/api/admin/settings")
+        const response = await fetch("/api/home")
         if (response.ok) {
           const data = await response.json()
           setSettings(data)
@@ -484,45 +484,33 @@ export default function DashboardPage() {
             </div>
 
             <div className="relative group h-full">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-300"></div>
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-300"></div>
               <Card className="relative bg-white border-0 shadow-lg h-full flex flex-col">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-emerald-600">Quick Transfer</CardTitle>
+                  <CardTitle className="text-sm font-medium text-primary-600">Savings Account</CardTitle>
                 </CardHeader>
                 <CardContent className="flex-grow">
-                  {recentContacts.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2">
-                      {recentContacts.slice(0, 3).map((contact) => (
-                        <Button
-                          key={contact.id}
-                          variant="outline"
-                          className="flex flex-col items-center p-3 h-auto border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300"
-                          asChild
-                        >
-                          <Link href={`/dashboard/transfers?type=zelle&contactId=${contact.id}`}>
-                            <Avatar className="h-8 w-8 mb-1 border-2 border-emerald-100">
-                              <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white">
-                                {contact.initials}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-xs truncate w-full text-center">{contact.name}</span>
-                          </Link>
-                        </Button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center text-emerald-500 flex-1 flex items-center justify-center">
-                      No recent recipients
-                    </div>
-                  )}
+                  <div className="text-2xl font-bold">${(userData?.savingsBalance || 0).toFixed(2)}</div>
+                  <p className="text-xs text-primary-500">Account #: xxxx-xxxx-4583</p>
                 </CardContent>
                 <div className="p-4 pt-0 mt-auto">
-                  <Button
-                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-md hover:shadow-lg transition-all"
-                    asChild
-                  >
-                    <Link href="/dashboard/transfers?type=zelle">Zelle Transfer</Link>
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button
+                      size="sm"
+                      className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white shadow-md hover:shadow-lg transition-all"
+                      asChild
+                    >
+                      <Link href="/dashboard/transfers">Send Money</Link>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-primary-200 text-primary-600 hover:bg-primary-50"
+                      asChild
+                    >
+                      <Link href="/dashboard/accounts">Details</Link>
+                    </Button>
+                  </div>
                 </div>
               </Card>
             </div>

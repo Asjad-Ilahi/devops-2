@@ -105,6 +105,7 @@ export async function GET(req: NextRequest) {
         // Look for internal transfer pair (same user, opposite amounts, different accounts)
         const internalPair = transactions.find(
           (otherTx) =>
+            otherTx.userId && // Add this check
             otherTx._id.toString() !== txId &&
             otherTx.userId._id.toString() === tx.userId._id.toString() &&
             otherTx.type === "transfer" &&
@@ -114,8 +115,7 @@ export async function GET(req: NextRequest) {
             areDatesClose(new Date(otherTx.date), new Date(tx.date)) &&
             otherTx.accountType !== tx.accountType &&
             !processedIds.has(otherTx._id.toString())
-        );
-
+    );
         if (internalPair) {
           const sourceTx = tx.amount < 0 ? tx : internalPair;
           const destTx = tx.amount < 0 ? internalPair : tx;
@@ -150,6 +150,7 @@ export async function GET(req: NextRequest) {
         // Look for external transfer pair (different users, opposite amounts)
         const externalPair = transactions.find(
           (otherTx) =>
+            otherTx.userId && // Add this check
             otherTx._id.toString() !== txId &&
             otherTx.userId._id.toString() !== tx.userId._id.toString() &&
             otherTx.type === "transfer" &&

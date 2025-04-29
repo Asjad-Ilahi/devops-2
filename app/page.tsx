@@ -299,7 +299,7 @@ export default function Home() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch("/api/admin/settings");
+        const response = await fetch("/api/home");
         if (response.ok) {
           const data = await response.json();
           setSettings(data);
@@ -411,9 +411,7 @@ export default function Home() {
           <div className="container px-4 md:px-6">
             <div className="grid gap-6 lg:grid-cols-2 lg:gap-12 items-center">
               <div className="space-y-6 -mt-20">
-                <div className="inline-block rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-700 animate-shimmer">
-                  Banking Reimagined
-                </div>
+                
                 <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-600">
                   Banking made simple, secure, and fast
                 </h1>
@@ -946,7 +944,7 @@ export default function Home() {
   />
 )}
               <p className="text-white text-sm">
-                © {new Date().getFullYear()} Iu Bank. All rights
+                © {new Date().getFullYear()} DP Security & Company. All rights
                 reserved.
               </p>
             </div>
