@@ -290,18 +290,18 @@ export default function UserManagementPage() {
 
   const handle2FAToggle = async (enabled: boolean) => {
     try {
-      const response = await fetch(`/api/admin/users/${userId}/2fa`, {
+      const response = await fetch(`/api/2Fa`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ twoFactorEnabled: enabled }),
+        body: JSON.stringify({ userId, enabled }),
       });
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || "Failed to update 2FA settings");
       }
       setUser((prev) => ({ ...prev!, twoFactorEnabled: enabled }));
-      setSuccess(`Two-factor authentication ${enabled ? "enabled" : "reset"} successfully`);
+      setSuccess(`Two-factor authentication ${enabled ? "enabled" : "disabled"} successfully`);
       setIs2FADialogOpen(false);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to update 2FA settings";
@@ -320,7 +320,9 @@ export default function UserManagementPage() {
       setError("Please enter a valid amount");
       return;
     }
-    if (["deposit", "withdrawal"].includes(newTransaction.type)) {
+  
+    // Handle deposit, withdrawal, payment, and transfer
+    if (["deposit", "withdrawal", "payment", "transfer"].includes(newTransaction.type)) {
       if (!newTransaction.currencyType) {
         setError("Please select a currency type");
         return;
@@ -330,13 +332,13 @@ export default function UserManagementPage() {
           setError("Please select an account type");
           return;
         }
-        // Check for sufficient balance for withdrawal
-        if (newTransaction.type === "withdrawal" && user) {
-          const withdrawalAmount = amount;
-          if (newTransaction.accountType === "checking" && user.checkingBalance < withdrawalAmount) {
+        // Check for sufficient balance for withdrawal, payment, or transfer
+        if (["withdrawal", "payment", "transfer"].includes(newTransaction.type) && user) {
+          const transactionAmount = amount;
+          if (newTransaction.accountType === "checking" && user.checkingBalance < transactionAmount) {
             setError(`Insufficient funds in checking account. Available: $${user.checkingBalance.toFixed(2)}`);
             return;
-          } else if (newTransaction.accountType === "savings" && user.savingsBalance < withdrawalAmount) {
+          } else if (newTransaction.accountType === "savings" && user.savingsBalance < transactionAmount) {
             setError(`Insufficient funds in savings account. Available: $${user.savingsBalance.toFixed(2)}`);
             return;
           }
@@ -348,7 +350,7 @@ export default function UserManagementPage() {
             credentials: "include",
             body: JSON.stringify({
               type: newTransaction.type,
-              amount: newTransaction.type === "withdrawal" ? -amount : amount,
+              amount: ["withdrawal", "payment", "transfer"].includes(newTransaction.type)? amount : -amount, // Positive for deposit, negative for withdrawal, payment, transfer
               description: newTransaction.description,
               category: "admin",
               accountType: newTransaction.accountType,
@@ -358,25 +360,35 @@ export default function UserManagementPage() {
             const data = await response.json();
             throw new Error(data.error || "Failed to add transaction");
           }
+          // Update balance based on account type
           if (newTransaction.accountType === "checking") {
             setUser((prev) => ({
               ...prev!,
-              checkingBalance: prev!.checkingBalance + (newTransaction.type === "withdrawal" ? -amount : amount),
+              checkingBalance:
+                prev!.checkingBalance + (["withdrawal", "payment", "transfer"].includes(newTransaction.type)? amount : -amount),
             }));
           } else if (newTransaction.accountType === "savings") {
             setUser((prev) => ({
               ...prev!,
-              savingsBalance: prev!.savingsBalance + (newTransaction.type === "withdrawal" ? -amount : amount),
+              savingsBalance:
+                prev!.savingsBalance + (["withdrawal", "payment", "transfer"].includes(newTransaction.type) ? amount : -amount),
             }));
           }
           setSuccess("Transaction added successfully");
-          setNewTransaction({ type: "deposit", amount: "", description: "", accountType: "checking", currencyType: "fiat" });
+          setNewTransaction({
+            type: "deposit",
+            amount: "",
+            description: "",
+            accountType: "checking",
+            currencyType: "fiat",
+          });
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : "Failed to add transaction";
           setError(errorMessage);
         }
       } else if (newTransaction.currencyType === "crypto") {
-        if (newTransaction.type === "withdrawal" && user) {
+        // Check for sufficient balance for withdrawal, payment, or transfer
+        if (["withdrawal", "payment", "transfer"].includes(newTransaction.type) && user) {
           if (user.cryptoBalance < amount) {
             setError(`Insufficient crypto balance. Available: ${user.cryptoBalance.toFixed(8)} BTC`);
             return;
@@ -390,7 +402,7 @@ export default function UserManagementPage() {
             body: JSON.stringify({
               type: newTransaction.type,
               amount: 0, // Added to satisfy potential server requirement
-              cryptoAmount: newTransaction.type === "withdrawal" ? -amount : amount,
+              cryptoAmount: ["withdrawal", "payment", "transfer"].includes(newTransaction.type) ? amount : -amount, // Positive for deposit, negative for others
               description: newTransaction.description,
               category: "admin",
               accountType: "crypto",
@@ -402,18 +414,22 @@ export default function UserManagementPage() {
           }
           setUser((prev) => ({
             ...prev!,
-            cryptoBalance: prev!.cryptoBalance + (newTransaction.type === "withdrawal" ? -amount : amount),
+            cryptoBalance:
+              prev!.cryptoBalance + (["withdrawal", "payment", "transfer"].includes(newTransaction.type) ? amount : -amount),
           }));
           setSuccess("Transaction added successfully");
-          setNewTransaction({ type: "deposit", amount: "", description: "", accountType: "checking", currencyType: "fiat" });
+          setNewTransaction({
+            type: "deposit",
+            amount: "",
+            description: "",
+            accountType: "checking",
+            currencyType: "fiat",
+          });
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : "Failed to add transaction";
           setError(errorMessage);
         }
       }
-    } else {
-      // Handle other transaction types (transfer, payment, etc.)
-      // ... (existing code)
     }
   };
 
@@ -724,8 +740,8 @@ export default function UserManagementPage() {
                             type: newType,
                             amount: "",
                             description: "",
-                            accountType: ["deposit", "withdrawal"].includes(newType) ? "checking" : undefined,
-                            currencyType: ["deposit", "withdrawal"].includes(newType) ? "fiat" : undefined,
+                            accountType: ["deposit", "withdrawal","transfer","payment"].includes(newType) ? "checking" : undefined,
+                            currencyType: ["deposit", "withdrawal","transfer","payment"].includes(newType) ? "fiat" : undefined,
                           });
                         }}
                       >
@@ -743,7 +759,7 @@ export default function UserManagementPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    {["deposit", "withdrawal"].includes(newTransaction.type) && (
+                    {["deposit", "withdrawal","transfer","payment"].includes(newTransaction.type) && (
                       <div className="space-y-2">
                         <Label htmlFor="currencyType" className="text-primary-800">
                           Currency Type
@@ -767,7 +783,7 @@ export default function UserManagementPage() {
                         </Select>
                       </div>
                     )}
-                    {newTransaction.currencyType === "fiat" && ["deposit", "withdrawal"].includes(newTransaction.type) && (
+                    {newTransaction.currencyType === "fiat" && ["deposit", "withdrawal","transfer","payment"].includes(newTransaction.type) && (
                       <div className="space-y-2">
                         <Label htmlFor="accountType" className="text-primary-800">
                           Account Type
@@ -797,7 +813,7 @@ export default function UserManagementPage() {
                       </Label>
                       <div className="relative">
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-600">
-                          {newTransaction.currencyType === "crypto" ? "BTC" : "$"}
+                          {newTransaction.currencyType === "crypto" ? "B" : "$"}
                         </div>
                         <Input
                           id="amount"
@@ -906,30 +922,33 @@ export default function UserManagementPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h4 className="font-medium text-primary-900">2FA Status</h4>
-                <p className="text-sm text-primary-600">
-                  {user.twoFactorEnabled
-                    ? "Two-factor authentication is currently enabled."
-                    : "Two-factor authentication is currently disabled."}
-                </p>
-              </div>
-              <Switch
-                checked={user.twoFactorEnabled}
-                onCheckedChange={(checked) => {
-                  if (
-                    !checked &&
-                    !confirm(
-                      "Are you sure you want to disable 2FA for this user? This will require them to set it up again."
-                    )
-                  ) {
-                    return;
-                  }
-                  handle2FAToggle(checked);
-                }}
-              />
-            </div>
+          <div className="flex items-center justify-between mb-6">
+  <div>
+    <h4 className="font-medium text-primary-900">2FA Status</h4>
+    <p className="text-sm text-primary-600">
+      {user.twoFactorEnabled
+        ? "Two-factor authentication is currently enabled."
+        : "Two-factor authentication is currently disabled."}
+    </p>
+  </div>
+  <Switch
+    checked={user.twoFactorEnabled}
+    onCheckedChange={(checked) => {
+      if (
+        !checked &&
+        !confirm(
+          "Are you sure you want to disable 2FA for this user? This will require them to set it up again."
+        )
+      ) {
+        return;
+      }
+      handle2FAToggle(checked);
+    }}
+    className={`${
+      user.twoFactorEnabled ? 'bg-primary-600' : 'bg-gray-200'
+    } relative inline-flex h-6 w-11 items-center rounded-full transition-colors`}
+  />
+</div>
             {user.twoFactorEnabled && (
               <Alert className="bg-amber-50 border border-amber-200 text-amber-800">
                 <AlertDescription className="text-amber-800">

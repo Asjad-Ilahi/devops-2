@@ -10,9 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Color from "color";
+import { LogoProvider, useLogo } from "@/app/logoContext";
+
 
 export default function LoginPage() {
   const router = useRouter();
+  const { logoUrl } = useLogo();
+  
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -103,7 +107,12 @@ export default function LoginPage() {
         return;
       }
 
-      setShowTwoFactor(true);
+      if (data.requiresTwoFactor) {
+        setShowTwoFactor(true);
+      } else {
+        localStorage.setItem("token", data.token);
+        router.push(data.redirect);
+      }
       setIsLoginLoading(false);
     } catch (error) {
       setError("An unexpected error occurred. Please try again later.");
@@ -144,9 +153,9 @@ export default function LoginPage() {
           <div className="flex justify-center">
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full blur opacity-25"></div>
-              {settings?.logoUrl ? (
+              {logoUrl ? (
                 <img
-                  src={settings.logoUrl}
+                  src={logoUrl}
                   alt="Site Logo"
                   className="relative h-12 w-auto"
                 />
@@ -290,7 +299,7 @@ export default function LoginPage() {
                     value={twoFactorCode}
                     onChange={(e) => setTwoFactorCode(e.target.value)}
                     placeholder="Enter verification code"
-                    className="mt-1 text-center text-lg tracking-widest bg-primary-50 border-primary-200 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+                    className="mt-1 text-center text-lg tracking-widest bg-primary-0 border-primary-200 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
                     maxLength={6}
                   />
                 </div>

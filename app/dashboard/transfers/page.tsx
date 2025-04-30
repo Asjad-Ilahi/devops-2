@@ -45,7 +45,7 @@ interface RateLimit {
   lastAttempt: number;
 }
 
-function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
+function ZelleTransfer({ checkingBalance, updateAccounts }: { checkingBalance: number; updateAccounts: () => Promise<void> }) {
   const [step, setStep] = useState<"select" | "amount" | "confirmation" | "verify" | "result">("select");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -64,8 +64,6 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
     const fetchAndVerifyContacts = async () => {
       const storedContacts = localStorage.getItem("recentZelleContacts");
       let contacts: Contact[] = storedContacts ? JSON.parse(storedContacts) : [];
-
-      // Verify each contact against the database
       const verifiedContacts = await Promise.all(
         contacts.map(async (contact: Contact) => {
           try {
@@ -87,11 +85,8 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
           }
         })
       );
-
-      // Filter out null values (contacts that don't exist in the database)
       const validContacts = verifiedContacts.filter((contact): contact is Contact => contact !== null);
       setRecentContacts(validContacts);
-
       const contactId = searchParams.get("contactId");
       if (contactId) {
         const contact = validContacts.find((c: Contact) => c.id === contactId);
@@ -102,7 +97,6 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
         }
       }
     };
-
     fetchAndVerifyContacts();
   }, [searchParams]);
 
@@ -137,7 +131,6 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-
     if (!newContact.name) {
       setError("Name is required");
       setIsLoading(false);
@@ -153,47 +146,23 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
       setIsLoading(false);
       return;
     }
-
-    try {
-      const value = contactType === "email" ? newContact.email : newContact.phone;
-      const response = await fetch("/api/user/check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contactType, value }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error || "Failed to check recipient");
-        setIsLoading(false);
-        return;
-      }
-      if (!data.exists) {
-        setError("Recipient not found in the system");
-        setIsLoading(false);
-        return;
-      }
-
-      const contact: Contact = {
-        id: `new-${Date.now()}`,
-        name: newContact.name,
-        email: contactType === "email" ? value : "",
-        phone: contactType === "phone" ? value : "",
-        initials: newContact.name
-          .split(" ")
-          .map((n) => n[0])
-          .join("")
-          .toUpperCase(),
-      };
-      setSelectedContact(contact);
-      const updatedContacts = [contact, ...recentContacts].slice(0, 5);
-      localStorage.setItem("recentZelleContacts", JSON.stringify(updatedContacts));
-      setRecentContacts(updatedContacts);
-      setStep("amount");
-    } catch (error) {
-      setError("An error occurred while checking the recipient");
-    } finally {
-      setIsLoading(false);
-    }
+    const contact: Contact = {
+      id: `new-${Date.now()}`,
+      name: newContact.name,
+      email: contactType === "email" ? newContact.email : "",
+      phone: contactType === "phone" ? newContact.phone : "",
+      initials: newContact.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase(),
+    };
+    setSelectedContact(contact);
+    const updatedContacts = [contact, ...recentContacts].slice(0, 5);
+    localStorage.setItem("recentZelleContacts", JSON.stringify(updatedContacts));
+    setRecentContacts(updatedContacts);
+    setStep("amount");
+    setIsLoading(false);
   };
 
   const handleAmountSubmit = (e: React.FormEvent) => {
@@ -208,7 +177,7 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
 
   const handleConfirmation = async () => {
     setIsLoading(true);
-    setError(null); // Clear any previous errors
+    setError(null);
     const transferAmount = Number.parseFloat(amount);
     if (transferAmount > checkingBalance) {
       setError(`Insufficient balance. Current balance: $${checkingBalance.toFixed(2)}`);
@@ -216,7 +185,6 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
       setIsLoading(false);
       return;
     }
-
     try {
       const recipientValue = contactType === "email" ? selectedContact?.email : selectedContact?.phone;
       const response = await fetch("/api/transfer/zelle/request", {
@@ -232,7 +200,6 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
           verificationMethod: "email",
         }),
       });
-
       const data = await response.json();
       if (!response.ok) {
         console.error(`API error: ${response.status} ${response.statusText}`, data);
@@ -240,9 +207,12 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
         setIsLoading(false);
         return;
       }
-
-      console.log("Transfer request successful:", data);
-      setStep("verify");
+      if (data.requiresVerification) {
+        setStep("verify");
+      } else {
+        await updateAccounts();
+        setStep("result");
+      }
     } catch (error) {
       console.error("Network or unexpected error:", error);
       setError("An error occurred while requesting the transfer. Please try again.");
@@ -255,13 +225,11 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-
     if (!verificationCode) {
       setError("Please enter a verification code");
       setIsLoading(false);
       return;
     }
-
     try {
       const response = await fetch("/api/transfer/zelle/verify", {
         method: "POST",
@@ -277,7 +245,6 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
         setIsLoading(false);
         return;
       }
-
       if (selectedContact) {
         const updatedContacts = recentContacts.filter(
           (c) => !(c.email === selectedContact.email && c.phone === selectedContact.phone)
@@ -287,7 +254,7 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
         setRecentContacts(limitedContacts);
         localStorage.setItem("recentZelleContacts", JSON.stringify(limitedContacts));
       }
-
+      await updateAccounts();
       setStep("result");
     } catch (error) {
       setError("An error occurred during verification");
@@ -300,7 +267,6 @@ function ZelleTransfer({ checkingBalance }: { checkingBalance: number }) {
     if (!checkRateLimit()) return;
     setIsLoading(true);
     setError(null);
-
     try {
       const recipientValue = contactType === "email" ? selectedContact?.email : selectedContact?.phone;
       const response = await fetch("/api/transfer/zelle/resend", {
@@ -768,6 +734,7 @@ function TransferContent() {
   const [internalRateLimit, setInternalRateLimit] = useState<RateLimit>({ attempts: 0, lastAttempt: 0 });
   const [externalRateLimit, setExternalRateLimit] = useState<RateLimit>({ attempts: 0, lastAttempt: 0 });
   const [colors, setColors] = useState<Colors | null>(null);
+  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
 
   useEffect(() => {
     const fetchColors = async () => {
@@ -815,7 +782,6 @@ function TransferContent() {
         setError("Please log in to view accounts");
         return;
       }
-
       try {
         const response = await fetch("/api/accounts", {
           method: "GET",
@@ -824,11 +790,9 @@ function TransferContent() {
             "Content-Type": "application/json",
           },
         });
-
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-
         const data = await response.json();
         const newAccounts: Account[] = [
           {
@@ -850,16 +814,59 @@ function TransferContent() {
             openedDate: data.openedDate || "N/A",
           },
         ];
-
         setAccounts(newAccounts);
+        setIs2FAEnabled(data.twoFactorEnabled || false);
         setError(null);
       } catch (error) {
         setError(error instanceof Error ? error.message : "Failed to load accounts");
       }
     };
-
     fetchAccounts();
   }, []);
+
+  const updateAccounts = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("Please log in to view accounts");
+      return;
+    }
+    try {
+      const response = await fetch("/api/accounts", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setAccounts([
+        {
+          name: "Checking Account",
+          number: data.checkingNumber?.slice(-4).padStart(12, "x") || "xxxx-xxxx-xxxx",
+          fullNumber: data.checkingNumber || "Not Available",
+          balance: data.checkingBalance || 0,
+          type: "checking",
+          status: "active",
+          openedDate: data.openedDate || "N/A",
+        },
+        {
+          name: "Savings Account",
+          number: data.savingsNumber?.slice(-4).padStart(12, "x") || "xxxx-xxxx-xxxx",
+          fullNumber: data.savingsNumber || "Not Available",
+          balance: data.savingsBalance || 0,
+          type: "savings",
+          status: "active",
+          openedDate: data.openedDate || "N/A",
+        },
+      ]);
+      setError(null);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to load accounts");
+    }
+  };
 
   const checkRateLimit = (limit: RateLimit, setLimit: (limit: RateLimit) => void) => {
     const now = Date.now();
@@ -884,19 +891,16 @@ function TransferContent() {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-
     if (!internalFrom || !internalTo || !internalAmount) {
       setError("Please fill in all required fields");
       setIsLoading(false);
       return;
     }
-
     if (internalFrom === internalTo) {
       setError("Source and destination accounts cannot be the same");
       setIsLoading(false);
       return;
     }
-
     const transferAmount = Number.parseFloat(internalAmount);
     const sourceBalance = getBalance(internalFrom);
     if (transferAmount > sourceBalance) {
@@ -904,7 +908,6 @@ function TransferContent() {
       setIsLoading(false);
       return;
     }
-
     try {
       const token = localStorage.getItem("token");
       const response = await fetch("/api/transfer/internal/request", {
@@ -921,15 +924,18 @@ function TransferContent() {
           verificationMethod: "email",
         }),
       });
-
       const data = await response.json();
       if (!response.ok) {
         setError(data.error || "Transfer request failed");
         setIsLoading(false);
         return;
       }
-
-      setInternalStep("verify");
+      if (data.requiresVerification) {
+        setInternalStep("verify");
+      } else {
+        await updateAccounts();
+        setInternalStep("result");
+      }
     } catch (error) {
       setError("An error occurred. Please try again.");
     } finally {
@@ -941,13 +947,11 @@ function TransferContent() {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-
     if (!internalVerificationCode) {
       setError("Please enter a verification code");
       setIsLoading(false);
       return;
     }
-
     try {
       const token = localStorage.getItem("token");
       const normalizedCode = internalVerificationCode.trim().toUpperCase();
@@ -962,43 +966,13 @@ function TransferContent() {
           verificationMethod: "email",
         }),
       });
-
       const data = await response.json();
       if (!response.ok) {
         setError(data.error || "Verification failed");
         setIsLoading(false);
         return;
       }
-
-      const fetchResponse = await fetch("/api/accounts", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-      const fetchData = await fetchResponse.json();
-      setAccounts([
-        {
-          name: "Checking Account",
-          number: fetchData.checkingNumber?.slice(-4).padStart(12, "x") || "xxxx-xxxx-xxxx",
-          fullNumber: fetchData.checkingNumber || "Not Available",
-          balance: fetchData.checkingBalance || 0,
-          type: "checking",
-          status: "active",
-          openedDate: fetchData.openedDate || "N/A",
-        },
-        {
-          name: "Savings Account",
-          number: fetchData.savingsNumber?.slice(-4).padStart(12, "x") || "xxxx-xxxx-xxxx",
-          fullNumber: fetchData.savingsNumber || "Not Available",
-          balance: fetchData.savingsBalance || 0,
-          type: "savings",
-          status: "active",
-          openedDate: fetchData.openedDate || "N/A",
-        },
-      ]);
-
+      await updateAccounts();
       setInternalStep("result");
     } catch (error) {
       setError("An error occurred during verification.");
@@ -1051,7 +1025,6 @@ function TransferContent() {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-
     if (
       !externalAccount ||
       !externalBankName ||
@@ -1077,7 +1050,6 @@ function TransferContent() {
       setIsLoading(false);
       return;
     }
-
     const transferAmount = Number.parseFloat(externalAmount);
     const sourceBalance = getBalance(externalAccount);
     if (transferAmount > sourceBalance) {
@@ -1085,7 +1057,6 @@ function TransferContent() {
       setIsLoading(false);
       return;
     }
-
     try {
       const token = localStorage.getItem("token");
       const response = await fetch("/api/transfer/external/request", {
@@ -1108,15 +1079,18 @@ function TransferContent() {
           verificationMethod: "email",
         }),
       });
-
       const data = await response.json();
       if (!response.ok) {
         setError(data.error || "External transfer request failed");
         setIsLoading(false);
         return;
       }
-
-      setExternalStep("verify");
+      if (data.requiresVerification) {
+        setExternalStep("verify");
+      } else {
+        await updateAccounts();
+        setExternalStep("result");
+      }
     } catch (error) {
       setError("An error occurred. Please try again.");
     } finally {
@@ -1128,13 +1102,11 @@ function TransferContent() {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-
     if (!externalVerificationCode) {
       setError("Please enter a verification code");
       setIsLoading(false);
       return;
     }
-
     try {
       const token = localStorage.getItem("token");
       const normalizedCode = externalVerificationCode.trim().toUpperCase();
@@ -1149,43 +1121,13 @@ function TransferContent() {
           verificationMethod: "email",
         }),
       });
-
       const data = await response.json();
       if (!response.ok) {
         setError(data.error || "Verification failed");
         setIsLoading(false);
         return;
       }
-
-      const fetchResponse = await fetch("/api/accounts", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-      const fetchData = await fetchResponse.json();
-      setAccounts([
-        {
-          name: "Checking Account",
-          number: fetchData.checkingNumber?.slice(-4).padStart(12, "x") || "xxxx-xxxx-xxxx",
-          fullNumber: fetchData.checkingNumber || "Not Available",
-          balance: fetchData.checkingBalance || 0,
-          type: "checking",
-          status: "active",
-          openedDate: fetchData.openedDate || "N/A",
-        },
-        {
-          name: "Savings Account",
-          number: fetchData.savingsNumber?.slice(-4).padStart(12, "x") || "xxxx-xxxx-xxxx",
-          fullNumber: fetchData.savingsNumber || "Not Available",
-          balance: fetchData.savingsBalance || 0,
-          type: "savings",
-          status: "active",
-          openedDate: fetchData.openedDate || "N/A",
-        },
-      ]);
-
+      await updateAccounts();
       setExternalStep("result");
     } catch (error) {
       setError("An error occurred during verification.");
@@ -1702,7 +1644,6 @@ function TransferContent() {
             Money Transfers
           </h1>
         </div>
-
         {error && (
           <Alert variant="destructive" className="mb-6 bg-red-50 border-red-200">
             <AlertDescription className="text-red-700">{error}</AlertDescription>
@@ -1753,7 +1694,6 @@ function TransferContent() {
               </CardContent>
             </Card>
           </div>
-
           <div className="md:hidden w-full col-span-3">
             <Tabs
               value={transferType}
@@ -1777,7 +1717,6 @@ function TransferContent() {
             </Tabs>
           </div>
         </div>
-
         {transferType === "internal" && (
           <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
             <CardHeader>
@@ -1794,7 +1733,6 @@ function TransferContent() {
             </CardContent>
           </Card>
         )}
-
         {transferType === "external" && (
           <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
             <CardHeader>
@@ -1811,10 +1749,9 @@ function TransferContent() {
             </CardContent>
           </Card>
         )}
-
         {transferType === "zelle" && (
           <Suspense fallback={<div className="p-6 text-primary-600">Loading Zelle transfer...</div>}>
-            <ZelleTransfer checkingBalance={getBalance("checking")} />
+            <ZelleTransfer checkingBalance={getBalance("checking")} updateAccounts={updateAccounts} />
           </Suspense>
         )}
       </div>

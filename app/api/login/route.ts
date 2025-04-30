@@ -32,16 +32,25 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Your account is awaiting admin approval. Please try again later." }, { status: 403 });
       }
 
-      const verificationCode = crypto.randomBytes(3).toString("hex").toUpperCase();
-      user.twoFactorCode = verificationCode;
-      user.twoFactorCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-      await user.save();
+      if (user.twoFactorEnabled) {
+        const verificationCode = crypto.randomBytes(3).toString("hex").toUpperCase();
+        user.twoFactorCode = verificationCode;
+        user.twoFactorCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        await user.save();
 
-      await sendVerificationEmail(user.email, verificationCode);
+        await sendVerificationEmail(user.email, verificationCode);
 
-      return NextResponse.json({
-        message: "Verification code sent",
-      });
+        return NextResponse.json({
+          message: "Verification code sent",
+          requiresTwoFactor: true,
+        });
+      } else {
+        user.lastLogin = new Date(); // Store current timestamp for last login
+        await user.save();
+
+        const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "1h" });
+        return NextResponse.json({ token, redirect: "/dashboard", requiresTwoFactor: false });
+      }
     } catch (error) {
       console.error("Login error:", error);
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });

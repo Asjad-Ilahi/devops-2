@@ -8,6 +8,7 @@ import { Eye, EyeOff, Loader2, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { LogoProvider, useLogo } from "@/app/logoContext";
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -37,6 +38,7 @@ export default function AdminLoginPage() {
   const [isMounted, setIsMounted] = useState<boolean>(false)
   const [colors, setColors] = useState<Colors | null>(null)
   const [settings, setSettings] = useState<any>(null)
+  const { logoUrl } = useLogo();
 
   // Fetch colors and settings
   useEffect(() => {
@@ -210,8 +212,8 @@ export default function AdminLoginPage() {
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              {settings?.logoUrl ? (
-                <img src={settings.logoUrl} alt="Site Logo" className="h-10 w-auto" />
+              {logoUrl ? (
+                <img src={logoUrl} alt="Site Logo" className="h-10 w-auto" />
               ) : (
                 <img src="/zelle-logo.svg" alt="Zelle" className="h-10 w-auto" />
               )}

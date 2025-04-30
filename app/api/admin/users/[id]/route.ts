@@ -51,7 +51,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       status: user.status || "pending",
       twoFactorEnabled: user.twoFactorEnabled || false,
       lastLogin: user.lastLogin ? new Date(user.lastLogin).toISOString() : "N/A",
-      createdAt: user.createdAt ? new Date(user.createdAt).toISOString() : "N/A",
+      createdAt: user.createdAt ? new Date(user.createdAt).toISOString() : user._id.getTimestamp().toISOString(),
     };
 
     return NextResponse.json({ user: userData });
@@ -117,7 +117,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       status: user.status || "pending",
       twoFactorEnabled: user.twoFactorEnabled || false,
       lastLogin: user.lastLogin ? new Date(user.lastLogin).toISOString() : "N/A",
-      createdAt: user.createdAt ? new Date(user.createdAt).toISOString() : "N/A",
+      createdAt: user.createdAt ? new Date(user.createdAt).toISOString() : user._id.getTimestamp().toISOString(),
     };
 
     return NextResponse.json({ user: userData });

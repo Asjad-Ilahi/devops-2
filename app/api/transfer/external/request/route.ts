@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
+import Transaction from "@/models/Transaction";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendVerificationEmail } from "@/lib/email";
@@ -57,26 +58,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
     }
 
-    const verificationCode = crypto.randomBytes(3).toString("hex").toUpperCase();
-    user.pendingExternalTransfer = {
-      from,
-      amount,
-      externalBankName,
-      externalAccountNumber,
-      externalStreet,
-      externalCity,
-      externalState,
-      externalZip,
-      externalPhone,
-      memo,
-      verificationCode,
-      createdAt: new Date(),
-    };
-    await user.save();
+    if (user.twoFactorEnabled) {
+      const verificationCode = crypto.randomBytes(3).toString("hex").toUpperCase();
+      user.pendingExternalTransfer = {
+        from,
+        amount,
+        externalBankName,
+        externalAccountNumber,
+        externalStreet,
+        externalCity,
+        externalState,
+        externalZip,
+        externalPhone,
+        memo,
+        verificationCode,
+        createdAt: new Date(),
+      };
+      await user.save();
+      await sendVerificationEmail(user.email, verificationCode);
+      return NextResponse.json(
+        { message: "Verification code sent to your email", requiresVerification: true },
+        { status: 200 }
+      );
+    } else {
+      // Process transfer immediately
+      if (from === "checking") user.balance -= amount;
+      else user.savingsBalance -= amount;
 
-    await sendVerificationEmail(user.email, verificationCode);
+      await Transaction.create({
+        userId: user._id,
+        description: memo || `External transfer to ${externalBankName}`,
+        amount: -amount,
+        type: "transfer",
+        category: "External Transfer",
+        accountType: from,
+        status: "completed",
+      });
 
-    return NextResponse.json({ message: "Verification code sent to your email" }, { status: 200 });
+      await user.save();
+      return NextResponse.json(
+        { message: "External transfer completed successfully", requiresVerification: false },
+        { status: 200 }
+      );
+    }
   } catch (error) {
     console.error("External transfer request error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

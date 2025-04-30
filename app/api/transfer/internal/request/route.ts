@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
+import Transaction from "@/models/Transaction";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendVerificationEmail } from "@/lib/email";
+import mongoose from "mongoose";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -37,13 +39,52 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
     }
 
-    const verificationCode = crypto.randomBytes(3).toString("hex").toUpperCase();
-    user.pendingTransfer = { from, to, amount, memo, verificationCode, createdAt: new Date() };
-    await user.save();
+    if (user.twoFactorEnabled) {
+      const verificationCode = crypto.randomBytes(3).toString("hex").toUpperCase();
+      user.pendingTransfer = { from, to, amount, memo, verificationCode, createdAt: new Date() };
+      await user.save();
+      await sendVerificationEmail(user.email, verificationCode);
+      return NextResponse.json(
+        { message: "Verification code sent to your email", requiresVerification: true },
+        { status: 200 }
+      );
+    } else {
+      // Process transfer immediately
+      if (from === "checking") user.balance -= amount;
+      else user.savingsBalance -= amount;
+      if (to === "checking") user.balance += amount;
+      else user.savingsBalance += amount;
 
-    await sendVerificationEmail(user.email, verificationCode);
+      const transferId = new mongoose.Types.ObjectId();
+      await Transaction.create([
+        {
+          userId: user._id,
+          description: memo || `Transfer from ${from} to ${to}`,
+          amount: -amount,
+          type: "transfer",
+          category: "Transfer",
+          accountType: from,
+          status: "completed",
+          transferId,
+        },
+        {
+          userId: user._id,
+          description: memo || `Transfer from ${from} to ${to}`,
+          amount: amount,
+          type: "transfer",
+          category: "Transfer",
+          accountType: to,
+          status: "completed",
+          transferId,
+        },
+      ]);
 
-    return NextResponse.json({ message: "Verification code sent to your email" }, { status: 200 });
+      await user.save();
+      return NextResponse.json(
+        { message: "Transfer successful", requiresVerification: false },
+        { status: 200 }
+      );
+    }
   } catch (error) {
     console.error("Internal transfer request error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

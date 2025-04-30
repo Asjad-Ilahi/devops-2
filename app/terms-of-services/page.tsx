@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation"; // Import useSearchParams
 import Color from "color";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LogoProvider, useLogo } from "@/app/logoContext";
+
 
 // Define interfaces for component props
 interface DecorativeCircleProps {
@@ -218,6 +220,7 @@ function BackLinkButton() {
 
 export default function TermsOfServicePage() {
   const [settings, setSettings] = useState<any>(null);
+  const { logoUrl } = useLogo();
   const [colors, setColors] = useState<{
     primaryColor: string;
     secondaryColor: string;
@@ -343,7 +346,7 @@ export default function TermsOfServicePage() {
         <div className="container flex h-16 items-center px-4 sm:px-6 lg:px-8">
           <div className="flex items-center">
             <img
-              src={settings?.logoUrl || "/placeholder.svg"}
+              src={logoUrl || "/placeholder.svg"}
               alt="Site Logo"
               className="h-8 w-auto"
               loading="lazy"
@@ -435,7 +438,7 @@ export default function TermsOfServicePage() {
           <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
             <div className="flex items-center gap-4">
               <img
-                src={settings?.logoUrl || "/placeholder.svg"}
+                src={logoUrl || "/placeholder.svg"}
                 alt="Site Logo"
                 className="h-8 w-auto"
                 loading="lazy"

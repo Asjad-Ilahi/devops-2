@@ -38,41 +38,66 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid verification code" }, { status: 401 });
     }
 
-    const { recipientId, amount, memo } = sender.pendingZelleTransfer;
-    const recipient = await User.findById(recipientId);
-    if (!recipient) {
-      return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
-    }
+    const { recipientId, recipientType, recipientValue, amount, memo } = sender.pendingZelleTransfer;
 
-    sender.balance -= amount;
-    recipient.balance += amount;
+    // Process the transfer
+    if (recipientId) {
+      // Internal transfer: recipient exists in the system
+      const recipient = await User.findById(recipientId);
+      if (!recipient) {
+        return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
+      }
 
-    const transferId = new mongoose.Types.ObjectId();
-    await Transaction.create([
-      {
+      sender.balance -= amount;
+      recipient.balance += amount;
+
+      const transferId = new mongoose.Types.ObjectId();
+      await Transaction.create([
+        {
+          userId: sender._id,
+          description: memo || `Zelle transfer to ${recipient.fullName || recipient.email || recipient.phone}`,
+          amount: -amount,
+          type: "transfer",
+          category: "Zelle",
+          accountType: "checking",
+          status: "completed",
+          transferId,
+        },
+        {
+          userId: recipient._id,
+          description: memo || `Zelle transfer from ${sender.fullName || sender.email || sender.phone}`,
+          amount: amount,
+          type: "deposit",
+          category: "Zelle",
+          accountType: "checking",
+          status: "completed",
+          transferId,
+        },
+      ]);
+
+      await Promise.all([sender.save(), recipient.save()]);
+    } else {
+      // External transfer: recipient does not exist in the system
+      // Use recipientValue for description, fall back if missing
+      const descriptionValue = recipientValue || "unknown external recipient";
+      sender.balance -= amount;
+
+      await Transaction.create({
         userId: sender._id,
-        description: memo || `Zelle transfer to ${recipient.fullName || recipient.email || recipient.phone}`,
+        description: memo || `Zelle transfer to external recipient: ${descriptionValue}`,
         amount: -amount,
         type: "transfer",
-        category: "Zelle",
+        category: "Zelle External",
         accountType: "checking",
         status: "completed",
-        transferId,
-      },
-      {
-        userId: recipient._id,
-        description: memo || `Zelle transfer from ${sender.fullName || sender.email || sender.phone}`,
-        amount: amount,
-        type: "deposit",
-        category: "Zelle",
-        accountType: "checking",
-        status: "completed",
-        transferId,
-      },
-    ]);
+      });
 
+      await sender.save();
+    }
+
+    // Clear pending transfer
     sender.pendingZelleTransfer = undefined;
-    await Promise.all([sender.save(), recipient.save()]);
+    await sender.save();
 
     return NextResponse.json({ message: "Zelle transfer completed successfully" }, { status: 200 });
   } catch (error) {

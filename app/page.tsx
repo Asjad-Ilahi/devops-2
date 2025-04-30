@@ -22,6 +22,7 @@ import {
   LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LogoProvider, useLogo } from "@/app/logoContext";
 
 // Define interfaces for component props
 interface FeatureItemProps {
@@ -290,6 +291,7 @@ function AnimatedCounter({
 
 export default function Home() {
   const [settings, setSettings] = useState<any>(null);
+  const { logoUrl } = useLogo();
   const [colors, setColors] = useState<{
     primaryColor: string;
     secondaryColor: string;
@@ -372,9 +374,9 @@ export default function Home() {
       <header className="border-b border-border bg-gradient-to-r from-primary-800 to-secondary-900 sticky top-0 z-50 shadow-sm">
         <div className="container flex h-16 items-center px-4 sm:px-6 lg:px-8">
           <div className="flex items-center">
-          {settings?.logoUrl ? (
+          {logoUrl ? (
   <img
-    src={settings.logoUrl}
+    src={logoUrl}
     alt="Site Logo"
     className="h-8 w-auto"
     loading="lazy"
@@ -697,8 +699,8 @@ export default function Home() {
                   />
                   <FeatureItem
                     icon={BadgeCheck}
-                    title="Bank Exclusive: DP Security"
-                    description="We surpass all banking regulations and security standards with bank exclusive DP Security."
+                    title="Bank Exclusive: Iu-Banking"
+                    description="We surpass all banking regulations and security standards with bank exclusive Iu-Banking."
                   />
                 </div>
               </div>
@@ -928,9 +930,9 @@ export default function Home() {
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
             <div className="flex items-center gap-4">
-            {settings?.logoUrl ? (
+            {logoUrl ? (
   <img
-    src={settings.logoUrl}
+    src={logoUrl}
     alt="Site Logo"
     className="h-8 w-auto"
     loading="lazy"
@@ -944,7 +946,7 @@ export default function Home() {
   />
 )}
               <p className="text-white text-sm">
-                © {new Date().getFullYear()} DP Security & Company. All rights
+                © {new Date().getFullYear()} Iu-Banking. All rights
                 reserved.
               </p>
             </div>

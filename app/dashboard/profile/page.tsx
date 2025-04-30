@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
   Eye,
@@ -35,9 +36,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import Color from 'color'
 import { useAuth } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { logout } from '@/lib/auth'
 
 interface ProfileData {
   firstName: string
@@ -63,6 +66,7 @@ export default function ProfilePage() {
     state: "",
     zipCode: "",
   })
+  const [userId, setUserId] = useState<string | null>(null) // Add userId state
   const [lastLogin, setLastLogin] = useState<string | null>(null)
   const [createdAt, setCreatedAt] = useState<string | null>(null)
   const [currentPassword, setCurrentPassword] = useState("")
@@ -80,6 +84,7 @@ export default function ProfilePage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [colors, setColors] = useState<{ primaryColor: string; secondaryColor: string } | null>(null)
+  const [is2FAEnabled, setIs2FAEnabled] = useState<boolean>(false) // State for 2FA toggle
 
   // Fetch colors (public endpoint, no auth required)
   useEffect(() => {
@@ -146,6 +151,8 @@ export default function ProfilePage() {
           state: data.state || "",
           zipCode: data.zipCode || "",
         })
+        setUserId(data._id) // Set userId from API response
+        setIs2FAEnabled(data.twoFactorEnabled || false)
         setLastLogin(data.lastLogin ? new Date(data.lastLogin).toLocaleString() : "Never")
         setCreatedAt(data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : "Unknown")
       } catch (error) {
@@ -368,6 +375,46 @@ export default function ProfilePage() {
     }
   }
 
+  // Handle 2FA toggle
+  const handle2FAToggle = async (checked: boolean) => {
+    if (!userId) {
+      setError("User ID is missing. Please try refreshing the page.")
+      return
+    }
+
+    setIs2FAEnabled(checked)
+    setIsLoading(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await apiFetch("/api/2Fa", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: userId, // Ensure userId is explicitly passed as a string
+          enabled: checked,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to update 2FA setting")
+      }
+
+      setSuccess(`2FA ${checked ? "enabled" : "disabled"} successfully`)
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (error) {
+      console.error("Error updating 2FA:", error)
+      setError(error instanceof Error ? error.message : "An unknown error occurred")
+      setIs2FAEnabled(!checked) // Revert state on failure
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const render2FAModal = () => (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <Card className="w-full max-w-md backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
@@ -445,6 +492,18 @@ export default function ProfilePage() {
     const firstInitial = profileForm.firstName.charAt(0).toUpperCase() || ""
     const lastInitial = profileForm.lastName.charAt(0).toUpperCase() || ""
     return `${firstInitial}${lastInitial}` || "U"
+  }
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await logout()
+    } catch (error) {
+      setError("Failed to log out")
+    } finally {
+      setIsLoggingOut(false)
+    }
   }
 
   return (
@@ -765,6 +824,7 @@ export default function ProfilePage() {
                     <Button
                       variant="outline"
                       className="border-primary-200 text-primary-700 hover:bg-primary-50"
+                      onClick={() => logout()}
                     >
                       Log Out
                     </Button>
@@ -795,6 +855,25 @@ export default function ProfilePage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6 relative z-10">
+                    <div className="mb-6">
+                      <h3 className="text-lg font-medium text-primary-900 mb-2">Two-Factor Authentication</h3>
+                      <p className="text-sm text-primary-700 mb-4">
+                        Protect your account with an extra layer of security.
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="2fa-toggle" className="text-primary-800 font-medium">
+                          Enable Two-Factor Authentication
+                        </Label>
+                        <Switch
+                          id="2fa-toggle"
+                          checked={is2FAEnabled}
+                          onCheckedChange={handle2FAToggle}
+                          disabled={isLoading}
+                          className={`${is2FAEnabled ? 'bg-primary-600' : 'bg-gray-200'
+                            } relative inline-flex h-6 w-11 items-center rounded-full transition-colors`}
+                        />
+                      </div>
+                    </div>
                     <div className="pt-4">
                       <h3 className="text-lg font-medium text-primary-900 mb-4">Verification Method</h3>
                       <div className="space-y-4">

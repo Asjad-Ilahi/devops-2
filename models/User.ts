@@ -48,7 +48,9 @@ const userSchema = new mongoose.Schema({
     createdAt: Date,
   },
   pendingZelleTransfer: {
-    recipientId: { type: String }, // Recipient's user ID
+    recipientId: { type: String, default: null }, // Set to null for external transfers
+    recipientType: { type: String }, // "email" or "phone" for external transfers
+    recipientValue: { type: String }, // The email or phone number for external transfers
     amount: { type: Number },
     memo: { type: String },
     verificationCode: { type: String },

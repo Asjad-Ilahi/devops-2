@@ -61,6 +61,7 @@ export default function CryptoPage() {
   const [sellAmount, setSellAmount] = useState<string>("")
   const [sellEquivalent, setSellEquivalent] = useState<string>("0")
   const [isBuySwapped, setIsBuySwapped] = useState<boolean>(false)
+  const [isSellSwapped, setIsSellSwapped] = useState<boolean>(false)
 
   // Transaction history initialized as empty array
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -216,15 +217,29 @@ export default function CryptoPage() {
     setBuyEquivalent("0")
   }, [isBuySwapped])
 
-  // Calculate sell equivalent
+  // Calculate sell equivalent based on swap state
   useEffect(() => {
     if (sellAmount && btcPrice) {
-      const usdEquivalent = Number.parseFloat(sellAmount) * btcPrice
-      setSellEquivalent(usdEquivalent.toFixed(2))
+      const amount = Number.parseFloat(sellAmount)
+      if (!isSellSwapped) {
+        // Input is BTC, calculate USD
+        const usdEquivalent = amount * btcPrice
+        setSellEquivalent(usdEquivalent.toFixed(2))
+      } else {
+        // Input is USD, calculate BTC
+        const btcEquivalent = amount / btcPrice
+        setSellEquivalent(btcEquivalent.toFixed(8))
+      }
     } else {
       setSellEquivalent("0")
     }
-  }, [sellAmount, btcPrice])
+  }, [sellAmount, btcPrice, isSellSwapped])
+
+  // Clear sell input when swapping
+  useEffect(() => {
+    setSellAmount("")
+    setSellEquivalent("0")
+  }, [isSellSwapped])
 
   // Handle buy BTC with real API call
   const handleBuyBTC = async () => {
@@ -303,8 +318,17 @@ export default function CryptoPage() {
       return
     }
 
-    const sellValue = Number.parseFloat(sellAmount)
-    if (sellValue > cryptoBalance) {
+    let btcToSell: number
+    if (!isSellSwapped) {
+      // Input is BTC
+      btcToSell = Number.parseFloat(sellAmount)
+    } else {
+      // Input is USD, calculate BTC
+      const usdAmount = Number.parseFloat(sellAmount)
+      btcToSell = usdAmount / btcPrice
+    }
+
+    if (btcToSell > cryptoBalance) {
       setError("Insufficient BTC in your wallet")
       return
     }
@@ -316,7 +340,7 @@ export default function CryptoPage() {
         method: "POST",
         body: JSON.stringify({
           action: "sell",
-          amount: sellValue,
+          amount: btcToSell,
           btcPrice,
         }),
       })
@@ -565,53 +589,116 @@ export default function CryptoPage() {
               className="p-6 backdrop-blur-sm bg-white/70 border border-primary-100 rounded-lg shadow-lg mt-4"
             >
               <div className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="sellAmount" className="text-primary-800 font-medium">
-                    Amount (BTC)
-                  </Label>
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                      <Bitcoin className="h-4 w-4 text-amber-500" />
+                {!isSellSwapped ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="sellAmount" className="text-primary-800 font-medium">
+                        Amount (BTC)
+                      </Label>
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                          <Bitcoin className="h-4 w-4 text-amber-500" />
+                        </div>
+                        <Input
+                          id="sellAmount"
+                          type="number"
+                          min="0.00000001"
+                          step="0.00000001"
+                          className="pl-8 border-primary-200 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                          placeholder="0.00000000"
+                          value={sellAmount}
+                          onChange={(e) => setSellAmount(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-primary-700">Available: {cryptoBalance.toFixed(8)} BTC</span>
+                        <button
+                          type="button"
+                          className="text-secondary-600 hover:text-secondary-700 font-medium"
+                          onClick={() => setSellAmount(cryptoBalance.toString())}
+                        >
+                          Max
+                        </button>
+                      </div>
                     </div>
-                    <Input
-                      id="sellAmount"
-                      type="number"
-                      min="0.00000001"
-                      step="0.00000001"
-                      className="pl-8 border-primary-200 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                      placeholder="0.00000000"
-                      value={sellAmount}
-                      onChange={(e) => setSellAmount(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-primary-700">Available: {cryptoBalance.toFixed(8)} BTC</span>
-                    <button
-                      type="button"
-                      className="text-secondary-600 hover:text-secondary-700 font-medium"
-                      onClick={() => setSellAmount(cryptoBalance.toString())}
-                    >
-                      Max
-                    </button>
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-center py-3">
-                  <div className="p-2 bg-primary-100 rounded-full animate-bounce">
-                    <ArrowDownUp className="h-5 w-5 text-primary-600" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-primary-800 font-medium">You'll Receive (USD)</Label>
-                  <div className="bg-primary-50/70 p-4 rounded-lg flex items-center border border-primary-100">
-                    <DollarSign className="h-5 w-5 mr-3 text-emerald-500" />
-                    <div>
-                      <span className="font-mono text-primary-900 font-bold">${sellEquivalent}</span> USD
+                    <div className="flex items-center justify-center py-3">
+                      <button
+                        type="button"
+                        className="p-2 bg-primary-100 rounded-full hover:bg-primary-200 transition-colors"
+                        onClick={() => setIsSellSwapped(!isSellSwapped)}
+                      >
+                        <ArrowDownUp className="h-5 w-5 text-primary-600" />
+                      </button>
                     </div>
-                  </div>
-                  <p className="text-xs text-primary-600 font-medium">1 BTC = ${btcPrice.toFixed(2)}</p>
-                </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-primary-800 font-medium">You'll Receive (USD)</Label>
+                      <div className="bg-primary-50/70 p-4 rounded-lg flex items-center border border-primary-100">
+                        <DollarSign className="h-5 w-5 mr-3 text-emerald-500" />
+                        <div>
+                          <span className="font-mono text-primary-900 font-bold">${sellEquivalent}</span> USD
+                        </div>
+                      </div>
+                      <p className="text-xs text-primary-600 font-medium">1 BTC = ${btcPrice.toFixed(2)}</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="sellAmount" className="text-primary-800 font-medium">
+                        Amount (USD)
+                      </Label>
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-700 font-bold">$</div>
+                        <Input
+                          id="sellAmount"
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          className="pl-7 border-primary-200 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                          placeholder="0.00"
+                          value={sellAmount}
+                          onChange={(e) => setSellAmount(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-primary-700">Available: {cryptoBalance.toFixed(8)} BTC</span>
+                        <button
+                          type="button"
+                          className="text-secondary-600 hover:text-secondary-700 font-medium"
+                          onClick={() => {
+                            const maxUsd = (cryptoBalance * btcPrice).toFixed(2)
+                            setSellAmount(maxUsd)
+                          }}
+                        >
+                          Max
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-center py-3">
+                      <button
+                        type="button"
+                        className="p-2 bg-primary-100 rounded-full hover:bg-primary-200 transition-colors"
+                        onClick={() => setIsSellSwapped(!isSellSwapped)}
+                      >
+                        <ArrowDownUp className="h-5 w-5 text-primary-600" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-primary-800 font-medium">BTC to Sell</Label>
+                      <div className="bg-primary-50/70 p-4 rounded-lg flex items-center border border-primary-100">
+                        <Bitcoin className="h-5 w-5 mr-3 text-amber-500" />
+                        <div>
+                          <span className="font-mono text-primary-900 font-bold">{sellEquivalent}</span> BTC
+                        </div>
+                      </div>
+                      <p className="text-xs text-primary-600 font-medium">1 BTC = ${btcPrice.toFixed(2)}</p>
+                    </div>
+                  </>
+                )}
 
                 <Button
                   className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"

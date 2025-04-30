@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAuth, logout } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { LogoProvider, useLogo } from "@/app/logoContext";
 
 // Transaction interface
 interface Transaction {
@@ -66,6 +67,8 @@ export default function DashboardPage() {
   useAuth() // Proactively check token expiration
 
   const router = useRouter()
+      const { logoUrl } = useLogo();
+
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [userData, setUserData] = useState<UserData | null>(null)
   const [cryptoValue, setCryptoValue] = useState<number>(0)
@@ -233,8 +236,8 @@ export default function DashboardPage() {
           <div className="flex h-full flex-col bg-gradient-to-br from-primary-800 to-secondary-900 text-white">
             <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
               <div className="flex items-center gap-2">
-                {settings?.logoUrl ? (
-                  <img src={settings.logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
                 ) : (
                   <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
                 )}
@@ -300,8 +303,8 @@ export default function DashboardPage() {
       <div className="hidden md:flex border-r bg-gradient-to-br from-primary-800 to-secondary-900 text-white w-64 flex-col fixed inset-y-0">
         <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
           <div className="flex items-center gap-2">
-            {settings?.logoUrl ? (
-              <img src={settings.logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
+            {logoUrl ? (
+              <img src={logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
             ) : (
               <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
             )}
@@ -311,31 +314,31 @@ export default function DashboardPage() {
           <div className="px-3 py-2">
             <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-primary-200">Main</h2>
             <div className="space-y-1">
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/50" asChild>
                 <Link href="/dashboard">
                   <Home className="mr-2 h-4 w-4" />
                   Dashboard
                 </Link>
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/50" asChild>
                 <Link href="/dashboard/accounts">
                   <CreditCard className="mr-2 h-4 w-4" />
                   Accounts
                 </Link>
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/50" asChild>
                 <Link href="/dashboard/transactions">
                   <FileText className="mr-2 h-4 w-4" />
                   Transactions
                 </Link>
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/50" asChild>
                 <Link href="/dashboard/transfers">
                   <Send className="mr-2 h-4 w-4" />
                   Transfers
                 </Link>
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/50" asChild>
                 <Link href="/dashboard/crypto">
                   <ArrowUpRight className="mr-2 h-4 w-4" />
                   Crypto
@@ -346,13 +349,13 @@ export default function DashboardPage() {
           <div className="px-3 py-2">
             <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-primary-200">Settings</h2>
             <div className="space-y-1">
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/50" asChild>
                 <Link href="/dashboard/profile">
                   <User className="mr-2 h-4 w-4" />
                   Profile
                 </Link>
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" onClick={logout}>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/50" onClick={logout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout
               </Button>
@@ -449,6 +452,40 @@ export default function DashboardPage() {
               </Card>
             </div>
 
+
+
+            <div className="relative group h-full">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-300"></div>
+              <Card className="relative bg-white border-0 shadow-lg h-full flex flex-col">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-primary-600">Savings Account</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                  <div className="text-2xl font-bold">${(userData?.savingsBalance || 0).toFixed(2)}</div>
+                  <p className="text-xs text-primary-500">Account #: xxxx-xxxx-4583</p>
+                </CardContent>
+                <div className="p-4 pt-0 mt-auto">
+                  <div className="flex space-x-2">
+                    <Button
+                      size="sm"
+                      className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white shadow-md hover:shadow-lg transition-all"
+                      asChild
+                    >
+                      <Link href="/dashboard/transfers">Send Money</Link>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-primary-200 text-primary-600 hover:bg-primary-50"
+                      asChild
+                    >
+                      <Link href="/dashboard/accounts">Details</Link>
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
             <div className="relative group h-full">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-300"></div>
               <Card className="relative bg-white border-0 shadow-lg h-full flex flex-col">
@@ -477,38 +514,6 @@ export default function DashboardPage() {
                       asChild
                     >
                       <Link href="/dashboard/crypto">Details</Link>
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            <div className="relative group h-full">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-2xl blur opacity-30 group-hover:opacity-70 transition duration-300"></div>
-              <Card className="relative bg-white border-0 shadow-lg h-full flex flex-col">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-primary-600">Savings Account</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <div className="text-2xl font-bold">${(userData?.savingsBalance || 0).toFixed(2)}</div>
-                  <p className="text-xs text-primary-500">Account #: xxxx-xxxx-4583</p>
-                </CardContent>
-                <div className="p-4 pt-0 mt-auto">
-                  <div className="flex space-x-2">
-                    <Button
-                      size="sm"
-                      className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white shadow-md hover:shadow-lg transition-all"
-                      asChild
-                    >
-                      <Link href="/dashboard/transfers">Send Money</Link>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-primary-200 text-primary-600 hover:bg-primary-50"
-                      asChild
-                    >
-                      <Link href="/dashboard/accounts">Details</Link>
                     </Button>
                   </div>
                 </div>

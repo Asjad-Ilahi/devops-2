@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { LogoProvider, useLogo } from "@/app/logoContext";
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
@@ -110,6 +111,7 @@ const formatDate = (dateString: string): string => {
 
 export default function AdminDashboardPage() {
   const router = useRouter()
+  const { logoUrl } = useLogo();
 
   // State management
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
@@ -759,8 +761,8 @@ export default function AdminDashboardPage() {
       <div className="hidden md:flex border-r bg-gradient-to-br from-primary-800 to-secondary-900 text-white w-64 flex-col fixed inset-y-0">
         <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
           <div className="flex items-center gap-2">
-            {settings?.logoUrl ? (
-              <img src={settings.logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
+            {logoUrl ? (
+              <img src={logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
             ) : (
               <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
             )}
@@ -771,19 +773,19 @@ export default function AdminDashboardPage() {
           <div className="px-3 py-2">
             <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-primary-200">Dashboard</h2>
             <div className="space-y-1">
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/50" asChild>
                 <Link href="/admin/dashboard">
                   <Home className="mr-2 h-4 w-4" />
                   Overview
                 </Link>
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/50" asChild>
                 <Link href="/admin/users">
                   <Users className="mr-2 h-4 w-4" />
                   Users
                 </Link>
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/50" asChild>
                 <Link href="/admin/transactions">
                   <CreditCard className="mr-2 h-4 w-4" />
                   Transactions
@@ -794,13 +796,13 @@ export default function AdminDashboardPage() {
           <div className="px-3 py-2">
             <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-primary-200">Settings</h2>
             <div className="space-y-1">
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/50" asChild>
                 <Link href="/admin/profile">
                   <User className="mr-2 h-4 w-4" />
                   Profile
                 </Link>
               </Button>
-              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10" asChild>
+              <Button variant="ghost" className="w-full justify-start text-white hover:bg-white/50" asChild>
                 <Link href="/admin/settings">
                   <Settings className="mr-2 h-4 w-4" />
                   Site Settings
@@ -808,7 +810,7 @@ export default function AdminDashboardPage() {
               </Button>
               <Button
                 variant="ghost"
-                className="w-full justify-start text-white hover:bg-white/10"
+                className="w-full justify-start text-white hover:bg-white/50"
                 onClick={handleLogout}
               >
                 <LogOut className="mr-2 h-4 w-4" />
@@ -832,8 +834,8 @@ export default function AdminDashboardPage() {
               <div className="flex h-full flex-col bg-gradient-to-br from-primary-800 to-secondary-900 text-white">
                 <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
                   <div className="flex items-center gap-2">
-                    {settings?.logoUrl ? (
-                      <img src={settings.logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
                     ) : (
                       <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
                     )}

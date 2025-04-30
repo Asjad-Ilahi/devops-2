@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LogoProvider, useLogo } from "@/app/logoContext";
+
 import {
   Select,
   SelectContent,
@@ -20,6 +22,7 @@ import Color from "color";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { logoUrl } = useLogo();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -442,9 +445,9 @@ export default function RegisterPage() {
       </div>
       <div className="w-full max-w-md space-y-8 z-10">
         <div className="text-center">
-        {settings?.logoUrl ? (
+        {logoUrl ? (
   <img
-    src={settings.logoUrl}
+    src={logoUrl}
     alt="Site Logo"
     className="h-16 w-auto mx-auto drop-shadow-md"
   />
