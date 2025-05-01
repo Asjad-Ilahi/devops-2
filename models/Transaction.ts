@@ -26,6 +26,8 @@ const transactionSchema = new mongoose.Schema({
     enum: [
       "deposit",
       "withdrawal",
+      "credit",       
+      "debit",
       "transfer",
       "payment",
       "fee",
