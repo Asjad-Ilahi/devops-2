@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ZelleLogoProvider, useZelleLogo } from "@/app/zellLogoContext";
+
 import Color from "color";
 
 interface Account {
@@ -58,6 +60,7 @@ function ZelleTransfer({ checkingBalance, updateAccounts }: { checkingBalance: n
   const [recentContacts, setRecentContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [rateLimit, setRateLimit] = useState<RateLimit>({ attempts: 0, lastAttempt: 0 });
+  const { zelleLogoUrl } = useZelleLogo();
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -735,6 +738,8 @@ function TransferContent() {
   const [externalRateLimit, setExternalRateLimit] = useState<RateLimit>({ attempts: 0, lastAttempt: 0 });
   const [colors, setColors] = useState<Colors | null>(null);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const { zelleLogoUrl } = useZelleLogo();
+
 
   useEffect(() => {
     const fetchColors = async () => {
@@ -1686,7 +1691,16 @@ function TransferContent() {
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-sm font-medium text-primary-900">Zelle Transfer</CardTitle>
-                  <Send className="h-5 w-5 text-primary-700" />
+                  {zelleLogoUrl? (
+                  <img 
+                    src={zelleLogoUrl}
+                    alt="Zelle Logo"
+                  className="h-5 w-5 text-primary-700" />
+) : (<img 
+  src="/zelle-logo.png"
+  alt="Zelle Logo"
+className="h-5 w-5 text-primary-700" />)}
+
                 </div>
               </CardHeader>
               <CardContent>
