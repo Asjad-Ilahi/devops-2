@@ -39,9 +39,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-
-
-
 interface Colors {
   primaryColor: string
   secondaryColor: string
@@ -414,8 +411,8 @@ export default function TransactionDetailPage() {
             const { transactions: receiverRefunds } = await receiverRefundsRes.json()
             console.log("DEBUG: Receiver refunds:", receiverRefunds)
             setRefundedTransactions((prev) => {
-              const existingIds = new Set();
-              const newRefunds = receiverRefunds.filter((tx: Transaction) => !existingIds.has(tx.id));
+              const existingIds = new Set(prev.map((tx) => tx.id))
+              const newRefunds = receiverRefunds.filter((tx: Transaction) => !existingIds.has(tx.id))
               return [...prev, ...newRefunds]
             })
           } else {
@@ -433,6 +430,7 @@ export default function TransactionDetailPage() {
     }
     fetchTransactionData()
   }, [transactionId, receiverId, router])
+
   const getTransactionIcon = (type: string) => {
     console.log("DEBUG: Getting transaction icon for type:", type)
     switch (type) {
@@ -494,17 +492,14 @@ export default function TransactionDetailPage() {
         console.log("DEBUG: Update error response:", errorData)
         throw new Error(`Failed to update transaction: ${errorData}`)
       }
-      const { transaction: updatedTransaction, userBalance, userCryptoBalance } = await response.json()
+      const { transaction: updatedTransaction, user } = await response.json()
       console.log("DEBUG: Updated transaction data:", updatedTransaction)
+      console.log("DEBUG: Updated user data:", user)
       setTransaction(updatedTransaction)
-      setUser((prev) =>
-        prev
-          ? { ...prev, balance: userBalance, cryptoBalance: userCryptoBalance || prev.cryptoBalance }
-          : prev
-      )
+      setUser(user)
       setSuccess("Transaction updated successfully")
       setEditMode((prev) => ({ ...prev, [type]: false }))
-      console.log("DEBUG: Transaction updated successfully")
+      console.log("DEBUG: Transaction and user updated successfully")
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to update transaction"
       console.error("DEBUG: Error in handleSaveChanges:", errorMessage)
@@ -716,16 +711,16 @@ export default function TransactionDetailPage() {
     <div className="min-h-screen w-full bg-gradient-to-br from-primary-50 to-secondary-50">
       <div className="container mx-auto p-6">
         <div className="mb-6">
-        <Button
-          variant="ghost"
-          asChild
-          className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
-        >
-          <Link href={backLink}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Link>
-        </Button>
+          <Button
+            variant="ghost"
+            asChild
+            className="p-0 mb-2 text-primary-700 hover:text-primary-900 hover:bg-primary-100 transition-colors"
+          >
+            <Link href={backLink}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Link>
+          </Button>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between sm:items-end gap-4">
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-700 to-secondary-700 bg-clip-text text-transparent">
@@ -760,15 +755,16 @@ export default function TransactionDetailPage() {
                     <Edit className="mr-2 h-4 w-4" />
                     Edit
                   </Button>
-                  {!isInternalTransfer && (<Button
-                    variant="secondary"
-                    onClick={() => setConfirmRefund(true)}
-                    disabled={saving || senderTransaction.category === "admin"}
-                    className="bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200 hover:text-yellow-800 disabled:bg-gray-100 disabled:text-gray-500 disabled:border-gray-200"
-                  >
-                    <RefreshCcw className="mr-2 h-4 w-4" />
-                    {isGroupTransaction || isInternalTransfer ? "Refund Both Transactions" : "Refund Transaction"}
-                  </Button>
+                  {!isInternalTransfer && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => setConfirmRefund(true)}
+                      disabled={saving || senderTransaction.category === "admin"}
+                      className="bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200 hover:text-yellow-800 disabled:bg-gray-100 disabled:text-gray-500 disabled:border-gray-200"
+                    >
+                      <RefreshCcw className="mr-2 h-4 w-4" />
+                      {isGroupTransaction || isInternalTransfer ? "Refund Both Transactions" : "Refund Transaction"}
+                    </Button>
                   )}
                 </div>
               )}
@@ -828,28 +824,7 @@ export default function TransactionDetailPage() {
                       className="border-primary-200 focus:ring-primary-500 bg-white/50"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sender-type" className="text-primary-800 font-medium">Type</Label>
-                    <Select
-                      value={editFormSender.type}
-                      onValueChange={(value) => setEditFormSender({ ...editFormSender, type: value as Transaction["type"] })}
-                    >
-                      <SelectTrigger id="sender-type" className="border-primary-200 bg-white/50">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="deposit">Deposit</SelectItem>
-                        <SelectItem value="withdrawal">Withdrawal</SelectItem>
-                        <SelectItem value="transfer">Transfer</SelectItem>
-                        <SelectItem value="payment">Payment</SelectItem>
-                        <SelectItem value="fee">Fee</SelectItem>
-                        <SelectItem value="interest">Interest</SelectItem>
-                        <SelectItem value="crypto_buy">Crypto Buy</SelectItem>
-                        <SelectItem value="crypto_sell">Crypto Sell</SelectItem>
-                        <SelectItem value="refund">Refund</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                
                   <div className="space-y-2">
                     <Label htmlFor="sender-category" className="text-primary-800 font-medium">Category</Label>
                     <Input

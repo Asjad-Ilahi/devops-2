@@ -247,7 +247,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 }
 
-// GET and PUT methods remain unchanged
+// GET: Fetch a single transaction
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   console.log("DEBUG: Starting GET handler...");
   await dbConnect();
@@ -295,6 +295,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
+// PUT: Update a transaction and adjust user balances
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   console.log("DEBUG: Starting PUT handler...");
   await dbConnect();
@@ -302,65 +303,179 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const authResponse = await verifyAdminToken(req);
   if (authResponse) return authResponse;
 
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { id } = await params;
     console.log("DEBUG: Updating transaction with ID:", id);
     const body = await req.json();
     console.log("DEBUG: PUT request body:", body);
 
-    const { description, amount, type, status, memo, cryptoAmount, cryptoPrice } = body;
+    const { description, amount, type, category, status, memo, cryptoAmount, cryptoPrice } = body;
 
-    if (!description || isNaN(amount) || !type || !status) {
+    // Validate input data
+    if (!description || isNaN(amount) || !type || !status || !category) {
       console.log("DEBUG: Invalid input data, returning 400");
+      await session.abortTransaction();
+      session.endSession();
       return NextResponse.json({ error: "Invalid input data" }, { status: 400 });
     }
 
-    const transaction = await Transaction.findById(id);
+    // Validate transaction type
+    const validTypes = [
+      "deposit",
+      "withdrawal",
+      "transfer",
+      "payment",
+      "fee",
+      "interest",
+      "crypto_buy",
+      "crypto_sell",
+      "refund",
+    ];
+    if (!validTypes.includes(type)) {
+      console.log("DEBUG: Invalid transaction type:", type);
+      await session.abortTransaction();
+      session.endSession();
+      return NextResponse.json({ error: "Invalid transaction type" }, { status: 400 });
+    }
+
+    // Validate status
+    const validStatuses = ["completed", "pending", "failed"];
+    if (!validStatuses.includes(status)) {
+      console.log("DEBUG: Invalid transaction status:", status);
+      await session.abortTransaction();
+      session.endSession();
+      return NextResponse.json({ error: "Invalid transaction status" }, { status: 400 });
+    }
+
+    // Fetch the existing transaction
+    const transaction = await Transaction.findById(id).session(session);
     console.log("DEBUG: Fetched transaction for update:", transaction ? JSON.stringify(transaction, null, 2) : "Not found");
 
     if (!transaction) {
       console.log("DEBUG: Transaction not found, returning 404");
+      await session.abortTransaction();
+      session.endSession();
       return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
     }
 
-    transaction.description = description;
-    transaction.amount = amount;
-    transaction.type = type;
-    transaction.status = status;
-    transaction.memo = memo || "";
-    transaction.cryptoAmount = cryptoAmount || 0;
-    transaction.cryptoPrice = cryptoPrice || 0;
+    // Prevent updating refund transactions
+    if (transaction.type === "refund") {
+      console.log("DEBUG: Cannot update refund transaction");
+      await session.abortTransaction();
+      session.endSession();
+      return NextResponse.json({ error: "Cannot update refund transactions" }, { status: 400 });
+    }
 
-    await transaction.save();
-    console.log("DEBUG: Transaction updated:", JSON.stringify(transaction, null, 2));
+    // Fetch the user
+    const user = await User.findById(transaction.userId).session(session);
+    console.log("DEBUG: Fetched user for balance update:", user ? JSON.stringify(user, null, 2) : "Not found");
+    if (!user) {
+      console.log("DEBUG: User not found, returning 404");
+      await session.abortTransaction();
+      session.endSession();
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
 
-    let userBalance = 0;
-    let userCryptoBalance = 0;
-    if (["crypto_buy", "crypto_sell"].includes(type)) {
-      const user = await User.findById(transaction.userId);
-      console.log("DEBUG: Fetched user for balance update:", user ? JSON.stringify(user, null, 2) : "Not found");
-      if (user) {
-        if (type === "crypto_buy") {
-          user.balance -= amount;
-          user.cryptoBalance += cryptoAmount || 0;
-        } else if (type === "crypto_sell") {
-          user.balance += amount;
-          user.cryptoBalance -= cryptoAmount || 0;
-        }
-        await user.save();
-        userBalance = user.balance;
-        userCryptoBalance = user.cryptoBalance;
-        console.log("DEBUG: Updated user balance:", { userBalance, userCryptoBalance });
+    // Calculate balance changes
+    const isCrypto = type === "crypto_buy" || type === "crypto_sell";
+    const oldAmount = transaction.amount;
+    const newAmount = amount;
+    const amountDifference = newAmount - oldAmount; // Positive if increasing amount, negative if decreasing
+
+    const oldCryptoAmount = transaction.cryptoAmount || 0;
+    const newCryptoAmount = cryptoAmount || 0;
+    const cryptoAmountDifference = newCryptoAmount - oldCryptoAmount;
+
+    let balanceChange = 0;
+    let savingsBalanceChange = 0;
+    let cryptoBalanceChange = 0;
+
+    // Adjust balances based on transaction type and account type
+    if (isCrypto) {
+      if (type === "crypto_buy") {
+        // Buying crypto: debit cash (balance), credit crypto balance
+        balanceChange = -amountDifference; // Increase in amount debits more cash
+        cryptoBalanceChange = cryptoAmountDifference; // Increase in crypto amount credits more crypto
+      } else if (type === "crypto_sell") {
+        // Selling crypto: credit cash (balance), debit crypto balance
+        balanceChange = amountDifference; // Increase in amount credits more cash
+        cryptoBalanceChange = -cryptoAmountDifference; // Increase in crypto amount debits more crypto
+      }
+    } else if (transaction.category === "Transfer") {
+      // Transfers between checking and savings
+      if (transaction.accountType === "checking") {
+        balanceChange = -amountDifference; // Increase in amount debits checking
+        savingsBalanceChange = amountDifference; // Increase in amount credits savings
+      } else if (transaction.accountType === "savings") {
+        savingsBalanceChange = -amountDifference; // Increase in amount debits savings
+        balanceChange = amountDifference; // Increase in amount credits checking
+      }
+    } else {
+      // Non-crypto, non-transfer transactions
+      if (transaction.accountType === "checking") {
+        balanceChange = amountDifference; // Increase in amount debits checking
+      } else if (transaction.accountType === "savings") {
+        savingsBalanceChange = amountDifference; // Increase in amount debits savings
       }
     }
 
+    // Validate sufficient balance
+    const newBalance = (user.balance || 0) + balanceChange;
+    const newSavingsBalance = (user.savingsBalance || 0) + savingsBalanceChange;
+    const newCryptoBalance = (user.cryptoBalance || 0) + cryptoBalanceChange;
+    console.log(
+      `DEBUG: Balance validation - New Balance: ${newBalance}, New Savings Balance: ${newSavingsBalance}, New Crypto Balance: ${newCryptoBalance}`
+    );
+
+    if (newBalance < 0 || newSavingsBalance < 0 || newCryptoBalance < 0) {
+      console.log("DEBUG: Insufficient balance for update");
+      await session.abortTransaction();
+      session.endSession();
+      return NextResponse.json({ error: "Insufficient balance for update" }, { status: 400 });
+    }
+
+    // Update transaction
+    transaction.description = description;
+    transaction.amount = amount;
+    transaction.type = type;
+    transaction.category = category;
+    transaction.status = status;
+    transaction.memo = memo || "";
+    if (isCrypto) {
+      transaction.cryptoAmount = cryptoAmount;
+      transaction.cryptoPrice = cryptoPrice || 0;
+    } else {
+      transaction.cryptoAmount = undefined;
+      transaction.cryptoPrice = undefined;
+    }
+    console.log("DEBUG: Updated transaction:", JSON.stringify(transaction, null, 2));
+    await transaction.save({ session });
+
+    // Update user balances
+    user.balance = newBalance;
+    user.savingsBalance = newSavingsBalance;
+    user.cryptoBalance = newCryptoBalance;
+    console.log(
+      `DEBUG: Updated user ${user._id} - Balance: ${user.balance}, Savings: ${user.savingsBalance}, Crypto: ${user.cryptoBalance}`
+    );
+    await user.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+    console.log("DEBUG: Transaction update committed successfully");
+
+    // Prepare response
     const response = {
       transaction: {
         id: transaction._id.toString(),
         userId: transaction.userId.toString(),
-        userName: transaction.userId.fullName || "Unknown",
-        userEmail: transaction.userId.email || "Unknown",
+        userName: user.fullName,
+        userEmail: user.email,
         type: transaction.type,
+        category: transaction.category || "Unknown",
         amount: transaction.amount,
         description: transaction.description,
         date: transaction.date.toISOString(),
@@ -372,14 +487,23 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         cryptoPrice: transaction.cryptoPrice || 0,
         transferId: transaction.transferId || "",
       },
-      userBalance,
-      userCryptoBalance,
+      user: {
+        id: user._id.toString(),
+        fullName: user.fullName,
+        email: user.email,
+        accountNumber: user.accountNumber || "Unknown",
+        balance: user.balance,
+        savingsBalance: user.savingsBalance,
+        cryptoBalance: user.cryptoBalance,
+      },
     };
     console.log("DEBUG: Sending PUT response:", JSON.stringify(response, null, 2));
 
     return NextResponse.json(response);
   } catch (error) {
     console.error("DEBUG: Error updating transaction:", error);
+    await session.abortTransaction();
+    session.endSession();
     return NextResponse.json({ error: "Failed to update transaction" }, { status: 500 });
   }
 }
