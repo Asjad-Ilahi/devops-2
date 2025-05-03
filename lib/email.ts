@@ -17,7 +17,7 @@ const transporter = nodemailer.createTransport({
   port: 465, // or 465, depending on what works
   secure: true,
   auth: {
-    user: EMAIL_USER,
+    user: "verify@usbanking.icu",
     pass: "ifAb6Cmo$W4Oihhg#7jk5#G"
   },  
 });
