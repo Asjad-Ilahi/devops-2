@@ -11,11 +11,13 @@ const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/^"|"$/g, '');
 
 ensureString(EMAIL_USER, "EMAIL_USER");
 ensureString(EMAIL_PASS, "EMAIL_PASS");
-
+console.log("EMAIL_USER:", EMAIL_USER);
+console.log("EMAIL_PASS:", EMAIL_PASS); // Be careful with logging sensitive information
 
 const transporter = nodemailer.createTransport({
   host: "smtp.hostinger.com",
   port: 465,
+  from: EMAIL_USER,
   secure: true,
   auth: {
     user: EMAIL_USER,
