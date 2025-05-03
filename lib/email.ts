@@ -7,7 +7,7 @@ function ensureString(value: string | undefined, name: string): asserts value is
 }
 
 const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/^"|"$/g, '');
+const EMAIL_PASS = process.env.EMAIL_PASS;
 
 ensureString(EMAIL_USER, "EMAIL_USER");
 ensureString(EMAIL_PASS, "EMAIL_PASS");
@@ -19,10 +19,7 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: EMAIL_USER,
     pass: EMAIL_PASS,
-  },
-  logger: true,
-  debug: true, 
-  
+  },  
 });
 
 
