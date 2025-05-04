@@ -637,8 +637,8 @@ export default function AdminDashboardPage() {
         error instanceof Error && error.message === "User not found"
           ? "User not found. They may have been already approved or removed."
           : error instanceof Error
-          ? error.message
-          : "Failed to approve user"
+            ? error.message
+            : "Failed to approve user"
       setApprovalError(errorMessage)
 
       // Refresh pending users to ensure UI is in sync
@@ -761,10 +761,22 @@ export default function AdminDashboardPage() {
       <div className="hidden md:flex border-r bg-gradient-to-br from-primary-800 to-secondary-900 text-white w-64 flex-col fixed inset-y-0">
         <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
           <div className="flex items-center gap-2">
-            {logoUrl ? (
-              <img src={logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
+            {settings?.logoUrl ? (
+              <img
+                src={settings.logoUrl}
+                alt="Site Logo"
+                style={{
+                  width: settings.logoWidth > 0 ? `${settings.logoWidth}px` : 'auto',
+                  height: settings.logoHeight > 0 ? `${settings.logoHeight}px` : '32px',
+                  filter: 'brightness(100%)',
+                }}
+              />
             ) : (
-              <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+              <img
+                src="/zelle-logo.svg"
+                alt="Zelle"
+                style={{ width: 'auto', height: '32px', filter: 'brightness(100%)' }}
+              />
             )}
             <Badge variant="secondary">Admin</Badge>
           </div>
@@ -834,10 +846,22 @@ export default function AdminDashboardPage() {
               <div className="flex h-full flex-col bg-gradient-to-br from-primary-800 to-secondary-900 text-white">
                 <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
                   <div className="flex items-center gap-2">
-                    {logoUrl ? (
-                      <img src={logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
+                    {settings?.logoUrl ? (
+                      <img
+                        src={settings.logoUrl}
+                        alt="Site Logo"
+                        style={{
+                          width: settings.logoWidth > 0 ? `${settings.logoWidth}px` : 'auto',
+                          height: settings.logoHeight > 0 ? `${settings.logoHeight}px` : '32px',
+                          filter: 'brightness(100%)',
+                        }}
+                      />
                     ) : (
-                      <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
+                      <img
+                        src="/zelle-logo.svg"
+                        alt="Zelle"
+                        style={{ width: 'auto', height: '32px', filter: 'brightness(100%)' }}
+                      />
                     )}
                     <Badge variant="secondary">Admin</Badge>
                   </div>
@@ -1006,15 +1030,15 @@ export default function AdminDashboardPage() {
                               user.status === "active"
                                 ? "default"
                                 : user.status === "pending"
-                                ? "secondary"
-                                : "destructive"
+                                  ? "secondary"
+                                  : "destructive"
                             }
                             className={
                               user.status === "active"
                                 ? "bg-green-100 text-green-800 border-green-200 hover:bg-green-200"
                                 : user.status === "pending"
-                                ? "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
-                                : "bg-red-100 text-red-800 border-red-200 hover:bg-red-200"
+                                  ? "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
+                                  : "bg-red-100 text-red-800 border-red-200 hover:bg-red-200"
                             }
                           >
                             {user.status}
@@ -1106,15 +1130,15 @@ export default function AdminDashboardPage() {
                             user.status === "active"
                               ? "default"
                               : user.status === "pending"
-                              ? "secondary"
-                              : "destructive"
+                                ? "secondary"
+                                : "destructive"
                           }
                           className={
                             user.status === "active"
                               ? "bg-green-100 text-green-800 border-green-200"
                               : user.status === "pending"
-                              ? "bg-amber-100 text-amber-800 border-amber-200"
-                              : "bg-red-100 text-red-800 border-red-200"
+                                ? "bg-amber-100 text-amber-800 border-amber-200"
+                                : "bg-red-100 text-red-800 border-red-200"
                           }
                         >
                           {user.status}
@@ -1220,15 +1244,15 @@ export default function AdminDashboardPage() {
                                 group.status === "completed"
                                   ? "default"
                                   : group.status === "pending"
-                                  ? "secondary"
-                                  : "destructive"
+                                    ? "secondary"
+                                    : "destructive"
                               }
                               className={
                                 group.status === "completed"
                                   ? "bg-green-100 text-green-800 border-green-200 hover:bg-green-200"
                                   : group.status === "pending"
-                                  ? "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
-                                  : "bg-red-100 text-red-800 border-red-200 hover:bg-red-200"
+                                    ? "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
+                                    : "bg-red-100 text-red-800 border-red-200 hover:bg-red-200"
                               }
                             >
                               {group.status.charAt(0).toUpperCase() + group.status.slice(1)}
@@ -1422,15 +1446,15 @@ export default function AdminDashboardPage() {
                               group.status === "completed"
                                 ? "default"
                                 : group.status === "pending"
-                                ? "secondary"
-                                : "destructive"
+                                  ? "secondary"
+                                  : "destructive"
                             }
                             className={
                               group.status === "completed"
                                 ? "bg-green-100 text-green-800 border-green-200"
                                 : group.status === "pending"
-                                ? "bg-amber-100 text-amber-800 border-amber-200"
-                                : "bg-red-100 text-red-800 border-red-200"
+                                  ? "bg-amber-100 text-amber-800 border-amber-200"
+                                  : "bg-red-100 text-red-800 border-red-200"
                             }
                           >
                             {group.status.charAt(0).toUpperCase() + group.status.slice(1)}
