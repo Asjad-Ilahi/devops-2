@@ -12,24 +12,38 @@ async function connectDB() {
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-    // Fetch settings with lean() and select only needed fields
+    // Fetch settings with lean() and select all needed fields, including dimensions
     const settings = (await Settings.findOne()
-      .select('logoUrl facebookUrl twitterUrl instagramUrl zelleLogoUrl')
+      .select('logoUrl logoWidth logoHeight facebookUrl twitterUrl instagramUrl zelleLogoUrl zelleLogoWidth zelleLogoHeight')
       .lean()) as unknown as ISettings;
     
     if (!settings) {
       return NextResponse.json({ error: 'Settings not found' }, { status: 404 });
     }
 
-    // Destructure the properties
-    const { logoUrl, facebookUrl, twitterUrl, instagramUrl, zelleLogoUrl } = settings;
-    
-    const response = NextResponse.json({
+    // Destructure the properties with defaults for dimensions
+    const {
       logoUrl,
+      logoWidth = 0,
+      logoHeight = 0,
       facebookUrl,
       twitterUrl,
       instagramUrl,
       zelleLogoUrl,
+      zelleLogoWidth = 0,
+      zelleLogoHeight = 0,
+    } = settings;
+    
+    const response = NextResponse.json({
+      logoUrl,
+      logoWidth,
+      logoHeight,
+      facebookUrl,
+      twitterUrl,
+      instagramUrl,
+      zelleLogoUrl,
+      zelleLogoWidth,
+      zelleLogoHeight,
     });
     
     // Add caching headers
