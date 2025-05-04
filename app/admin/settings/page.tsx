@@ -23,7 +23,7 @@ export default function AdminSettingsPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
-  // Consolidated settings state
+  // Consolidated settings state with logo dimensions
   const [settings, setSettings] = useState({
     siteName: "Zelle Banking",
     supportEmail: "support@zellebank.example.com",
@@ -36,7 +36,11 @@ export default function AdminSettingsPage() {
     primaryColor: "#5f6cd3",
     secondaryColor: "#9c65d2",
     logoUrl: "/zelle-logo.svg",
+    logoWidth: 0,
+    logoHeight: 0,
     zelleLogoUrl: "/zelle-logo.svg",
+    zelleLogoWidth: 0,
+    zelleLogoHeight: 0,
     checkingIcon: "square",
     savingsIcon: "circle",
   });
@@ -92,7 +96,11 @@ export default function AdminSettingsPage() {
           primaryColor: data.primaryColor || "#5f6cd3",
           secondaryColor: data.secondaryColor || "#9c65d2",
           logoUrl: data.logoUrl || "/zelle-logo.svg",
+          logoWidth: data.logoWidth || 0,
+          logoHeight: data.logoHeight || 0,
           zelleLogoUrl: data.zelleLogoUrl || "/zelle-logo.svg",
+          zelleLogoWidth: data.zelleLogoWidth || 0,
+          zelleLogoHeight: data.zelleLogoHeight || 0,
           checkingIcon: data.checkingIcon || "square",
           savingsIcon: data.savingsIcon || "circle",
         });
@@ -148,23 +156,38 @@ export default function AdminSettingsPage() {
   // Handlers for form changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setSettings({ ...settings, [name]: value });
+    let parsedValue: string | number = value;
+    if (['logoWidth', 'logoHeight', 'zelleLogoWidth', 'zelleLogoHeight'].includes(name)) {
+      parsedValue = value ? parseInt(value, 10) : 0;
+    }
+    setSettings({ ...settings, [name]: parsedValue });
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: "logoUrl" | "zelleLogoUrl") => {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        // Compress the image before uploading
         const options = {
-          maxSizeMB: 0.2, // Limit to 200KB
-          maxWidthOrHeight: 800, // Resize to max 800px width or height
+          maxSizeMB: 0.2,
+          maxWidthOrHeight: 800,
           useWebWorker: true,
         };
         const compressedFile = await imageCompression(file, options);
         const reader = new FileReader();
         reader.onloadend = () => {
-          setSettings({ ...settings, [field]: reader.result as string });
+          const dataUrl = reader.result as string;
+          const img = new Image();
+          img.onload = () => {
+            const width = img.width;
+            const height = img.height;
+            setSettings({
+              ...settings,
+              [field]: dataUrl,
+              [field.replace('Url', 'Width')]: width,
+              [field.replace('Url', 'Height')]: height,
+            });
+          };
+          img.src = dataUrl;
         };
         reader.readAsDataURL(compressedFile);
       } catch (error) {
@@ -475,65 +498,121 @@ export default function AdminSettingsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-primary-800">Site Logo</Label>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="logoUpload"
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleLogoUpload(e, "logoUrl")}
-                        className="hidden"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() => document.getElementById("logoUpload")?.click()}
-                        className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        Upload Logo
-                      </Button>
-                    </div>
-                    {settings.logoUrl && (
-                      <img
-                        src={settings.logoUrl}
-                        alt="Logo preview"
-                        className="h-10 w-auto rounded"
-                        loading="lazy"
-                      />
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-primary-800">Zelle Logo</Label>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="zelleLogoUpload"
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleLogoUpload(e, "zelleLogoUrl")}
-                        className="hidden"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() => document.getElementById("zelleLogoUpload")?.click()}
-                        className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        Upload Zelle Logo
-                      </Button>
-                    </div>
-                    {settings.zelleLogoUrl && (
-                      <img
-                        src={settings.zelleLogoUrl}
-                        alt="Zelle Logo preview"
-                        className="h-10 w-auto rounded"
-                        loading="lazy"
-                      />
-                    )}
-                  </div>
-                </div>
+  <Label className="text-primary-800">Site Logo</Label>
+  <div className="flex items-center gap-4">
+    <div className="flex items-center gap-2">
+      <Input
+        id="logoUpload"
+        type="file"
+        accept="image/*"
+        onChange={(e) => handleLogoUpload(e, "logoUrl")}
+        className="hidden"
+      />
+      <Button
+        variant="outline"
+        onClick={() => document.getElementById("logoUpload")?.click()}
+        className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
+      >
+        <Upload className="mr-2 h-4 w-4" />
+        Upload Logo
+      </Button>
+    </div>
+    {settings.logoUrl && (
+      <img
+        src={settings.logoUrl}
+        alt="Logo preview"
+        style={{
+          width: settings.logoWidth > 0 ? `${settings.logoWidth}px` : '100px',
+          height: settings.logoHeight > 0 ? `${settings.logoHeight}px` : 'auto',
+        }}
+        className="rounded"
+        loading="lazy"
+      />
+    )}
+  </div>
+  <div className="mt-2 grid grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label htmlFor="logoWidth" className="text-primary-800">Width (px)</Label>
+      <Input
+        id="logoWidth"
+        name="logoWidth"
+        type="number"
+        value={settings.logoWidth || ''}
+        onChange={handleChange}
+        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+      />
+    </div>
+    <div className="space-y-2">
+      <Label htmlFor="logoHeight" className="text-primary-800">Height (px)</Label>
+      <Input
+        id="logoHeight"
+        name="logoHeight"
+        type="number"
+        value={settings.logoHeight || ''}
+        onChange={handleChange}
+        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+      />
+    </div>
+  </div>
+</div>
+<div className="space-y-2">
+  <Label className="text-primary-800">Zelle Logo</Label>
+  <div className="flex items-center gap-4">
+    <div className="flex items-center gap-2">
+      <Input
+        id="zelleLogoUpload"
+        type="file"
+        accept="image/*"
+        onChange={(e) => handleLogoUpload(e, "zelleLogoUrl")}
+        className="hidden"
+      />
+      <Button
+        variant="outline"
+        onClick={() => document.getElementById("zelleLogoUpload")?.click()}
+        className="bg-white/60 border-primary-200 text-primary-700 hover:bg-primary-50 hover:text-primary-800 hover:border-primary-300"
+      >
+        <Upload className="mr-2 h-4 w-4" />
+        Upload Zelle Logo
+      </Button>
+    </div>
+    {settings.zelleLogoUrl && (
+      <img
+        src={settings.zelleLogoUrl}
+        alt="Zelle Logo preview"
+        style={{
+          width: settings.zelleLogoWidth > 0 ? `${settings.zelleLogoWidth}px` : '100px',
+          height: settings.zelleLogoHeight > 0 ? `${settings.zelleLogoHeight}px` : 'auto',
+        }}
+        className="rounded"
+        loading="lazy"
+      />
+    )}
+  </div>
+  <div className="mt-2 grid grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label htmlFor="zelleLogoWidth" className="text-primary-800">Width (px)</Label>
+      <Input
+        id="zelleLogoWidth"
+        name="zelleLogoWidth"
+        type="number"
+        value={settings.zelleLogoWidth || ''}
+        onChange={handleChange}
+        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+      />
+    </div>
+    <div className="space-y-2">
+      <Label htmlFor="zelleLogoHeight" className="text-primary-800">Height (px)</Label>
+      <Input
+        id="zelleLogoHeight"
+        name="zelleLogoHeight"
+        type="number"
+        value={settings.zelleLogoHeight || ''}
+        onChange={handleChange}
+        className="border-primary-200 bg-white/80 focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50"
+      />
+    </div>
+  </div>
+</div>
                 <div className="space-y-2">
                   <Label className="text-primary-800">Account Icons</Label>
                   <div className="grid grid-cols-2 gap-4">
