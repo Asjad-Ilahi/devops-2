@@ -64,6 +64,8 @@ function ZelleTransfer({ checkingBalance, updateAccounts }: { checkingBalance: n
   const { zelleLogoUrl } = useZelleLogo();
   const searchParams = useSearchParams();
 
+
+
   useEffect(() => {
     const fetchAndVerifyContacts = async () => {
       const storedContacts = localStorage.getItem("recentZelleContacts");
@@ -767,6 +769,7 @@ function TransferContent() {
   const [colors, setColors] = useState<Colors | null>(null);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const { zelleLogoUrl } = useZelleLogo();
+  const [settings, setSettings] = useState<any>(null)
 
   useEffect(() => {
     const fetchColors = async () => {
@@ -804,7 +807,22 @@ function TransferContent() {
         console.error("Error fetching colors:", error);
       }
     };
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch("/api/home")
+        if (response.ok) {
+          const data = await response.json()
+          setSettings(data)
+        } else {
+          setSettings(null)
+        }
+      } catch (error) {
+        setSettings(null)
+      }
+    }
     fetchColors();
+    fetchSettings();
+
   }, []);
 
   useEffect(() => {
@@ -1712,27 +1730,35 @@ function TransferContent() {
               </CardContent>
             </Card>
             <Card
-              className={`cursor-pointer transition-all backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg ${transferType === "zelle" ? "border-primary-400 bg-primary-50/50" : "hover:border-primary-200"}`}
-              onClick={() => setTransferType("zelle")}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-center">
-                  <CardTitle className="text-sm font-medium text-primary-900">Zelle Transfer</CardTitle>
-                  {zelleLogoUrl? (
-                  <img 
-                    src={zelleLogoUrl}
-                    alt="Zelle Logo"
-                  className="h-5 w-auto text-primary-700" />
-) : (<img 
-  src="/zelle-logo.png"
-  alt="Zelle Logo"
-className="h-5 w-auto text-primary-700" />)}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-primary-600">Send money to friends and family with Zelle</CardDescription>
-              </CardContent>
-            </Card>
+  className={`cursor-pointer transition-all backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg ${transferType === "zelle" ? "border-primary-400 bg-primary-50/50" : "hover:border-primary-200"}`}
+  onClick={() => setTransferType("zelle")}
+>
+  <CardHeader className="pb-2">
+    <div className="flex justify-between items-center">
+      <CardTitle className="text-sm font-medium text-primary-900">Zelle Transfer</CardTitle>
+      {zelleLogoUrl || settings?.zelleLogoUrl ? (
+        <img
+          src={zelleLogoUrl || settings?.zelleLogoUrl}
+          alt="Zelle Logo"
+          style={{
+            width: settings?.zelleLogoWidth > 0 ? `${settings.zelleLogoWidth}px` : 'auto',
+            height: settings?.zelleLogoHeight > 0 ? `${settings.zelleLogoHeight}px` : '32px',
+            filter: 'brightness(100%)',
+          }}
+        />
+      ) : (
+        <img
+          src="/zelle-logo.svg"
+          alt="Zelle"
+          style={{ width: 'auto', height: '32px', filter: 'brightness(100%)' }}
+        />
+      )}
+    </div>
+  </CardHeader>
+  <CardContent>
+    <CardDescription className="text-primary-600">Send money to friends and family with Zelle</CardDescription>
+  </CardContent>
+</Card>
           </div>
           <div className="md:hidden w-full col-span-3">
             <Tabs
