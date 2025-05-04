@@ -629,7 +629,6 @@ function ZelleTransfer({ checkingBalance, updateAccounts }: { checkingBalance: n
 
   const renderResultStep = () => (
     <div className="space-y-6 text-center">
-      <img src={zelleLogoUrl || "/default-logo.png"} alt="Zelle Logo" className="mx-auto h-20 w-auto" />
       <h3 className="text-xl font-bold text-primary-900">Transfer Pending</h3>
       <p className="text-primary-600">
         You've sent ${Number.parseFloat(amount).toFixed(2)} to {selectedContact?.name}. Some transfers may take up to 48 hours to reflect onto their account.
