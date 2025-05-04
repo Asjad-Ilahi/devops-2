@@ -12,7 +12,11 @@ export interface ISettings extends Document {
   primaryColor?: string;
   secondaryColor?: string;
   logoUrl?: string;
+  logoWidth?: number;
+  logoHeight?: number;
   zelleLogoUrl?: string;
+  zelleLogoWidth?: number;
+  zelleLogoHeight?: number;
   checkingIcon?: string;
   savingsIcon?: string;
   createdAt: Date;
@@ -31,7 +35,11 @@ const SettingsSchema: Schema = new Schema({
   primaryColor: { type: String, required: false },
   secondaryColor: { type: String, required: false },
   logoUrl: { type: String, required: false },
+  logoWidth: { type: Number, required: false },
+  logoHeight: { type: Number, required: false },
   zelleLogoUrl: { type: String, required: false },
+  zelleLogoWidth: { type: Number, required: false },
+  zelleLogoHeight: { type: Number, required: false },
   checkingIcon: { type: String, required: false },
   savingsIcon: { type: String, required: false },
   createdAt: { type: Date, default: Date.now },
