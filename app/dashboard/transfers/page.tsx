@@ -60,6 +60,7 @@ function ZelleTransfer({ checkingBalance, updateAccounts }: { checkingBalance: n
   const [recentContacts, setRecentContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [rateLimit, setRateLimit] = useState<RateLimit>({ attempts: 0, lastAttempt: 0 });
+  const [transactionId, setTransactionId] = useState<string | null>(null); // Added for transaction ID
   const { zelleLogoUrl } = useZelleLogo();
   const searchParams = useSearchParams();
 
@@ -210,6 +211,9 @@ function ZelleTransfer({ checkingBalance, updateAccounts }: { checkingBalance: n
         setIsLoading(false);
         return;
       }
+      if (data.transactionId) {
+        setTransactionId(data.transactionId); // Store transaction ID
+      }
       if (data.requiresVerification) {
         setStep("verify");
       } else {
@@ -247,6 +251,9 @@ function ZelleTransfer({ checkingBalance, updateAccounts }: { checkingBalance: n
         setError(data.error || "Verification failed");
         setIsLoading(false);
         return;
+      }
+      if (data.transactionId) {
+        setTransactionId(data.transactionId); // Store transaction ID
       }
       if (selectedContact) {
         const updatedContacts = recentContacts.filter(
@@ -302,6 +309,7 @@ function ZelleTransfer({ checkingBalance, updateAccounts }: { checkingBalance: n
     setMemo("");
     setVerificationCode("");
     setError(null);
+    setTransactionId(null); // Reset transaction ID
     setRateLimit({ attempts: 0, lastAttempt: 0 });
   };
 
@@ -619,13 +627,12 @@ function ZelleTransfer({ checkingBalance, updateAccounts }: { checkingBalance: n
 
   const renderResultStep = () => (
     <div className="space-y-6 text-center">
-      <div className="mx-auto w-16 h-16 bg-green-50 rounded-full flex items-center justify-center">
-        <Check className="h-8 w-8 text-green-700" />
-      </div>
-      <h3 className="text-xl font-bold text-primary-900">Transfer Successful!</h3>
+      <img src={zelleLogoUrl || "/default-logo.png"} alt="Zelle Logo" className="mx-auto h-20 w-auto" />
+      <h3 className="text-xl font-bold text-primary-900">Transfer Pending</h3>
       <p className="text-primary-600">
-        You've sent ${Number.parseFloat(amount).toFixed(2)} to {selectedContact?.name}
+        You've sent ${Number.parseFloat(amount).toFixed(2)} to {selectedContact?.name}. Some transfers may take up to 48 hours to reflect onto their account.
       </p>
+
       <div className="border border-primary-200 rounded-lg p-4 space-y-2 text-left bg-white/80">
         <div className="flex items-center justify-between">
           <span className="text-primary-600">Amount:</span>
@@ -649,6 +656,12 @@ function ZelleTransfer({ checkingBalance, updateAccounts }: { checkingBalance: n
             <span className="text-primary-900">{memo}</span>
           </div>
         )}
+        {transactionId && (
+          <div className="flex items-center justify-between">
+            <span className="text-primary-600">Transaction ID:</span>
+            <span className="text-primary-900">{transactionId}</span>
+          </div>
+        )}
       </div>
       <div className="flex space-x-3">
         <Button
@@ -670,32 +683,47 @@ function ZelleTransfer({ checkingBalance, updateAccounts }: { checkingBalance: n
 
   return (
     <Card className="backdrop-blur-sm bg-white/60 border border-primary-100 shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-primary-900">
-          {step === "select" ? (
-            "Select Recipient"
-          ) : step === "amount" ? (
-            "Enter Amount"
-          ) : step === "confirmation" ? (
-            "Confirm Transfer"
-          ) : step === "verify" ? (
-            "Verify Transfer"
-          ) : (
-            "Transfer Status"
-          )}
-        </CardTitle>
-        <CardDescription className="text-primary-600">
-          {step === "select"
-            ? "Choose who you want to send money to"
-            : step === "amount"
-            ? "Enter the amount to send"
-            : step === "confirmation"
-            ? "Review and confirm your transfer"
-            : step === "verify"
-            ? "Enter verification code to complete transfer"
-            : "Your transfer has been processed"}
-        </CardDescription>
-      </CardHeader>
+<CardHeader>
+  <div className="grid grid-cols-3 items-center">
+    {/* First column: Text content */}
+    <div>
+      <CardTitle className="text-primary-900">
+        {step === "select" ? (
+          "Select Recipient"
+        ) : step === "amount" ? (
+          "Enter Amount"
+        ) : step === "confirmation" ? (
+          "Confirm Transfer"
+        ) : step === "verify" ? (
+          "Verify Transfer"
+        ) : (
+          "Transfer Status"
+        )}
+      </CardTitle>
+      <CardDescription className="text-primary-600">
+        {step === "select"
+          ? "Choose who you want to send money to"
+          : step === "amount"
+          ? "Enter the amount to send"
+          : step === "confirmation"
+          ? "Review and confirm your transfer"
+          : step === "verify"
+          ? "Enter verification code to complete transfer"
+          : "Your transfer has been processed"}
+      </CardDescription>
+    </div>
+    {/* Second column: Logo, centered */}
+    <div className="flex justify-center">
+      <img
+        src={zelleLogoUrl || "/default-logo.png"}
+        alt="Zelle Logo"
+        className="h-20 w-auto"
+      />
+    </div>
+    {/* Third column: Empty spacer */}
+    <div></div>
+  </div>
+</CardHeader>
       <CardContent>
         {step === "select" && renderSelectContactStep()}
         {step === "amount" && renderAmountStep()}
@@ -739,7 +767,6 @@ function TransferContent() {
   const [colors, setColors] = useState<Colors | null>(null);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const { zelleLogoUrl } = useZelleLogo();
-
 
   useEffect(() => {
     const fetchColors = async () => {
@@ -1695,12 +1722,11 @@ function TransferContent() {
                   <img 
                     src={zelleLogoUrl}
                     alt="Zelle Logo"
-                  className="h-5 w-5 text-primary-700" />
+                  className="h-5 w-auto text-primary-700" />
 ) : (<img 
   src="/zelle-logo.png"
   alt="Zelle Logo"
-className="h-5 w-5 text-primary-700" />)}
-
+className="h-5 w-auto text-primary-700" />)}
                 </div>
               </CardHeader>
               <CardContent>
