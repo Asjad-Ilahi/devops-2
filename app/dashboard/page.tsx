@@ -235,15 +235,27 @@ export default function DashboardPage() {
         </SheetTrigger>
         <SheetContent side="left" className="p-0 w-64">
           <div className="flex h-full flex-col bg-gradient-to-br from-primary-800 to-secondary-900 text-white">
-            <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
-              <div className="flex items-center gap-2">
-                {logoUrl ? (
-                  <img src={logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
-                ) : (
-                  <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
-                )}
-              </div>
-            </div>
+          <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
+  <div className="flex items-center gap-2">
+    {settings?.logoUrl ? (
+      <img
+        src={settings.logoUrl}
+        alt="Site Logo"
+        style={{
+          width: settings.logoWidth > 0 ? `${settings.logoWidth}px` : 'auto',
+          height: settings.logoHeight > 0 ? `${settings.logoHeight}px` : '32px',
+          filter: 'brightness(100%)',
+        }}
+      />
+    ) : (
+      <img
+        src="/zelle-logo.svg"
+        alt="Zelle"
+        style={{ width: 'auto', height: '32px', filter: 'brightness(100%)' }}
+      />
+    )}
+  </div>
+</div>
             <nav className="flex-1 overflow-auto py-2">
               <div className="px-3 py-2">
                 <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-primary-200">Main</h2>
@@ -302,15 +314,27 @@ export default function DashboardPage() {
 
       {/* Desktop Sidebar */}
       <div className="hidden md:flex border-r bg-gradient-to-br from-primary-800 to-secondary-900 text-white w-64 flex-col fixed inset-y-0">
-        <div className="p-4 border-b border-primary-700 bg-gradient-to-r from-primary-900 to-secondary-950">
-          <div className="flex items-center gap-2">
-            {logoUrl ? (
-              <img src={logoUrl} alt="Site Logo" className="h-8 w-auto brightness-200" />
-            ) : (
-              <img src="/zelle-logo.svg" alt="Zelle" className="h-8 w-auto brightness-200" />
-            )}
-          </div>
-        </div>
+      <div className="p-4 border-b border-primary-600 bg-gradient-to-r from-primary-900 to-secondary-950">
+  <div className="flex items-center gap-2">
+    {settings?.logoUrl ? (
+      <img
+        src={settings.logoUrl}
+        alt="Site Logo"
+        style={{
+          width: settings.logoWidth > 0 ? `${settings.logoWidth}px` : 'auto',
+          height: settings.logoHeight > 0 ? `${settings.logoHeight}px` : '32px',
+          filter: 'brightness(100%)',
+        }}
+      />
+    ) : (
+      <img
+        src="/zelle-logo.svg"
+        alt="Zelle"
+        style={{ width: 'auto', height: '32px', filter: 'brightness(100%)' }}
+      />
+    )}
+  </div>
+</div>
         <nav className="flex-1 overflow-auto py-4">
           <div className="px-3 py-2">
             <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-primary-200">Main</h2>
