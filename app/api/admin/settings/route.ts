@@ -69,7 +69,11 @@ export async function PUT(request: NextRequest) {
         primaryColor: data.primaryColor || '#5f6cd3',
         secondaryColor: data.secondaryColor || '#9c65d2',
         logoUrl: data.logoUrl || '',
+        logoWidth: data.logoWidth,
+        logoHeight: data.logoHeight,
         zelleLogoUrl: data.zelleLogoUrl || '',
+        zelleLogoWidth: data.zelleLogoWidth,
+        zelleLogoHeight: data.zelleLogoHeight,
         checkingIcon: data.checkingIcon || '',
         savingsIcon: data.savingsIcon || ''
       },
