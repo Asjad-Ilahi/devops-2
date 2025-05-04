@@ -43,6 +43,7 @@ interface Transaction {
   category?: string
   cryptoAmount?: number
   cryptoPrice?: number
+  memo?: string
 }
 
 // UserData interface
@@ -375,14 +376,7 @@ export default function DashboardPage() {
   <div className="flex items-center gap-4 px-6">
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8 border-2 border-primary-100">
-            <AvatarImage src="/placeholder.svg?height=32&width=32" alt="@user" />
-            <AvatarFallback className="bg-gradient-to-br from-primary-500 to-secondary-500 text-white">
-              {userData?.fullName?.charAt(0) || "JD"}
-            </AvatarFallback>
-          </Avatar>
-        </Button>
+
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
@@ -521,77 +515,85 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Recent Transactions */}
-          <h2 className="text-xl font-bold mb-4 text-primary-800">Recent Transactions</h2>
-          <div className="relative">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-2xl blur opacity-20"></div>
-            <Card className="relative border-0 shadow-lg">
-              <CardContent className="p-0">
-                <div className="divide-y divide-primary-100">
-                  {transactions.slice(0, 5).map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      className="flex items-center justify-between p-4 hover:bg-primary-50 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                            transaction.type === "deposit" || transaction.type === "interest"
-                              ? "bg-gradient-to-br from-emerald-500 to-teal-500"
-                              : transaction.type === "withdrawal" ||
-                                transaction.type === "payment" ||
-                                transaction.type === "fee"
-                                ? "bg-gradient-to-br from-red-500 to-pink-500"
-                                : transaction.type === "transfer"
-                                  ? "bg-gradient-to-br from-blue-500 to-primary-500"
-                                  : "bg-gradient-to-br from-amber-500 to-orange-500" // For crypto_buy, crypto_sell
-                          }`}
-                        >
-                          {transaction.type === "deposit" || transaction.type === "interest" ? (
-                            <DollarSign className="h-5 w-5 text-white" />
-                          ) : transaction.type === "withdrawal" ||
-                            transaction.type === "payment" ||
-                            transaction.type === "fee" ? (
-                            <CreditCard className="h-5 w-5 text-white" />
-                          ) : transaction.type === "transfer" ? (
-                            <Send className="h-5 w-5 text-white" />
-                          ) : (
-                            <ArrowUpRight className="h-5 w-5 text-white" /> // For crypto transactions
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-medium text-sm sm:text-base">{transaction.description}</div>
-                          <div className="text-xs text-primary-500">
-                            {new Date(transaction.date).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </div>
-                      <div
-                        className={`font-bold text-sm sm:text-base ${transaction.amount > 0 ? "text-emerald-600" : "text-red-600"}`}
-                      >
-                        {transaction.amount > 0 ? "+" : ""}
-                        {transaction.amount.toFixed(2)}
-                      </div>
-                    </div>
-                  ))}
-                  {transactions.length === 0 && (
-                    <div className="p-4 text-center text-primary-500">
-                      {error ? "Unable to load transactions" : "No recent transactions found."}
-                    </div>
-                  )}
+{/* Recent Transactions */}
+<h2 className="text-xl font-bold mb-4 text-primary-800">Recent Transactions</h2>
+<div className="relative">
+  <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-2xl blur opacity-20"></div>
+  <Card className="relative border-0 shadow-lg">
+    <CardContent className="p-0">
+      <div className="divide-y divide-primary-100">
+        {transactions.slice(0, 5).map((transaction) => (
+          <div
+            key={transaction.id}
+            className="flex items-center justify-between p-4 hover:bg-primary-50 transition-colors"
+          >
+            <div className="flex items-center gap-4">
+              <div
+                className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                  transaction.type === "deposit" || transaction.type === "interest"
+                    ? "bg-gradient-to-br from-emerald-500 to-teal-500"
+                    : transaction.type === "withdrawal" ||
+                      transaction.type === "payment" ||
+                      transaction.type === "fee"
+                      ? "bg-gradient-to-br from-red-500 to-pink-500"
+                      : transaction.type === "transfer"
+                        ? "bg-gradient-to-br from-blue-500 to-primary-500"
+                        : "bg-gradient-to-br from-amber-500 to-orange-500" // For crypto_buy, crypto_sell
+                }`}
+              >
+                {transaction.type === "deposit" || transaction.type === "interest" ? (
+                  <DollarSign className="h-5 w-5 text-white" />
+                ) : transaction.type === "withdrawal" ||
+                  transaction.type === "payment" ||
+                  transaction.type === "fee" ? (
+                  <CreditCard className="h-5 w-5 text-white" />
+                ) : transaction.type === "transfer" ? (
+                  <Send className="h-5 w-5 text-white" />
+                ) : (
+                  <ArrowUpRight className="h-5 w-5 text-white" /> // For crypto transactions
+                )}
+              </div>
+              <div>
+                <div className="font-medium text-sm sm:text-base">
+                  {transaction.category === "Zelle External"
+                    ? `Zelle-${transaction.description}`
+                    : (transaction.type === "crypto_buy" || transaction.type === "crypto_sell")
+                      ? `${transaction.description} (${transaction.cryptoAmount}${transaction.memo ? ` - ${transaction.memo}` : ""})`
+                      : transaction.description}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-          <div className="flex justify-center mt-4">
-            <Button
-              variant="outline"
-              className="border-primary-200 text-primary-600 hover:bg-primary-50 hover:text-primary-700 hover:border-primary-300"
-              asChild
+                <div className="text-xs text-primary-500">
+                  {new Date(transaction.date).toLocaleDateString()}
+                </div>
+              </div>
+            </div>
+            <div
+              className={`font-bold text-sm sm:text-base ${
+                transaction.amount > 0 ? "text-emerald-600" : "text-red-600"
+              }`}
             >
-              <Link href="/dashboard/transactions">View All Transactions</Link>
-            </Button>
+              {transaction.amount > 0 ? "+" : ""}
+              {transaction.amount.toFixed(2)}
+            </div>
           </div>
+        ))}
+        {transactions.length === 0 && (
+          <div className="p-4 text-center text-primary-500">
+            {error ? "Unable to load transactions" : "No recent transactions found."}
+          </div>
+        )}
+      </div>
+    </CardContent>
+  </Card>
+</div>
+<div className="flex justify-center mt-4">
+  <Button
+    variant="outline"
+    className="border-primary-200 text-primary-600 hover:bg-primary-50 hover:text-primary-700 hover:border-primary-300"
+    asChild
+  >
+    <Link href="/dashboard/transactions">View All Transactions</Link>
+  </Button>
+</div>
         </main>
       </div>
     </div>
