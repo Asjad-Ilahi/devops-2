@@ -1,3 +1,5 @@
+
+// GET: Fetch all transactions
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Transaction from "@/models/Transaction";
@@ -32,8 +34,10 @@ interface ITransaction {
   description?: string;
   memo?: string;
   transferId?: string;
-  category?: string; // Add category as an optional field
-  __v?: number;
+  category?: string;
+  cryptoAmount?: number;
+  cryptoPrice?: number;
+  recipientWallet?: string;
 }
 
 // Interface for the processed transaction output
@@ -49,8 +53,11 @@ interface IProcessedTransaction {
   status: string;
   account: string;
   memo: string;
-  category: string; // Ensure category is always included
+  category: string;
   transferId?: string;
+  cryptoAmount?: number;
+  cryptoPrice?: number;
+  recipientWallet?: string;
 }
 
 // Helper function to check if two dates are within a tolerance window (10 seconds)
@@ -76,7 +83,7 @@ export async function GET(req: NextRequest) {
     const transactions = await Transaction.find()
       .sort({ date: -1 }) // Sort by date in descending order (latest first)
       .populate("userId", "fullName email accountNumber savingsNumber")
-      .lean() as ITransaction[];
+      .lean() as unknown as ITransaction[];
 
     if (!transactions.length) {
       return NextResponse.json({ transactions: [] }, { status: 200 });
@@ -115,7 +122,7 @@ export async function GET(req: NextRequest) {
             areDatesClose(new Date(otherTx.date), new Date(tx.date)) &&
             otherTx.accountType !== tx.accountType &&
             !processedIds.has(otherTx._id.toString())
-    );
+        );
         if (internalPair) {
           const sourceTx = tx.amount < 0 ? tx : internalPair;
           const destTx = tx.amount < 0 ? internalPair : tx;
@@ -189,6 +196,32 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Handle bitcoin_transfer as a standalone transaction
+      if (tx.type === "bitcoin_transfer") {
+        const amount = Math.abs(tx.cryptoAmount || 0);
+        const description = tx.description || `Sent to ${tx.recipientWallet || "Unknown Wallet"}`;
+
+        processedTransactions.push({
+          id: txId,
+          userId: tx.userId._id.toString(),
+          userName: tx.userId.fullName || "Unknown User",
+          userEmail: tx.userId.email || "N/A",
+          type: "bitcoin_transfer",
+          amount,
+          description,
+          date: new Date(tx.date).toISOString(),
+          status: tx.status,
+          account: tx.accountType,
+          memo: tx.memo || "",
+          category: tx.category || "Crypto Transfer",
+          cryptoAmount: tx.cryptoAmount || 0,
+          cryptoPrice: tx.cryptoPrice || 0,
+          recipientWallet: tx.recipientWallet || "",
+        });
+        processedIds.add(txId);
+        continue;
+      }
+
       // Add all transactions (paired or unpaired) as is
       processedTransactions.push({
         id: txId,
@@ -204,6 +237,9 @@ export async function GET(req: NextRequest) {
         memo: tx.memo || "",
         category: tx.category || "Unknown", // Set category with fallback
         transferId: tx.transferId,
+        cryptoAmount: tx.cryptoAmount || 0,
+        cryptoPrice: tx.cryptoPrice || 0,
+        recipientWallet: tx.recipientWallet || "",
       });
       processedIds.add(txId);
     }

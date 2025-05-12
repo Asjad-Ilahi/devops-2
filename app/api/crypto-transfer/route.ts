@@ -1,3 +1,4 @@
+// /api/crypto-transfer
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import dbConnect from "@/lib/mongodb";
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret") as { userId: string };
     await dbConnect();
 
-    const { action, amount, btcPrice } = await request.json();
+    const { action, amount, btcPrice, recipientWallet, memo } = await request.json();
     if (!action || !amount || !btcPrice) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
@@ -25,9 +26,9 @@ export async function POST(request: Request) {
     }
 
     const btcAmount = parseFloat(amount);
-    const usdAmount = btcAmount * btcPrice;
 
     if (action === "buy") {
+      const usdAmount = btcAmount * btcPrice;
       if (user.balance < usdAmount) {
         return NextResponse.json({ error: "Insufficient checking balance" }, { status: 400 });
       }
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Insufficient Bitcoin balance" }, { status: 400 });
       }
 
+      const usdAmount = btcAmount * btcPrice;
       user.balance += usdAmount;
       user.cryptoBalance -= btcAmount;
 
@@ -78,6 +80,38 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         message: `Successfully sold ${btcAmount.toFixed(8)} BTC`,
+        newCheckingBalance: user.balance,
+        newCryptoBalance: user.cryptoBalance,
+      });
+    } else if (action === "bitcoin_transfer") {
+      if (!recipientWallet) {
+        return NextResponse.json({ error: "Recipient wallet address is required" }, { status: 400 });
+      }
+
+      if ((user.cryptoBalance || 0) < btcAmount) {
+        return NextResponse.json({ error: "Insufficient Bitcoin balance" }, { status: 400 });
+      }
+
+      user.cryptoBalance -= btcAmount;
+
+      await Transaction.create({
+        userId: user._id,
+        description: `Bitcoin Sent to ${recipientWallet}`,
+        amount: 0, // No USD amount involved
+        type: "bitcoin_transfer",
+        category: "Crypto Transfer",
+        accountType: "crypto",
+        status: "completed",
+        cryptoAmount: -btcAmount,
+        cryptoPrice: btcPrice,
+        recipientWallet,
+        memo: memo || "",
+      });
+
+      await user.save();
+
+      return NextResponse.json({
+        message: `Successfully sent ${btcAmount.toFixed(8)} BTC to ${recipientWallet}`,
         newCheckingBalance: user.balance,
         newCryptoBalance: user.cryptoBalance,
       });

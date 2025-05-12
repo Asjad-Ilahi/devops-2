@@ -111,7 +111,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
 
       const isTransfer = originalTransaction.category === "Transfer" ? true : false;
-      const isCrypto = originalTransaction.type === "crypto_buy" || originalTransaction.type === "crypto_sell";
+      const isCrypto = originalTransaction.type === "crypto_buy" || originalTransaction.type === "crypto_sell" || originalTransaction.type === "bitcoin_transfer";
 
       // Process refund for the transaction
       const refund = new Transaction({
@@ -128,6 +128,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         transferId: originalTransaction.transferId,
         cryptoAmount: isCrypto ? -originalTransaction.cryptoAmount : undefined,
         cryptoPrice: isCrypto ? originalTransaction.cryptoPrice : undefined,
+        recipientWallet: originalTransaction.recipientWallet,
       });
       console.log(`DEBUG: Created refund transaction for ${originalTransaction._id}:`, JSON.stringify(refund, null, 2));
       refundTransactions.push(refund);
@@ -155,6 +156,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           // Refund a sell: return BTC (credit cryptoBalance), remove cash (debit balance)
           userUpdate.balanceChange += -originalTransaction.amount; // Debit cash received
           userUpdate.cryptoBalanceChange += -(originalTransaction.cryptoAmount || 0); // Credit BTC sold
+        } else if (originalTransaction.type === "bitcoin_transfer") {
+          // Refund a bitcoin transfer: return BTC (credit cryptoBalance)
+          userUpdate.cryptoBalanceChange += -(originalTransaction.cryptoAmount || 0); // Credit BTC sent back
         }
       } else {
         // Handle non-transfer, non-crypto refunds
@@ -234,6 +238,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         relatedTransactionId: tx.relatedTransactionId?.toString(),
         cryptoAmount: tx.cryptoAmount || 0,
         cryptoPrice: tx.cryptoPrice || 0,
+        recipientWallet: tx.recipientWallet || "",
       })),
     };
     console.log("DEBUG: Sending response:", JSON.stringify(response, null, 2));
@@ -284,6 +289,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         cryptoAmount: transaction.cryptoAmount || 0,
         cryptoPrice: transaction.cryptoPrice || 0,
         transferId: transaction.transferId || "",
+        recipientWallet: transaction.recipientWallet || "",
       },
     };
     console.log("DEBUG: Sending GET response:", JSON.stringify(response, null, 2));
@@ -312,7 +318,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const body = await req.json();
     console.log("DEBUG: PUT request body:", body);
 
-    const { description, amount, type, category, status, memo, cryptoAmount, cryptoPrice } = body;
+    const { description, amount, type, category, status, memo, cryptoAmount, cryptoPrice, recipientWallet } = body;
 
     // Validate input data
     if (!description || isNaN(amount) || !type || !status || !category) {
@@ -332,6 +338,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       "interest",
       "crypto_buy",
       "crypto_sell",
+      "bitcoin_transfer",
       "refund",
     ];
     if (!validTypes.includes(type)) {
@@ -380,7 +387,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     // Calculate balance changes
-    const isCrypto = type === "crypto_buy" || type === "crypto_sell";
+    const isCrypto = type === "crypto_buy" || type === "crypto_sell" || type === "bitcoin_transfer";
     const oldAmount = transaction.amount;
     const newAmount = amount;
     const amountDifference = newAmount - oldAmount; // Positive if increasing amount, negative if decreasing
@@ -403,6 +410,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         // Selling crypto: credit cash (balance), debit crypto balance
         balanceChange = amountDifference; // Increase in amount credits more cash
         cryptoBalanceChange = -cryptoAmountDifference; // Increase in crypto amount debits more crypto
+      } else if (type === "bitcoin_transfer") {
+        // Bitcoin transfer: debit crypto balance (no cash involved)
+        cryptoBalanceChange = -cryptoAmountDifference; // Increase in crypto amount debits more BTC
       }
     } else if (transaction.category === "Transfer") {
       // Transfers between checking and savings
@@ -447,9 +457,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (isCrypto) {
       transaction.cryptoAmount = cryptoAmount;
       transaction.cryptoPrice = cryptoPrice || 0;
+      transaction.recipientWallet = recipientWallet || "";
     } else {
       transaction.cryptoAmount = undefined;
       transaction.cryptoPrice = undefined;
+      transaction.recipientWallet = undefined;
     }
     console.log("DEBUG: Updated transaction:", JSON.stringify(transaction, null, 2));
     await transaction.save({ session });
@@ -486,6 +498,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         cryptoAmount: transaction.cryptoAmount || 0,
         cryptoPrice: transaction.cryptoPrice || 0,
         transferId: transaction.transferId || "",
+        recipientWallet: transaction.recipientWallet || "",
       },
       user: {
         id: user._id.toString(),

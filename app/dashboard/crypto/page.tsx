@@ -1,9 +1,10 @@
+// CryptoPage Component (Updated)
 "use client"
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { AlertCircle, ArrowDown, ArrowLeft, ArrowUp, Bitcoin, DollarSign, Loader2, ArrowDownUp } from "lucide-react"
+import { AlertCircle, ArrowDown, ArrowLeft, ArrowUp, Bitcoin, DollarSign, Loader2, ArrowDownUp, Send } from "lucide-react"
 import Color from 'color'
 
 import { Button } from "@/components/ui/button"
@@ -12,13 +13,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { useAuth } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
 // Define transaction interface for type safety
 interface Transaction {
   id: string
-  type: "buy" | "sell"
+  type: "buy" | "sell" | "bitcoin_transfer"
   amount: number
   value: number
   price: number
@@ -34,11 +36,13 @@ interface Colors {
 // Define raw transaction interface from API
 interface RawTransaction {
   _id: string
-  type: "crypto_buy" | "crypto_sell"
+  type: "crypto_buy" | "crypto_sell" | "bitcoin_transfer"
   cryptoAmount: number
   amount: number
   cryptoPrice: number
   date: string
+  memo?: string
+  recipientWallet?: string
 }
 
 export default function CryptoPage() {
@@ -60,8 +64,13 @@ export default function CryptoPage() {
   const [buyEquivalent, setBuyEquivalent] = useState<string>("0")
   const [sellAmount, setSellAmount] = useState<string>("")
   const [sellEquivalent, setSellEquivalent] = useState<string>("0")
+  const [sendAmount, setSendAmount] = useState<string>("")
+  const [sendWallet, setSendWallet] = useState<string>("")
+  const [sendMemo, setSendMemo] = useState<string>("")
   const [isBuySwapped, setIsBuySwapped] = useState<boolean>(false)
   const [isSellSwapped, setIsSellSwapped] = useState<boolean>(false)
+  const [showSendPopup, setShowSendPopup] = useState<boolean>(false)
+  const [pendingSend, setPendingSend] = useState<{ amount: number; wallet: string; memo: string } | null>(null)
 
   // Transaction history initialized as empty array
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -118,7 +127,7 @@ export default function CryptoPage() {
     return rawTransactions
       .filter((tx) => 
         tx._id && 
-        (tx.type === "crypto_buy" || tx.type === "crypto_sell") &&
+        (tx.type === "crypto_buy" || tx.type === "crypto_sell" || tx.type === "bitcoin_transfer") &&
         typeof tx.cryptoAmount === 'number' &&
         typeof tx.amount === 'number' &&
         typeof tx.cryptoPrice === 'number' &&
@@ -126,7 +135,7 @@ export default function CryptoPage() {
       )
       .map((tx) => ({
         id: tx._id,
-        type: tx.type === "crypto_buy" ? "buy" : "sell",
+        type: tx.type === "crypto_buy" ? "buy" : tx.type === "crypto_sell" ? "sell" : "bitcoin_transfer",
         amount: Math.abs(tx.cryptoAmount) || 0,
         value: Math.abs(tx.amount) || 0,
         price: tx.cryptoPrice || 0,
@@ -198,11 +207,9 @@ export default function CryptoPage() {
     if (buyAmount && btcPrice) {
       const amount = Number.parseFloat(buyAmount)
       if (!isBuySwapped) {
-        // Input is USD, calculate BTC
         const btc = amount / btcPrice
         setBuyEquivalent(btc.toFixed(8))
       } else {
-        // Input is BTC, calculate USD
         const usd = amount * btcPrice
         setBuyEquivalent(usd.toFixed(2))
       }
@@ -222,11 +229,9 @@ export default function CryptoPage() {
     if (sellAmount && btcPrice) {
       const amount = Number.parseFloat(sellAmount)
       if (!isSellSwapped) {
-        // Input is BTC, calculate USD
         const usdEquivalent = amount * btcPrice
         setSellEquivalent(usdEquivalent.toFixed(2))
       } else {
-        // Input is USD, calculate BTC
         const btcEquivalent = amount / btcPrice
         setSellEquivalent(btcEquivalent.toFixed(8))
       }
@@ -240,6 +245,13 @@ export default function CryptoPage() {
     setSellAmount("")
     setSellEquivalent("0")
   }, [isSellSwapped])
+
+  // Validate Bitcoin wallet address (simplified pattern for demonstration)
+  const validateWalletAddress = (address: string): boolean => {
+    // Bitcoin addresses typically start with 1, 3, or bc1 and are 26-35 characters long (simplified check)
+    const btcAddressPattern = /^(1|3|bc1)[A-Za-z0-9]{25,34}$/
+    return btcAddressPattern.test(address)
+  }
 
   // Handle buy BTC with real API call
   const handleBuyBTC = async () => {
@@ -320,10 +332,8 @@ export default function CryptoPage() {
 
     let btcToSell: number
     if (!isSellSwapped) {
-      // Input is BTC
       btcToSell = Number.parseFloat(sellAmount)
     } else {
-      // Input is USD, calculate BTC
       const usdAmount = Number.parseFloat(sellAmount)
       btcToSell = usdAmount / btcPrice
     }
@@ -371,6 +381,93 @@ export default function CryptoPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Handle send BTC with real API call
+  const handleSendBTC = async () => {
+    setError(null)
+    setSuccess(null)
+
+    if (!sendAmount || Number.parseFloat(sendAmount) <= 0) {
+      setError("Please enter a valid amount to send")
+      return
+    }
+
+    if (!sendWallet) {
+      setError("Please enter a recipient wallet address")
+      return
+    }
+
+    if (!validateWalletAddress(sendWallet)) {
+      setError("Invalid Bitcoin wallet address")
+      return
+    }
+
+    const btcToSend = Number.parseFloat(sendAmount)
+    if (btcToSend > cryptoBalance) {
+      setError("Insufficient BTC in your wallet")
+      return
+    }
+
+    // Show the popup before proceeding with the transaction
+    setPendingSend({ amount: btcToSend, wallet: sendWallet, memo: sendMemo })
+    setShowSendPopup(true)
+  }
+
+  // Confirm send BTC after popup
+  const confirmSendBTC = async () => {
+    if (!pendingSend) return
+
+    setIsLoading(true)
+    setShowSendPopup(false)
+
+    try {
+      const response = await apiFetch("/api/crypto-transfer", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "bitcoin_transfer",
+          amount: pendingSend.amount,
+          recipientWallet: pendingSend.wallet,
+          memo: pendingSend.memo,
+          btcPrice,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to send BTC")
+      }
+
+      const data = await response.json()
+      setCryptoBalance(data.newCryptoBalance || 0)
+      setCryptoValue((data.newCryptoBalance || 0) * btcPrice)
+      setSuccess(data.message)
+      setSendAmount("")
+      setSendWallet("")
+      setSendMemo("")
+
+      // Refetch transactions
+      const txResponse = await apiFetch("/api/transactions")
+      if (!txResponse.ok) throw new Error("Failed to fetch transactions")
+      const txData = await txResponse.json()
+      setTransactions(mapRawTransactions(txData.transactions || []))
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message !== 'Unauthorized') {
+        setError(error.message)
+      } else {
+        setError("Failed to complete the transfer")
+      }
+    } finally {
+      setIsLoading(false)
+      setPendingSend(null)
+    }
+  }
+
+  // Cancel send BTC from popup
+  const cancelSendBTC = () => {
+    setShowSendPopup(false)
+    setPendingSend(null)
+    setSuccess("Bitcoin transfer cancelled")
   }
 
   return (
@@ -456,10 +553,10 @@ export default function CryptoPage() {
           </Alert>
         )}
 
-        {/* Buy/Sell Tabs */}
+        {/* Buy/Sell/Send Tabs */}
         <div className="mb-8">
           <Tabs defaultValue="buy">
-            <TabsList className="grid w-full grid-cols-2 bg-primary-100/70 p-1 rounded-lg">
+            <TabsList className="grid w-full grid-cols-3 bg-primary-100/70 p-1 rounded-lg">
               <TabsTrigger
                 value="buy"
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
@@ -472,8 +569,15 @@ export default function CryptoPage() {
               >
                 Sell Bitcoin
               </TabsTrigger>
+              <TabsTrigger
+                value="send"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary-600 data-[state=active]:to-secondary-600 data-[state=active]:text-white rounded-md transition-all"
+              >
+                Send Bitcoin
+              </TabsTrigger>
             </TabsList>
 
+            {/* Buy Tab */}
             <TabsContent
               value="buy"
               className="p-6 backdrop-blur-sm bg-white/70 border border-primary-100 rounded-lg shadow-lg mt-4"
@@ -584,6 +688,7 @@ export default function CryptoPage() {
               </div>
             </TabsContent>
 
+            {/* Sell Tab */}
             <TabsContent
               value="sell"
               className="p-6 backdrop-blur-sm bg-white/70 border border-primary-100 rounded-lg shadow-lg mt-4"
@@ -716,8 +821,145 @@ export default function CryptoPage() {
                 </Button>
               </div>
             </TabsContent>
+
+            {/* Send Tab */}
+            <TabsContent
+              value="send"
+              className="p-6 backdrop-blur-sm bg-white/70 border border-primary-100 rounded-lg shadow-lg mt-4"
+            >
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="sendWallet" className="text-primary-800 font-medium">
+                    Recipient Wallet Address
+                  </Label>
+                  <Input
+                    id="sendWallet"
+                    type="text"
+                    placeholder="Enter Bitcoin wallet address"
+                    className="border-primary-200 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    value={sendWallet}
+                    onChange={(e) => setSendWallet(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="sendAmount" className="text-primary-800 font-medium">
+                    Amount (BTC)
+                  </Label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                      <Bitcoin className="h-4 w-4 text-amber-500" />
+                    </div>
+                    <Input
+                      id="sendAmount"
+                      type="number"
+                      min="0.00000001"
+                      step="0.00000001"
+                      className="pl-8 border-primary-200 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                      placeholder="0.00000000"
+                      value={sendAmount}
+                      onChange={(e) => setSendAmount(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-primary-700">Available: {cryptoBalance.toFixed(8)} BTC</span>
+                    <button
+                      type="button"
+                      className="text-secondary-600 hover:text-secondary-700 font-medium"
+                      onClick={() => setSendAmount(cryptoBalance.toString())}
+                    >
+                      Max
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="sendMemo" className="text-primary-800 font-medium">
+                    Memo (Optional)
+                  </Label>
+                  <Input
+                    id="sendMemo"
+                    type="text"
+                    placeholder="Add a note"
+                    className="border-primary-200 bg-white/50 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                    value={sendMemo}
+                    onChange={(e) => setSendMemo(e.target.value)}
+                  />
+                </div>
+
+                <Button
+                  className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1"
+                  onClick={handleSendBTC}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Send Bitcoin"
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
           </Tabs>
         </div>
+
+        {/* Send Confirmation Popup */}
+        <Dialog open={showSendPopup} onOpenChange={setShowSendPopup}>
+          <DialogContent className="sm:max-w-[425px]">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-primary-900">Payment Sent</h2>
+              <button onClick={cancelSendBTC} className="text-primary-700">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex justify-center my-4">
+              <Bitcoin className="h-12 w-12 text-amber-500" />
+            </div>
+            <p className="text-center text-primary-900">
+              Payment of {pendingSend?.amount.toFixed(8)} BTC is sent successfully!
+            </p>
+            <p className="text-center text-sm text-primary-700 mt-2">
+              Some accounts may not receive it immediately and will need you to call support at (323) 374-3366
+            </p>
+            <div className="mt-4 space-y-2">
+              <div className="flex justify-between text-sm text-primary-800">
+                <span>BTC Wallet</span>
+                <span className="font-medium">{pendingSend?.wallet}</span>
+              </div>
+              <div className="flex justify-between text-sm text-primary-800">
+                <span>Amount</span>
+                <span className="font-medium">{pendingSend?.amount.toFixed(8)} BTC</span>
+              </div>
+              <div className="flex justify-between text-sm text-primary-800">
+                <span>From Account</span>
+                <span className="font-medium">Crypto Wallet [...last 4]</span>
+              </div>
+              <div className="flex justify-between text-sm text-primary-800">
+                <span>Memo</span>
+                <span className="font-medium">{pendingSend?.memo || "N/A"}</span>
+              </div>
+            </div>
+            <Button
+              onClick={cancelSendBTC}
+              className="w-full mt-4 bg-transparent border border-primary-600 text-primary-600 hover:bg-primary-50"
+            >
+              Cancel Payment
+            </Button>
+            {/* Automatically confirm after 5 seconds if not cancelled */}
+            {showSendPopup && (
+              <div className="hidden">
+                {setTimeout(() => {
+                  if (showSendPopup) confirmSendBTC()
+                }, 10000)}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Transaction History */}
         <div>
@@ -742,14 +984,22 @@ export default function CryptoPage() {
                       <tr key={tx.id} className="hover:bg-primary-50/50 transition-colors">
                         <td className="p-4">
                           <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${tx.type === "buy" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              tx.type === "buy"
+                                ? "bg-green-100 text-green-800"
+                                : tx.type === "sell"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}
                           >
                             {tx.type === "buy" ? (
                               <ArrowUp className="mr-1 h-3 w-3" />
-                            ) : (
+                            ) : tx.type === "sell" ? (
                               <ArrowDown className="mr-1 h-3 w-3" />
+                            ) : (
+                              <Send className="mr-1 h-3 w-3" />
                             )}
-                            {tx.type === "buy" ? "Buy" : "Sell"}
+                            {tx.type === "buy" ? "Buy" : tx.type === "sell" ? "Sell" : "Send"}
                           </span>
                         </td>
                         <td className="p-4">
