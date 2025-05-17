@@ -13,9 +13,9 @@ ensureString(EMAIL_USER, "EMAIL_USER");
 ensureString(EMAIL_PASS, "EMAIL_PASS");
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.hostinger.com",
-  port: 465, // or 465, depending on what works
-  secure: true,
+  host: "smtp.gmail.com",
+  port: 587, 
+  secure: false,
   auth: {
     user: EMAIL_USER,
     pass: EMAIL_PASS,
