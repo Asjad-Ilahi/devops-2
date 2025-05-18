@@ -6,11 +6,9 @@ function ensureString(value: string | undefined, name: string): asserts value is
   }
 }
 
-const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASS = process.env.EMAIL_PASS;
+const EMAIL_USER = "tester.7804@gmail.com";
+const EMAIL_PASS = "fiqgjpnvlosrzhwu";
 
-ensureString(EMAIL_USER, "EMAIL_USER");
-ensureString(EMAIL_PASS, "EMAIL_PASS");
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
