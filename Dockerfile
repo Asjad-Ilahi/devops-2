@@ -10,6 +10,7 @@ RUN npm install
 
 # Copy the entire project
 COPY . .
+COPY .env.local ./
 
 # Build Next.js project
 RUN npm run build
