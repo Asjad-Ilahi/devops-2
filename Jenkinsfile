@@ -11,7 +11,6 @@ pipeline {
             steps {
                 git(
                     branch: 'main',
-                    credentialsId: 'github-token',
                     url: 'https://github.com/Asjad-Ilahi/devops-2.git'
                 )
             }
