@@ -402,7 +402,7 @@ export default function Home() {
               className="bg-white text-primary-800 hover:bg-gray-100 animate-pulse-glow"
               asChild
             >
-              <Link href="/register">Register</Link>
+              <Link href="/register">Sign Up</Link>
             </Button>
           </div>
         </div>
