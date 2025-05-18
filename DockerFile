@@ -12,7 +12,7 @@ RUN npm install
 COPY . .
 
 # Build Next.js project
-#RUN npm run build
+RUN npm run build
 
 # Expose and run
 EXPOSE 3000
