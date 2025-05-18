@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET
+const JWT_SECRET = "iuB2C7z9"
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('Authorization')

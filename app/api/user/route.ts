@@ -4,7 +4,7 @@ import User from "@/models/User";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs"; // Add bcrypt for password hashing
 
-const JWT_SECRET = process.env.JWT_SECRET || "";
+const JWT_SECRET = process.env.JWT_SECRET || "3456789";
 
 export async function GET(req: NextRequest) {
   await dbConnect();

@@ -8,7 +8,7 @@ interface CustomJwtPayload extends JwtPayload {
   userId: string;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = 'iuB2C7z9';
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET is not defined in environment variables");
 }

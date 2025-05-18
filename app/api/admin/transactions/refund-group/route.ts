@@ -4,7 +4,7 @@ import Transaction from "@/models/Transaction";
 import User from "@/models/User";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "";
+const JWT_SECRET = process.env.JWT_SECRET || "234567890";
 
 export async function POST(req: NextRequest) {
   await dbConnect();
