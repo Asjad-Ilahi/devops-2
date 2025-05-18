@@ -12,7 +12,7 @@ pipeline {
                 git(
                     branch: 'main',
                     credentialsId: 'github-token',
-                    url: 'https://github.com/Rayyan-Imtiaz/colorpalette/'
+                    url: 'https://github.com/Asjad-Ilahi/devops-2.git'
                 )
             }
         }
