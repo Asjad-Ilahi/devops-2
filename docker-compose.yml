@@ -1,16 +1,7 @@
 version: '3.8'
-
 services:
   web:
-    build:
-      context: .
-      args:
-        MONGODB_URI: ${MONGODB_URI}
-        EMAIL_USER: ${EMAIL_USER}
-        EMAIL_PASS: ${EMAIL_PASS}
-        JWT_SECRET: ${JWT_SECRET}
-        CRYPTO_KEY: ${CRYPTO_KEY}
-        NEXT_PUBLIC_CRYPTO_KEY: ${NEXT_PUBLIC_CRYPTO_KEY}
+    build: .
     container_name: jenkins_app
     ports:
       - '4000:3000'
@@ -18,7 +9,6 @@ services:
       - .env.local
     depends_on:
       - mongo
-
   mongo:
     image: mongo:6.0
     container_name: mongo_db
@@ -26,6 +16,5 @@ services:
       - '27017:27017'
     volumes:
       - mongodb_data:/data/db
-
 volumes:
   mongodb_data:
