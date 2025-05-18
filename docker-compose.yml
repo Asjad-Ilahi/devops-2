@@ -5,8 +5,6 @@ services:
     container_name: jenkins_app
     ports:
       - '4000:3000'
-    env_file:
-      - .env.local
     depends_on:
       - mongo
   mongo:
